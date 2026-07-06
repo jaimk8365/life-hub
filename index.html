@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Jaimi's Life Hub</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Life Hub" />
+<meta name="theme-color" content="#F7F3EC" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icons/icon-180.png" />
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#F7F3EC; --card:#FFFFFF; --ink:#2B2722; --ink-soft:#6B655C; --ink-faint:#A39C90;
+    --line:#E7E0D4; --coral:#E8927C; --mint:#7FB79B; --sunshine:#E6B855;
+    --rail-w:210px; --tabbar-h:62px;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
+
+  /* ---- frames ---- */
+  .stage{position:fixed;top:0;right:0;bottom:calc(var(--tabbar-h) + var(--sab));left:0;background:var(--paper)}
+  .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--paper)}
+  .stage iframe.active{display:block}
+  .stage iframe#f-quest{background:#0b0716}
+
+  /* ---- phone: bottom tab bar ---- */
+  nav{
+    position:fixed;left:0;right:0;bottom:0;height:calc(var(--tabbar-h) + var(--sab));
+    padding:6px 10px calc(6px + var(--sab));
+    background:rgba(252,250,245,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);display:flex;gap:6px;z-index:10;
+  }
+  nav button{
+    flex:1;border:0;background:transparent;font-family:inherit;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    border-radius:14px;color:var(--ink-faint);font-size:10.5px;font-weight:700;letter-spacing:.04em;
+    transition:all .15s;padding:4px 0;
+  }
+  nav button .ico{font-size:21px;line-height:1;filter:grayscale(.85);opacity:.75;transition:all .15s}
+  nav button.active{color:var(--ink);background:rgba(232,146,124,.13)}
+  nav button.active .ico{filter:none;opacity:1;transform:scale(1.08)}
+
+  /* ---- iPad / Mac: left rail ---- */
+  @media (min-width:760px){
+    .stage{top:0;bottom:0;left:var(--rail-w)}
+    nav{
+      top:0;bottom:0;left:0;right:auto;width:var(--rail-w);height:auto;
+      flex-direction:column;justify-content:flex-start;gap:6px;
+      padding:calc(20px + var(--sat)) 14px 20px;border-top:0;border-right:1px solid var(--line);
+    }
+    nav::before{
+      content:"Jaimi's Life Hub";
+      font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:-.01em;
+      display:block;padding:6px 10px 18px;color:var(--ink);
+    }
+    nav button{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:11px;padding:12px 13px;font-size:14px;letter-spacing:0;border-radius:13px}
+    nav button .ico{font-size:19px}
+    nav .spacer{flex:1}
+    nav .foot{font-size:11px;color:var(--ink-faint);padding:0 10px;line-height:1.5}
+  }
+  @media (max-width:759px){ nav .foot{display:none} nav .spacer{display:none} }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <iframe id="f-hub" title="Life Hub"></iframe>
+    <iframe id="f-quest" title="Night Court Questkeeper"></iframe>
+    <iframe id="f-course" title="Steady — 6 week ADHD course"></iframe>
+  </div>
+
+  <nav>
+    <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
+    <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
+    <button id="b-course" onclick="show('course')"><span class="ico">🌱</span><span>Course</span></button>
+    <span class="spacer"></span>
+    <span class="foot">One calm place for everything.<br>Ask Claude to “refresh my hub” for fresh data.</span>
+  </nav>
+
+<script>
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html' };
+  function show(which){
+    for (const k of Object.keys(SRC)){
+      const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);
+      const on = k === which;
+      if (on && !f.src) f.src = SRC[k];          // lazy-load each section once
+      f.classList.toggle('active', on);
+      b.classList.toggle('active', on);
+    }
+    try { localStorage.setItem('lifehub_tab', which); } catch(e){}
+    document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
+  }
+  show(localStorage.getItem('lifehub_tab') || 'hub');
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body>
+</html>
