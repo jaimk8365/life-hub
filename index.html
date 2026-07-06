@@ -68,7 +68,30 @@
     nav .spacer{flex:1}
     nav .foot{font-size:11px;color:var(--ink-faint);padding:0 10px;line-height:1.5}
   }
-  @media (max-width:759px){ nav .foot{display:none} nav .spacer{display:none} }
+  @media (max-width:759px){ nav .foot{display:none} nav .spacer{display:none} nav button.syncbtn{flex:.65} }
+
+  /* ---- sync button + panel ---- */
+  .syncbtn .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--ink-faint);transition:background .3s}
+  .syncbtn .dot.ok{background:var(--mint)}
+  .syncbtn .dot.err{background:#C75B45}
+  .syncbtn .dot.locked{background:var(--sunshine)}
+  .syncbtn .dot.busy{background:var(--sunshine);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .syncpanel{position:fixed;z-index:30;right:12px;bottom:calc(var(--tabbar-h) + var(--sab) + 10px);left:12px;max-width:430px;margin-left:auto;
+    background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 40px rgba(43,39,34,.18);padding:20px}
+  @media (min-width:760px){ .syncpanel{left:calc(var(--rail-w) + 14px);right:auto;bottom:14px;width:410px} }
+  .syncpanel h2{font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin-bottom:8px}
+  .syncpanel p{font-size:13px;color:var(--ink-soft);line-height:1.55;margin-bottom:10px}
+  .syncpanel a{color:#2563eb;font-weight:600}
+  .syncpanel input{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-family:inherit;font-size:14px;background:var(--paper-2);outline:none}
+  .syncpanel input:focus{border-color:var(--coral);box-shadow:0 0 0 3px rgba(232,146,124,.14)}
+  .syncpanel .row{display:flex;gap:8px;margin-top:10px}
+  .syncpanel .row button{flex:1;border:0;border-radius:11px;padding:11px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  .syncpanel .primary{background:var(--ink);color:#fff}
+  .syncpanel .soft{background:var(--line-soft);color:var(--ink)}
+  .syncpanel .msg{font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
+  .syncpanel .msg.bad{color:#C75B45}
+  .syncpanel .msg.good{color:#5E9277}
 </style>
 </head>
 <body>
@@ -82,9 +105,16 @@
     <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-course" onclick="show('course')"><span class="ico">🌱</span><span>Course</span></button>
+    <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
     <span class="foot">One calm place for everything.<br>Ask Claude to “refresh my hub” for fresh data.</span>
   </nav>
+
+  <div class="syncpanel" id="syncPanel" hidden>
+    <h2>🔄 Device sync</h2>
+    <div id="syncBody"></div>
+    <div class="msg" id="syncMsg"></div>
+  </div>
 
 <script>
   const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html' };
@@ -99,9 +129,61 @@
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
   }
-  show(localStorage.getItem('lifehub_tab') || 'hub');
+  // wait for the sync engine's first pull (or its ready signal) so sections open on fresh data
+  let booted = false;
+  const boot = () => { if (booted) return; booted = true; show(localStorage.getItem('lifehub_tab') || 'hub'); };
+  window.addEventListener('lifehub-sync-ready', boot, { once: true });
+  setTimeout(boot, 7000);
+
+  /* ---- sync panel ---- */
+  function toggleSync(){
+    const p = document.getElementById('syncPanel');
+    p.hidden = !p.hidden;
+    if (!p.hidden) renderSync();
+  }
+  function renderSync(){
+    const s = LifeHubSync.state();
+    const body = document.getElementById('syncBody');
+    if (!s.on){
+      body.innerHTML = `
+        <p><b>Keep iPhone, iPad &amp; Mac in step.</b> Quest progress, course answers and cleaning-schedule edits sync through your own GitHub account — encrypted with your passcode before they leave the device, so GitHub only ever stores scrambled text.</p>
+        <p>One-time setup on each device: <a href="https://github.com/settings/tokens/new?scopes=gist&description=Life%20Hub%20sync" target="_blank" rel="noopener">tap here to create your sync token</a> (everything's pre-filled — just press the green <b>Generate token</b> button at the bottom), copy the code it shows, and paste it below.</p>
+        <input id="tokIn" type="password" placeholder="Paste token here (ghp_…)" autocomplete="off" />
+        <div class="row"><button class="primary" onclick="connectSync()">Turn on sync</button></div>`;
+    } else {
+      const last = s.last ? new Date(s.last).toLocaleString('en-AU',{hour:'numeric',minute:'2-digit',day:'numeric',month:'short'}) : 'not yet';
+      const line = s.status==='err' ? '⚠️ ' + (s.detail || 'Sync problem — will retry.') :
+                   s.status==='locked' ? '🔒 Unlock the Life Hub tab once on this device, then sync can run.' :
+                   s.status==='busy' ? 'Syncing…' : '✓ Sync is on. Last synced: ' + last + '.';
+      body.innerHTML = `
+        <p>${line}</p>
+        <div class="row">
+          <button class="primary" onclick="LifeHubSync.syncNow()">Sync now</button>
+          <button class="soft" onclick="if(confirm('Turn sync off on this device? Nothing is deleted — this device just stops syncing.')){LifeHubSync.disconnect();renderSync();}">Turn off</button>
+        </div>`;
+    }
+    document.getElementById('syncMsg').textContent = '';
+  }
+  async function connectSync(){
+    const msg = document.getElementById('syncMsg');
+    msg.className = 'msg'; msg.textContent = 'Connecting…';
+    try {
+      await LifeHubSync.connect(document.getElementById('tokIn').value);
+      renderSync();
+      msg.className = 'msg good'; msg.textContent = 'Connected — this device now syncs ✓';
+    } catch(e){
+      msg.className = 'msg bad'; msg.textContent = e.message;
+    }
+  }
+  document.addEventListener('lifehub-sync-state', (e) => {
+    const d = document.getElementById('syncDot');
+    d.className = 'dot ' + ({ok:'ok', err:'err', busy:'busy', locked:'locked'}[e.detail.status] || '');
+    const p = document.getElementById('syncPanel');
+    if (!p.hidden && e.detail.status !== 'busy') renderSync();
+  });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
+<script src="./sync.js"></script>
 </body>
 </html>

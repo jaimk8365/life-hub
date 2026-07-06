@@ -19,6 +19,19 @@ localStorage on each device.
 
 To rebuild the course after editing its source: `node tools/build-hub.mjs src/course.html course/index.html`
 
+## Device sync
+
+`sync.js` (loaded by the shell) mirrors three localStorage keys — `steady_*` (course),
+`nightcourt-*` (Questkeeper), `hq_*` (hub cleaning edits) — into ONE secret GitHub Gist
+(`lifehub-sync.enc.json`), **encrypted on-device with the hub passcode** (PBKDF2 300k +
+AES-256-GCM) so GitHub only stores ciphertext. Setup per device via the Sync button: paste a
+classic PAT with only the `gist` scope (create at
+github.com/settings/tokens/new?scopes=gist&description=Life%20Hub%20sync). The token lives in
+that device's localStorage; revoking it on GitHub kills sync everywhere it was used.
+Conflicts are last-write-wins per key. Pulls happen on app open/foreground + every 60s;
+pushes ~2.5s after an edit. Changing the passcode means the gist can't be decrypted by old
+data — after a passcode change, clear the gist to `{}` and let devices re-push.
+
 ## Refreshing (Claude does this on "refresh my hub")
 
 1. Update `/Users/jaimikyte/Desktop/jaimi-hq.html` as usual (LIVE snapshot + both synced-at consts).
