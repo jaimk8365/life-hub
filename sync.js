@@ -13,6 +13,7 @@ const TRACKED = [
   { prefix: 'hq_',         frame: 'f-hub'     },  // hub cleaning-schedule edits
   { prefix: 'nightcourt-', frame: 'f-quest'   },  // all Questkeeper data
   { prefix: 'fin_',        frame: 'f-finance' },  // Money — accounts, transactions
+  { prefix: 'kit_',        frame: 'f-kitchen' },  // Kitchen — recipes, plans, shopping, pantry
 ];
 const T_KEY = 'lifehub_gh_token', G_KEY = 'lifehub_gist_id',
       M_KEY = 'lifehub_sync_meta', LAST_KEY = 'lifehub_sync_last';
