@@ -101,6 +101,7 @@
     <iframe id="f-course" title="Steady — 6 week ADHD course"></iframe>
     <iframe id="f-finance" title="Money"></iframe>
     <iframe id="f-kitchen" title="Kitchen"></iframe>
+    <iframe id="f-home" title="Home"></iframe>
   </div>
 
   <nav>
@@ -109,6 +110,7 @@
     <button id="b-course" onclick="show('course')"><span class="ico">🌱</span><span>Course</span></button>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Money</span></button>
     <button id="b-kitchen" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
+    <button id="b-home" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
     <span class="foot">One calm place for everything.<br>Ask Claude to “refresh my hub” for fresh data.</span>
@@ -121,7 +123,7 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html' };
   function show(which){
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);

@@ -14,6 +14,7 @@ const TRACKED = [
   { prefix: 'nightcourt-', frame: 'f-quest'   },  // all Questkeeper data
   { prefix: 'fin_',        frame: 'f-finance' },  // Money — accounts, transactions
   { prefix: 'kit_',        frame: 'f-kitchen' },  // Kitchen — recipes, plans, shopping, pantry
+  { prefix: 'home_',       frame: 'f-home'    },  // Home — tasks, completion log, reminder queue
 ];
 const T_KEY = 'lifehub_gh_token', G_KEY = 'lifehub_gist_id',
       M_KEY = 'lifehub_sync_meta', LAST_KEY = 'lifehub_sync_last';
