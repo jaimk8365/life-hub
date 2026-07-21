@@ -103,10 +103,12 @@
     <iframe id="f-kitchen" title="Kitchen"></iframe>
     <iframe id="f-home" title="Home"></iframe>
     <iframe id="f-admin" title="Life Admin"></iframe>
+    <iframe id="f-plan" title="My Day"></iframe>
   </div>
 
   <nav>
     <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
+    <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Day</span></button>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Money</span></button>
@@ -125,7 +127,7 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html' };
   function show(which){
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);

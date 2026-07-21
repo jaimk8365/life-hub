@@ -16,6 +16,7 @@ const TRACKED = [
   { prefix: 'kit_',        frame: 'f-kitchen' },  // Kitchen — recipes, plans, shopping, pantry
   { prefix: 'home_',       frame: 'f-home'    },  // Home — tasks, completion log, reminder queue
   { prefix: 'la_',         frame: 'f-admin'   },  // Life Admin — recurring dates, bills, appointments
+  { prefix: 'plan_',       frame: 'f-plan'    },  // My Day — visual day planner blocks + completions
 ];
 const T_KEY = 'lifehub_gh_token', G_KEY = 'lifehub_gist_id',
       M_KEY = 'lifehub_sync_meta', LAST_KEY = 'lifehub_sync_last';
