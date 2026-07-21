@@ -92,6 +92,18 @@
   .syncpanel .msg{font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
   .syncpanel .msg.bad{color:#C75B45}
   .syncpanel .msg.good{color:#5E9277}
+
+  /* ---- More menu (phone only; iPad/Mac rail shows every section) ---- */
+  .morebtn{display:none}
+  @media (max-width:759px){ nav button.sec{display:none} .morebtn{display:flex} }
+  .morepanel{position:fixed;z-index:30;left:12px;right:12px;bottom:calc(var(--tabbar-h) + var(--sab) + 10px);
+    background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 40px rgba(43,39,34,.18);padding:10px}
+  .morepanel h2{font-family:'Fraunces',serif;font-size:14px;font-weight:600;color:var(--ink-faint);margin:6px 10px 6px;text-transform:uppercase;letter-spacing:.06em}
+  .morepanel button{display:flex;align-items:center;gap:13px;width:100%;border:0;background:transparent;font-family:inherit;
+    font-size:15.5px;font-weight:600;color:var(--ink);padding:13px 12px;border-radius:13px;cursor:pointer;text-align:left}
+  .morepanel button .ico{font-size:20px}
+  .morepanel button:active{background:var(--line-soft)}
+  .morepanel button.on{background:rgba(232,146,124,.13)}
 </style>
 </head>
 <body>
@@ -109,16 +121,25 @@
   <nav>
     <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
     <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Day</span></button>
-    <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Money</span></button>
-    <button id="b-kitchen" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
-    <button id="b-home" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
-    <button id="b-admin" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
+    <button id="b-quest" class="sec" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
+    <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
+    <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
+    <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
+    <button id="b-more" class="morebtn" onclick="toggleMore()"><span class="ico">⋯</span><span>More</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
     <span class="foot">One calm place for everything.<br>Ask Claude to “refresh my hub” for fresh data.</span>
   </nav>
+
+  <div class="morepanel" id="morePanel" hidden>
+    <h2>More</h2>
+    <button onclick="showFromMore('quest')"><span class="ico">🌙</span>Quests</button>
+    <button onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
+    <button onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
+    <button onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
+  </div>
 
   <div class="syncpanel" id="syncPanel" hidden>
     <h2>🔄 Device sync</h2>
@@ -138,7 +159,25 @@
     }
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
+    // on phone, highlight "More" when a tucked-away section is showing
+    const inMore = ['quest','kitchen','home','admin'].includes(which);
+    const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
+    const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
+  /* ---- More menu (phone) ---- */
+  function toggleMore(){
+    const p = document.getElementById('morePanel');
+    document.getElementById('syncPanel').hidden = true;
+    p.hidden = !p.hidden;
+    if (!p.hidden){ const cur = localStorage.getItem('lifehub_tab');
+      p.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.getAttribute('onclick').includes("'"+cur+"'"))); }
+  }
+  function showFromMore(which){ document.getElementById('morePanel').hidden = true; show(which); }
+  document.addEventListener('click', (e)=>{
+    const p = document.getElementById('morePanel');
+    if (!p || p.hidden) return;
+    if (!p.contains(e.target) && !e.target.closest('#b-more')) p.hidden = true;
+  });
   // wait for the sync engine's first pull (or its ready signal) so sections open on fresh data
   let booted = false;
   const boot = () => { if (booted) return; booted = true; show(localStorage.getItem('lifehub_tab') || 'hub'); };
