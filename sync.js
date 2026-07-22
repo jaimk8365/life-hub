@@ -11,7 +11,8 @@ const API = 'https://api.github.com';
 const TRACKED = [
   { prefix: 'steady_',     frame: 'f-course'  },  // course answers/progress
   { prefix: 'hq_',         frame: 'f-hub'     },  // hub cleaning-schedule edits
-  { prefix: 'nightcourt-', frame: 'f-quest'   },  // all Questkeeper data
+  { prefix: 'nightcourt-', frame: 'f-quest'   },  // Questkeeper mirror (My Planner bridge)
+  { prefix: 'ncg_',        frame: 'f-quest'   },  // Night Court game — full save (xp, quests, sigils, constellations)
   { prefix: 'fin_',        frame: 'f-finance' },  // Money — accounts, transactions
   { prefix: 'kit_',        frame: 'f-kitchen' },  // Kitchen — recipes, plans, shopping, pantry
   { prefix: 'home_',       frame: 'f-home'    },  // Home — tasks, completion log, reminder queue
