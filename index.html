@@ -123,7 +123,7 @@
     <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Planner</span></button>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Money</span></button>
-    <button id="b-quest" class="sec" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
+    <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
     <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
@@ -135,7 +135,6 @@
 
   <div class="morepanel" id="morePanel" hidden>
     <h2>More</h2>
-    <button onclick="showFromMore('quest')"><span class="ico">🌙</span>Quests</button>
     <button onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
     <button onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
     <button onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
@@ -160,7 +159,7 @@
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
     // on phone, highlight "More" when a tucked-away section is showing
-    const inMore = ['quest','kitchen','home','admin'].includes(which);
+    const inMore = ['kitchen','home','admin'].includes(which);
     const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
