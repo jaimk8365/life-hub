@@ -1,5 +1,5 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v2';
+const CACHE = 'lifehub-v3';
 const PRECACHE = [
   './', './index.html', './manifest.webmanifest', './sync.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
