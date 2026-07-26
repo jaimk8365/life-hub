@@ -116,6 +116,7 @@
     <iframe id="f-home" title="Home"></iframe>
     <iframe id="f-admin" title="Life Admin"></iframe>
     <iframe id="f-plan" title="My Planner"></iframe>
+    <iframe id="f-reading" title="Book Journal"></iframe>
   </div>
 
   <nav>
@@ -127,6 +128,7 @@
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
     <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
+    <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📖</span><span>Books</span></button>
     <button id="b-more" class="morebtn" onclick="toggleMore()"><span class="ico">⋯</span><span>More</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
@@ -138,6 +140,7 @@
     <button onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
     <button onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
     <button onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
+    <button onclick="showFromMore('reading')"><span class="ico">📖</span>Book Journal</button>
   </div>
 
   <div class="syncpanel" id="syncPanel" hidden>
@@ -147,7 +150,7 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', reading:'./reading/index.html' };
   function show(which){
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);
@@ -159,7 +162,7 @@
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
     // on phone, highlight "More" when a tucked-away section is showing
-    const inMore = ['kitchen','home','admin'].includes(which);
+    const inMore = ['kitchen','home','admin','reading'].includes(which);
     const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
