@@ -22,6 +22,7 @@ if (!dataPath) { console.error('usage: update-plan-feed.mjs <data.json>'); proce
 const data = JSON.parse(readFileSync(dataPath, 'utf8'));
 for (const k of ['events', 'reminders']) if (!Array.isArray(data[k])) { console.error(`missing array: ${k}`); process.exit(1); }
 if (!('updatedAt' in data)) data.updatedAt = null;
+if (!data.updatedISO) data.updatedISO = new Date().toISOString();   // powers the planner's freshness pill
 
 const html = readFileSync(SRC, 'utf8');
 const s = html.indexOf(START), e = html.indexOf(END);
