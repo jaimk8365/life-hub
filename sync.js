@@ -19,6 +19,7 @@ const TRACKED = [
   { prefix: 'la_',         frame: 'f-admin'   },  // Life Admin — recurring dates, bills, appointments
   { prefix: 'plan_',       frame: 'f-plan'    },  // My Day — visual day planner blocks + completions
   { prefix: 'book_',       frame: 'f-reading' },  // Book Journal — books, quotes, reading goal, moods
+  { prefix: 'bty_',        frame: 'f-beauty'  },  // Beauty & Self-care — products, treatments, routine
 ];
 const T_KEY = 'lifehub_gh_token', G_KEY = 'lifehub_gist_id',
       M_KEY = 'lifehub_sync_meta', LAST_KEY = 'lifehub_sync_last';
