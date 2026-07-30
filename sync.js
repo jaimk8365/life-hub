@@ -199,6 +199,28 @@ window.LifeHubSync = {
     localStorage.removeItem(G_KEY);
     setState('off', '');
   },
+  /* ---- full local backup/restore — every tracked key, plaintext JSON,
+     downloaded to the device (not uploaded anywhere). Separate from the
+     encrypted gist sync above; this is a manual "just in case" copy. ---- */
+  exportAll(){
+    const out = { exportedAt: new Date().toISOString(), keys: {} };
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (isTracked(k)) out.keys[k] = localStorage.getItem(k);
+    }
+    return out;
+  },
+  importAll(payload, mode){ // mode: 'merge' (default, newer wins by writing all) or 'skip-existing'
+    let n = 0;
+    const keys = (payload && payload.keys) || {};
+    for (const k of Object.keys(keys)){
+      if (!isTracked(k)) continue;
+      if (mode === 'skip-existing' && localStorage.getItem(k) != null) continue;
+      localStorage.setItem(k, keys[k]);
+      n++;
+    }
+    return n;
+  },
 };
 
 /* ---------- boot ---------- */

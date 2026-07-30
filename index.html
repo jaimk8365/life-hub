@@ -120,6 +120,7 @@
     <iframe id="f-beauty" title="Beauty & Self-care"></iframe>
     <iframe id="f-kids" title="Kids"></iframe>
     <iframe id="f-wardrobe" title="Wardrobe"></iframe>
+    <iframe id="f-family" title="Family"></iframe>
   </div>
 
   <nav>
@@ -135,6 +136,7 @@
     <button id="b-beauty" class="sec" onclick="show('beauty')"><span class="ico">💄</span><span>Beauty</span></button>
     <button id="b-kids" class="sec" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
     <button id="b-wardrobe" class="sec" onclick="show('wardrobe')"><span class="ico">👗</span><span>Wardrobe</span></button>
+    <button id="b-family" class="sec" onclick="show('family')"><span class="ico">👨‍👩‍👧‍👦</span><span>Family</span></button>
     <button id="b-more" class="morebtn" onclick="toggleMore()"><span class="ico">⋯</span><span>More</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
@@ -150,6 +152,7 @@
     <button onclick="showFromMore('beauty')"><span class="ico">💄</span>Beauty &amp; Self-care</button>
     <button onclick="showFromMore('kids')"><span class="ico">🧒</span>Kids</button>
     <button onclick="showFromMore('wardrobe')"><span class="ico">👗</span>Wardrobe</button>
+    <button onclick="showFromMore('family')"><span class="ico">👨‍👩‍👧‍👦</span>Family</button>
   </div>
 
   <div class="syncpanel" id="syncPanel" hidden>
@@ -159,7 +162,7 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
   function show(which){
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);
@@ -171,7 +174,7 @@
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
     // on phone, highlight "More" when a tucked-away section is showing
-    const inMore = ['kitchen','home','admin','reading','beauty','kids','wardrobe'].includes(which);
+    const inMore = ['kitchen','home','admin','reading','beauty','kids','wardrobe','family'].includes(which);
     const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
@@ -222,7 +225,45 @@
           <button class="soft" onclick="if(confirm('Turn sync off on this device? Nothing is deleted — this device just stops syncing.')){LifeHubSync.disconnect();renderSync();}">Turn off</button>
         </div>`;
     }
+    body.innerHTML += `
+      <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+        <p style="margin-bottom:8px"><b>Backup everything.</b> Downloads one file with every module's data — money, kids, wardrobe, all of it. It's <b>not encrypted</b> once it's on your device, so keep it somewhere private (not a shared drive).</p>
+        <div class="row">
+          <button class="soft" onclick="exportBackup()">⇩ Download backup</button>
+          <button class="soft" onclick="document.getElementById('importFile').click()">⇧ Restore from file</button>
+        </div>
+        <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importBackup(this.files[0])">
+      </div>`;
     document.getElementById('syncMsg').textContent = '';
+  }
+  function exportBackup(){
+    const data = LifeHubSync.exportAll();
+    const blob = new Blob([JSON.stringify(data, null, 1)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const d = new Date(); const stamp = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    a.download = `life-hub-backup-${stamp}.json`;
+    a.click();
+    const msg = document.getElementById('syncMsg');
+    msg.className = 'msg good'; msg.textContent = `Downloaded — ${Object.keys(data.keys).length} keys backed up ✓`;
+  }
+  function importBackup(file){
+    if (!file) return;
+    const msg = document.getElementById('syncMsg');
+    if (!confirm('Restore from this backup? Anything already saved with the same name (in any module) will be overwritten with the version in the backup.')){
+      document.getElementById('importFile').value = ''; return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        const n = LifeHubSync.importAll(data, 'merge');
+        msg.className = 'msg good'; msg.textContent = `Restored ${n} keys ✓ — switch tabs to see the refreshed data.`;
+        document.querySelectorAll('.stage iframe').forEach(f => { if (f.src) try { f.contentWindow.location.reload(); } catch(e){} });
+      } catch(e){ msg.className = 'msg bad'; msg.textContent = 'Couldn’t read that file — is it a Life Hub backup?'; }
+    };
+    r.readAsText(file);
+    document.getElementById('importFile').value = '';
   }
   async function connectSync(){
     const msg = document.getElementById('syncMsg');
