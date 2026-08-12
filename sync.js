@@ -9,6 +9,7 @@
 const FILE = 'lifehub-sync.enc.json';
 const API = 'https://api.github.com';
 const TRACKED = [
+  { prefix: 'hq_task_engine_', frame: 'f-tasks' }, // Task Engine — tasks, ideas and links
   { prefix: 'steady_',     frame: 'f-course'  },  // course answers/progress
   { prefix: 'hq_',         frame: 'f-hub'     },  // hub cleaning-schedule edits
   { prefix: 'nightcourt-', frame: 'f-quest'   },  // Questkeeper mirror (My Planner bridge)

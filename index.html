@@ -116,6 +116,7 @@
     <iframe id="f-home" title="Home"></iframe>
     <iframe id="f-admin" title="Life Admin"></iframe>
     <iframe id="f-plan" title="My Planner"></iframe>
+    <iframe id="f-tasks" title="Task Engine"></iframe>
     <iframe id="f-reading" title="Book Journal"></iframe>
     <iframe id="f-beauty" title="Beauty & Self-care"></iframe>
     <iframe id="f-kids" title="Kids"></iframe>
@@ -126,6 +127,7 @@
   <nav>
     <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
     <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Planner</span></button>
+    <button id="b-tasks" onclick="show('tasks')"><span class="ico">✅</span><span>Tasks</span></button>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Money</span></button>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
@@ -162,7 +164,7 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
   function show(which){
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);
