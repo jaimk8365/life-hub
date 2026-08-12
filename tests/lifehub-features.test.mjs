@@ -101,7 +101,7 @@ test('affected deployed pages decrypt and contain the new source features', asyn
 
 test('Matthew finance has the shared adaptive budget controls in source and encrypted output', async () => {
   const source=await text('src/partner-finance.html');
-  for(const marker of ['Budget by account','All budgets','Set as my default view','Minimum income','Overtime','Monthly forecast','Budget Review','Tracking to overspend','Adapt over-budget categories to new spending']) assert.match(source,new RegExp(marker));
+  for(const marker of ['Budget by account','All budgets','Set as my default view','Minimum income','Overtime','Household forecast','Budget Review','Tracking to overspend','Adapt over-budget categories to new spending']) assert.match(source,new RegExp(marker));
   assert.match(source,/finp_budget_view_v1/);
   const pass=(await readFile(new URL('.partner-key',root),'utf8')).trim();
   const page=await text('partner/index.html');
@@ -127,4 +127,11 @@ test('Matthew overview mirrors the shared household guidance and compact money c
   assert.match(finance,/SHARED_ACCT_IDS=.*'thea','levi'/);
   assert.match(finance,/periodicTransfers/);
   assert.match(finance,/lastTransactionDate/);
+});
+
+test('Matthew app uses the five-section decision layout without Jaimi private finance labels', async () => {
+  const partner=await text('src/partner-finance.html');
+  for(const marker of ['Overview','Household Plan','Accounts & Transfers','Check-up','My Money','What needs attention','Next major bills','Household forecast']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
+  for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(partner,privateLabel);
+  assert.equal((partner.match(/<button data-v=/g)||[]).length,5);
 });
