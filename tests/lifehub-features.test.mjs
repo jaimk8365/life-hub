@@ -112,3 +112,19 @@ test('Matthew finance has the shared adaptive budget controls in source and encr
   assert.match(html,/Budget Review/);
   assert.match(html,/Minimum income/);
 });
+
+test('finance overview help, transfer check, kids accounts and compact insights are present', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['How to use Money together','Last updated','Newest transaction included','Is $700/week enough?','Periodic transfers','Money flow','Everyday is the starting account','Thea Savings','Levi Savings','Money check-up','Live checks','Older notes','insightsMode']) assert.match(finance,new RegExp(marker.replace(/[?$]/g,'\\$&')));
+  assert.match(finance,/billsTransferCheck\(700\)/);
+  assert.match(finance,/openTransfer\(\)/);
+});
+
+test('Matthew overview mirrors the shared household guidance and compact money check-up', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const marker of ['How to use Our Money together','Last updated','Newest transaction included','Is $700/week enough?','Periodic transfers','Money flow','Everyday is the starting account','Money check-up','Live checks','Older notes','partnerInsightsMode']) assert.match(partner,new RegExp(marker.replace(/[?$]/g,'\\$&')));
+  assert.match(partner,/partnerBillsTransferCheck\(700\)/);
+  assert.match(finance,/SHARED_ACCT_IDS=.*'thea','levi'/);
+  assert.match(finance,/periodicTransfers/);
+  assert.match(finance,/lastTransactionDate/);
+});
