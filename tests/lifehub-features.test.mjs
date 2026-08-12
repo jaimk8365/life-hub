@@ -98,3 +98,17 @@ test('affected deployed pages decrypt and contain the new source features', asyn
   assert.match(await decrypt('plan/index.html'), /Attach Task/);
   assert.match(await decrypt('quest/index.html'), /Attach Task/);
 });
+
+test('Matthew finance has the shared adaptive budget controls in source and encrypted output', async () => {
+  const source=await text('src/partner-finance.html');
+  for(const marker of ['Budget by account','All budgets','Set as my default view','Minimum income','Overtime','Monthly forecast','Budget Review','Tracking to overspend','Adapt over-budget categories to new spending']) assert.match(source,new RegExp(marker));
+  assert.match(source,/finp_budget_view_v1/);
+  const pass=(await readFile(new URL('.partner-key',root),'utf8')).trim();
+  const page=await text('partner/index.html');
+  const take=n=>Buffer.from(page.match(new RegExp(`const ${n}\\s*= Uint8Array\\.from\\(atob\\('([^']+)'`))[1],'base64');
+  const salt=take('SALT'),iv=take('IV'),data=take('DATA'),tag=data.subarray(data.length-16),ct=data.subarray(0,-16);
+  const d=createDecipheriv('aes-256-gcm',pbkdf2Sync(pass,salt,300000,32,'sha256'),iv);d.setAuthTag(tag);
+  const html=Buffer.concat([d.update(ct),d.final()]).toString('utf8');
+  assert.match(html,/Budget Review/);
+  assert.match(html,/Minimum income/);
+});
