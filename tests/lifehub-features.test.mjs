@@ -87,6 +87,15 @@ test('House and Land loan pages expose redraw and linked offset tracking control
   assert.match(finance,/id==='land'/);
 });
 
+test('family savings correction targets the right accounts without replacing transaction history', async () => {
+  const finance=await text('src/finance.html');
+  assert.match(finance,/fin_family_savings_aug13_v1/);
+  assert.match(finance,/savings:\{balance:151\.30,num:'1302'\}/);
+  assert.match(finance,/thea:\{balance:0\.18\}/);
+  assert.match(finance,/levi:\{balance:50\.15\}/);
+  assert.match(finance,/a\.openBal=Math\.round\(\(fix\.balance-sumTo\)\*100\)\/100/);
+});
+
 test('shell, Planner, Quests and Finance contain visible integration controls', async () => {
   const [shell, plan, quest, finance, task] = await Promise.all([
     text('index.html'), text('src/plan.html'), text('src/quest.html'), text('src/finance.html'), text('src/task-engine/index.html')
