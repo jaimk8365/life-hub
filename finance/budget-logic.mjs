@@ -26,3 +26,25 @@ export function buildBudgetReview(categories, pace = 1) {
   const summary = over.length ? `${over.length} budget${over.length===1?' is':'s are'} over budget.` : watch.length ? `${watch.length} budget${watch.length===1?' is':'s are'} tracking ahead of pace.` : 'Your tracked budgets are on pace.';
   return { over, watch, wentWell, summary };
 }
+
+function simulateLoan(balance, ratePct, weeklyPayment, offset = 0) {
+  let owing=Math.max(0,+balance||0),interest=0,weeks=0;
+  const rate=(+ratePct||0)/100/52,payment=Math.max(0,+weeklyPayment||0),limit=5200;
+  if(!payment || payment<=Math.max(0,owing-offset)*rate) return {weeks:null,interest:null};
+  while(owing>0.005&&weeks<limit){
+    const charged=Math.max(0,owing-offset)*rate;
+    interest+=charged;
+    owing=Math.max(0,owing+charged-payment);
+    weeks++;
+  }
+  return weeks>=limit?{weeks:null,interest:null}:{weeks,interest};
+}
+
+export function calculateOffsetImpact({balance,ratePct,weeklyPayment,offsetBalances=[]}) {
+  const offsetTotal=offsetBalances.reduce((sum,value)=>sum+Math.max(0,+value||0),0);
+  const withoutOffset=simulateLoan(balance,ratePct,weeklyPayment,0);
+  const withOffset=simulateLoan(balance,ratePct,weeklyPayment,offsetTotal);
+  const interestSaved=withoutOffset.interest!=null&&withOffset.interest!=null?Math.max(0,withoutOffset.interest-withOffset.interest):null;
+  const weeksSaved=withoutOffset.weeks!=null&&withOffset.weeks!=null?Math.max(0,withoutOffset.weeks-withOffset.weeks):null;
+  return {offsetTotal,withoutOffset,withOffset,interestSaved,weeksSaved};
+}

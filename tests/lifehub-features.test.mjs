@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildBudgetReview, buildMonthlyForecast, groupBudgetByAccount } from '../finance/budget-logic.mjs';
+import { buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, groupBudgetByAccount } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -70,6 +70,21 @@ test('finance can group budget lines by spending account and review overspend pa
   assert.deepEqual(review.over.map(x => x.id), ['groceries']);
   assert.deepEqual(review.wentWell.map(x => x.id), ['fuel']);
   assert.equal(review.summary.includes('over budget'), true);
+});
+
+test('mortgage offset impact combines linked balances and reduces interest and payoff time', () => {
+  const impact=calculateOffsetImpact({balance:310000,ratePct:6.46,weeklyPayment:523.25,offsetBalances:[12000,8000,-50]});
+  assert.equal(impact.offsetTotal,20000);
+  assert.ok(impact.interestSaved>0);
+  assert.ok(impact.weeksSaved>0);
+  assert.ok(impact.withOffset.weeks<impact.withoutOffset.weeks);
+});
+
+test('House and Land loan pages expose redraw and linked offset tracking controls', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['Available redraw','Linked offset accounts','Total reducing interest','Estimated interest saved','Estimated time saved','Accounts offsetting this loan','offsetAccountIds','redrawAmount']) assert.match(finance,new RegExp(marker));
+  assert.match(finance,/id==='house'/);
+  assert.match(finance,/id==='land'/);
 });
 
 test('shell, Planner, Quests and Finance contain visible integration controls', async () => {
