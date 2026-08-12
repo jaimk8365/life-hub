@@ -96,6 +96,14 @@ test('family savings correction targets the right accounts without replacing tra
   assert.match(finance,/a\.openBal=Math\.round\(\(fix\.balance-sumTo\)\*100\)\/100/);
 });
 
+test('Money update controls avoid manual transactions and budget supports three time views', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['Update Money','Upload screenshot','Update balance only','Upload CSV','Weekly','Monthly','Yearly','budgetPeriod','budgetPeriodAmount','Miscellaneous / one-offs']) assert.match(finance,new RegExp(marker));
+  assert.match(finance,/class="fab" onclick="openMoneyUpdate\(\)"/);
+  assert.doesNotMatch(finance,/class="fab" onclick="openAdd\(\)"/);
+  assert.match(finance,/function accountsUpdateControls\(\)/);
+});
+
 test('shell, Planner, Quests and Finance contain visible integration controls', async () => {
   const [shell, plan, quest, finance, task] = await Promise.all([
     text('index.html'), text('src/plan.html'), text('src/quest.html'), text('src/finance.html'), text('src/task-engine/index.html')
