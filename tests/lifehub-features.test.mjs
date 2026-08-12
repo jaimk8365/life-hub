@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, groupBudgetByAccount } from '../finance/budget-logic.mjs';
+import { buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, classifyPayAgainstBase, groupBudgetByAccount } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -102,6 +102,16 @@ test('Money update controls avoid manual transactions and budget supports three 
   assert.match(finance,/class="fab" onclick="openMoneyUpdate\(\)"/);
   assert.doesNotMatch(finance,/class="fab" onclick="openAdd\(\)"/);
   assert.match(finance,/function accountsUpdateControls\(\)/);
+});
+
+test('wage deposits split above-base overtime and flag below-base pay', () => {
+  assert.deepEqual(classifyPayAgainstBase(2100,1650),{received:2100,base:1650,variance:450,overtime:450,shortfall:0,status:'significant_overtime'});
+  assert.deepEqual(classifyPayAgainstBase(1400,1650),{received:1400,base:1650,variance:-250,overtime:0,shortfall:250,status:'below'});
+});
+
+test('Finance provides editable base-pay matching and a compact overtime overview alert', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['Base wage tracking','Jaimi','Matthew','Match words in bank description','Significant overtime','Stretch this pay','overtimeOverviewAlert','classifyDetectedPay','fin_base_pay_v1']) assert.match(finance,new RegExp(marker));
 });
 
 test('shell, Planner, Quests and Finance contain visible integration controls', async () => {

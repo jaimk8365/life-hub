@@ -48,3 +48,9 @@ export function calculateOffsetImpact({balance,ratePct,weeklyPayment,offsetBalan
   const weeksSaved=withoutOffset.weeks!=null&&withOffset.weeks!=null?Math.max(0,withoutOffset.weeks-withOffset.weeks):null;
   return {offsetTotal,withoutOffset,withOffset,interestSaved,weeksSaved};
 }
+
+export function classifyPayAgainstBase(amount, baseAmount, significantPct = 0.2) {
+  const received=Math.max(0,+amount||0),base=Math.max(0,+baseAmount||0),variance=received-base;
+  return {received,base,variance,overtime:Math.max(0,variance),shortfall:Math.max(0,-variance),
+    status:variance<0?'below':variance>=base*significantPct&&base>0?'significant_overtime':variance>0?'overtime':'base'};
+}
