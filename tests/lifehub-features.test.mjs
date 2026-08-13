@@ -242,3 +242,13 @@ test('Matthew app uses the five-section decision layout without Jaimi private fi
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(partner,privateLabel);
   assert.equal((partner.match(/<button data-v=/g)||[]).length,5);
 });
+
+test('both finance apps provide a top-left app guide and Matthew overview uses a flat hierarchy', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner]) for(const marker of ['📖 Guide','What each section does','Best weekly routine','Get the most from it']) assert.match(source,new RegExp(marker));
+  assert.match(finance,/class="guide-link" onclick="openFinanceHelp\(\)"/);
+  assert.match(partner,/class="guide-link" onclick="openPartnerHelp\(\)"/);
+  assert.match(partner,/Household position/);
+  assert.match(partner,/Account snapshot/);
+  assert.doesNotMatch(partner,/spend\.forEach\(a=>\{ html\+=partnerAccountForecast\(a\)/);
+});
