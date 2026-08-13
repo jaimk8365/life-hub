@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, classifyPayAgainstBase, groupBudgetByAccount } from '../finance/budget-logic.mjs';
+import { buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, groupBudgetByAccount } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -112,6 +112,23 @@ test('wage deposits split above-base overtime and flag below-base pay', () => {
 test('Finance provides editable base-pay matching and a compact overtime overview alert', async () => {
   const finance=await text('src/finance.html');
   for(const marker of ['Base wage tracking','Jaimi','Matthew','Match words in bank description','Significant overtime','Stretch this pay','overtimeOverviewAlert','classifyDetectedPay','fin_base_pay_v1']) assert.match(finance,new RegExp(marker));
+});
+
+test('account funding check includes budgets and protected goals', () => {
+  const result=compareAccountFunding({accountId:'savings',budgetMonthly:500,goalMonthly:150,transfers:[{toAcct:'savings',amount:100,frequency:'weekly',active:true},{toAcct:'savings',amount:100,frequency:'monthly',active:true}]});
+  assert.ok(result.requiredWeekly>result.transferredWeekly);
+  assert.equal(result.enough,false);
+});
+
+test('Finance and Matthew use compact funding checks and Finance forecasts three operating accounts', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const marker of ['Funding check','fundingCheckRows','Everyday','Bills','Loan Repay','Upcoming one-offs','Add one-off cost','operatingSafeForecast','Income received']) assert.match(finance,new RegExp(marker));
+  for(const marker of ['Funding check','fundingCheckRows','View transfers']) assert.match(partner,new RegExp(marker));
+});
+
+test('Planner has a navigable filtered month view including money dates', async () => {
+  const plan=await text('src/plan.html');
+  for(const marker of ['Month','renderMonth','stepMonth','monthFilter','All','Family','Money','Tasks','plan_money_dates']) assert.match(plan,new RegExp(marker));
 });
 
 test('shell, Planner, Quests and Finance contain visible integration controls', async () => {

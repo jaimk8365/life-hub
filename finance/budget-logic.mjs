@@ -54,3 +54,9 @@ export function classifyPayAgainstBase(amount, baseAmount, significantPct = 0.2)
   return {received,base,variance,overtime:Math.max(0,variance),shortfall:Math.max(0,-variance),
     status:variance<0?'below':variance>=base*significantPct&&base>0?'significant_overtime':variance>0?'overtime':'base'};
 }
+
+export function compareAccountFunding({accountId,budgetMonthly=0,goalMonthly=0,transfers=[]}) {
+  const requiredWeekly=(Math.max(0,+budgetMonthly||0)+Math.max(0,+goalMonthly||0))*12/52;
+  const transferredWeekly=transfers.filter(t=>t.active!==false&&t.toAcct===accountId).reduce((sum,t)=>sum+(t.frequency==='weekly'?+t.amount||0:t.frequency==='fortnightly'?(+t.amount||0)/2:(+t.amount||0)*12/52),0);
+  return {accountId,requiredWeekly,transferredWeekly,gapWeekly:transferredWeekly-requiredWeekly,enough:transferredWeekly>=requiredWeekly};
+}
