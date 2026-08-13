@@ -60,3 +60,40 @@ export function compareAccountFunding({accountId,budgetMonthly=0,goalMonthly=0,t
   const transferredWeekly=transfers.filter(t=>t.active!==false&&t.toAcct===accountId).reduce((sum,t)=>sum+(t.frequency==='weekly'?+t.amount||0:t.frequency==='fortnightly'?(+t.amount||0)/2:(+t.amount||0)*12/52),0);
   return {accountId,requiredWeekly,transferredWeekly,gapWeekly:transferredWeekly-requiredWeekly,enough:transferredWeekly>=requiredWeekly};
 }
+
+export function summarisePayDeposits(deposits, baseAmount) {
+  const base=Math.max(0,+baseAmount||0);
+  const rows=deposits.map(d=>({...d,...classifyPayAgainstBase(d.amount,base)}));
+  return {deposits:rows,baseReceived:rows.reduce((s,d)=>s+Math.min(d.received,base),0),overtimeReceived:rows.reduce((s,d)=>s+d.overtime,0),shortfall:rows.reduce((s,d)=>s+d.shortfall,0)};
+}
+
+export function buildAccountForecast({balance=0,horizonDays=14,lookbackDays=28,transactions=[],scheduled=[],expectedIncome=0,buffer=0}) {
+  const spend=transactions.filter(t=>t.amount<0&&t.cat!=='transfer'&&!t.scheduledObligation).reduce((s,t)=>s+Math.abs(+t.amount||0),0);
+  const dailySpend=lookbackDays>0?spend/lookbackDays:0;
+  const flexibleSpend=dailySpend*horizonDays;
+  const scheduledTotal=scheduled.reduce((s,x)=>s+Math.max(0,+x.amount||0),0);
+  return {horizonDays,lookbackDays,dailySpend,flexibleSpend,scheduled:scheduledTotal,expectedIncome,buffer,predictedBalance:(+balance||0)+(+expectedIncome||0)-flexibleSpend-scheduledTotal-(+buffer||0)};
+}
+
+export function deriveCategoryBudgets(budget) {
+  const out={};
+  budget.forEach(section=>(section.items||[]).forEach(item=>{if(item.category)out[item.category]=(out[item.category]||0)+(+item.mo||0);}));
+  return out;
+}
+
+export function projectNetWorth({currentNetWorth=0,transactions=[],lookbackDays=90,horizonDays=90}) {
+  const netChange=transactions.filter(t=>t.cat!=='transfer').reduce((s,t)=>s+(+t.amount||0),0);
+  const projectedChange=lookbackDays>0?netChange/lookbackDays*horizonDays:0;
+  return {currentNetWorth:+currentNetWorth||0,netChange,projectedChange,projectedNetWorth:(+currentNetWorth||0)+projectedChange,lookbackDays,horizonDays};
+}
+
+export function summariseLoanPayments({minimumWeekly=0,transactions=[],weeks=4,manualExtras=[]}) {
+  const minimumExpected=Math.max(0,+minimumWeekly||0)*Math.max(0,+weeks||0);
+  const actualPaid=transactions.reduce((s,t)=>s+Math.max(0,+t.amount||0),0);
+  const manualExtra=manualExtras.reduce((s,t)=>s+Math.max(0,+t.amount||0),0);
+  return {minimumExpected,actualPaid,manualExtra,extraPaid:Math.max(0,actualPaid-minimumExpected)+manualExtra,shortfall:Math.max(0,minimumExpected-actualPaid)};
+}
+
+export function escapeHtml(value) {
+  return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}

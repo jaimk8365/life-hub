@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, groupBudgetByAccount } from '../finance/budget-logic.mjs';
+import { buildAccountForecast, buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -109,6 +109,41 @@ test('wage deposits split above-base overtime and flag below-base pay', () => {
   assert.deepEqual(classifyPayAgainstBase(1400,1650),{received:1400,base:1650,variance:-250,overtime:0,shortfall:250,status:'below'});
 });
 
+test('overtime is calculated once per received pay and is never projected as recurring', () => {
+  const summary=summarisePayDeposits([{amount:2000,date:'2026-08-07'},{amount:1600,date:'2026-08-14'}],1600);
+  assert.equal(summary.baseReceived,3200);
+  assert.equal(summary.overtimeReceived,400);
+  assert.equal(summary.shortfall,0);
+  assert.equal(summary.deposits[0].overtime,400);
+});
+
+test('per-account forecast uses recent daily spending without double-counting scheduled bills', () => {
+  const result=buildAccountForecast({balance:1500,horizonDays:14,lookbackDays:28,transactions:[{amount:-280,date:'2026-08-01',cat:'groceries'},{amount:-120,date:'2026-08-02',cat:'subs',scheduledObligation:true}],scheduled:[{amount:120,date:'2026-08-20'}],expectedIncome:800,buffer:200});
+  assert.equal(result.dailySpend,10);
+  assert.equal(result.flexibleSpend,140);
+  assert.equal(result.scheduled,120);
+  assert.equal(result.predictedBalance,1840);
+});
+
+test('category budgets are derived from the editable master budget', () => {
+  const result=deriveCategoryBudgets([{sec:'Living',items:[{n:'Food',mo:500,category:'groceries'},{n:'Fuel',mo:200,category:'fuel'},{n:'Unknown',mo:50}]}]);
+  assert.deepEqual(result,{groceries:500,fuel:200});
+});
+
+test('net worth projection and loan payment summary use actual transaction patterns', () => {
+  const worth=projectNetWorth({currentNetWorth:100000,transactions:[{amount:5000,date:'2026-06-01',cat:'income'},{amount:-3500,date:'2026-06-10',cat:'groceries'}],lookbackDays:90,horizonDays:90});
+  assert.equal(worth.projectedNetWorth,101500);
+  const loan=summariseLoanPayments({minimumWeekly:500,transactions:[{amount:600,date:'2026-08-01'},{amount:550,date:'2026-08-08'}],weeks:2,manualExtras:[{amount:100,date:'2026-08-09'}]});
+  assert.equal(loan.minimumExpected,1000);
+  assert.equal(loan.actualPaid,1150);
+  assert.equal(loan.extraPaid,250);
+});
+
+test('user and imported text can be displayed safely without changing stored content', () => {
+  const raw='<img src=x onerror=alert(1)> & Landscaping';
+  assert.equal(escapeHtml(raw),'&lt;img src=x onerror=alert(1)&gt; &amp; Landscaping');
+});
+
 test('Finance provides editable base-pay matching and a compact overtime overview alert', async () => {
   const finance=await text('src/finance.html');
   for(const marker of ['Base wage tracking','Jaimi','Matthew','Match words in bank description','Significant overtime','Stretch this pay','overtimeOverviewAlert','classifyDetectedPay','fin_base_pay_v1']) assert.match(finance,new RegExp(marker));
@@ -124,6 +159,19 @@ test('Finance and Matthew use compact funding checks and Finance forecasts three
   const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
   for(const marker of ['Funding check','fundingCheckRows','Everyday','Bills','Loan Repay','Upcoming one-offs','Add one-off cost','operatingSafeForecast','Income received']) assert.match(finance,new RegExp(marker));
   for(const marker of ['Funding check','fundingCheckRows','View transfers']) assert.match(partner,new RegExp(marker));
+});
+
+test('Finance and Matthew expose matching per-account forecasts and read-only shared layout', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const marker of ['14-day outlook','accountForecast','Net worth forecast','Loan payment tracking','Minimum expected','Actual repayments']) assert.match(finance,new RegExp(marker));
+  for(const marker of ['14-day outlook','accountForecast','Net worth forecast','Loan payment tracking','Read-only']) assert.match(partner,new RegExp(marker));
+  assert.match(partner,/Read-only · Jaimi manages income and budgets/);
+  assert.match(partner,/keys:\['finp_shared','finp_matthew'\]/);
+});
+
+test('Planner supports pattern recommendations that can be accepted declined or tweaked', async () => {
+  const plan=await text('src/plan.html');
+  for(const marker of ['Pattern suggestions','plan_pattern_suggestions','acceptSuggestion','declineSuggestion','tweakSuggestion']) assert.match(plan,new RegExp(marker));
 });
 
 test('Planner has a navigable filtered month view including money dates', async () => {
@@ -158,9 +206,9 @@ test('affected deployed pages decrypt and contain the new source features', asyn
   assert.match(await decrypt('quest/index.html'), /Attach Task/);
 });
 
-test('Matthew finance has the shared adaptive budget controls in source and encrypted output', async () => {
+test('Matthew finance has the shared read-only budget controls in source and encrypted output', async () => {
   const source=await text('src/partner-finance.html');
-  for(const marker of ['Budget by account','All budgets','Set as my default view','Minimum income','Overtime','Household forecast','Budget Review','Tracking to overspend','Adapt over-budget categories to new spending']) assert.match(source,new RegExp(marker));
+  for(const marker of ['Budget by account','All budgets','Set as my default view','Minimum income','Overtime','Household forecast','Budget Review','Tracking to overspend','Read-only']) assert.match(source,new RegExp(marker));
   assert.match(source,/finp_budget_view_v1/);
   const pass=(await readFile(new URL('.partner-key',root),'utf8')).trim();
   const page=await text('partner/index.html');
