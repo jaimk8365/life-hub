@@ -218,6 +218,9 @@ test('Matthew finance has the shared read-only budget controls in source and enc
   const html=Buffer.concat([d.update(ct),d.final()]).toString('utf8');
   assert.match(html,/Budget Review/);
   assert.match(html,/Minimum income/);
+  for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Safe to spend','Accounts snapshot','Top priorities']) assert.match(html,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
+  assert.equal((html.match(/<button data-v=/g)||[]).length,7);
+  for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(html,privateLabel);
 });
 
 test('finance overview help, transfer check, kids accounts and compact insights are present', async () => {
@@ -236,11 +239,13 @@ test('Matthew overview mirrors the shared household guidance and compact money c
   assert.match(finance,/lastTransactionDate/);
 });
 
-test('Matthew app uses the five-section decision layout without Jaimi private finance labels', async () => {
+test('Matthew app mirrors Jaimi finance navigation and remains free of private finance labels', async () => {
   const partner=await text('src/partner-finance.html');
-  for(const marker of ['Overview','Household Plan','Accounts & Transfers','Check-up','My Money','What needs attention','Next major bills','Household forecast']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
+  for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Accounts snapshot','Top priorities','At a glance']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(partner,privateLabel);
-  assert.equal((partner.match(/<button data-v=/g)||[]).length,5);
+  assert.equal((partner.match(/<button data-v=/g)||[]).length,7);
+  for(const view of ['overview','accounts','budget','save','bills','debts','insights']) assert.match(partner,new RegExp(`<div id="${view}" class="view`));
+  assert.doesNotMatch(partner,/class="fab"/);
 });
 
 test('both finance apps provide a top-left app guide and Matthew overview uses a flat hierarchy', async () => {
@@ -248,7 +253,6 @@ test('both finance apps provide a top-left app guide and Matthew overview uses a
   for(const source of [finance,partner]) for(const marker of ['📖 Guide','What each section does','Best weekly routine','Get the most from it']) assert.match(source,new RegExp(marker));
   assert.match(finance,/class="guide-link" onclick="openFinanceHelp\(\)"/);
   assert.match(partner,/class="guide-link" onclick="openPartnerHelp\(\)"/);
-  assert.match(partner,/Household position/);
-  assert.match(partner,/Account snapshot/);
+  for(const card of ['Right now','Safe to spend','At a glance','Accounts snapshot','Top priorities','Insights','Save & Goals','Debts']) assert.match(partner,new RegExp(card.replace(/[&]/g,'&(?:amp;)?')));
   assert.doesNotMatch(partner,/spend\.forEach\(a=>\{ html\+=partnerAccountForecast\(a\)/);
 });
