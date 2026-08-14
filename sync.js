@@ -14,6 +14,7 @@ const TRACKED = [
   { prefix: 'hq_',         frame: 'f-hub'     },  // hub cleaning-schedule edits
   { prefix: 'nightcourt-', frame: 'f-quest'   },  // Questkeeper mirror (My Planner bridge)
   { prefix: 'ncg_',        frame: 'f-quest'   },  // Night Court game — full save (xp, quests, sigils, constellations)
+  { prefix: 'lifehub_quest_', frame: 'f-quest' }, // one-tap Quest inbox shared by Hub task sections
   { prefix: 'fin_',        frame: 'f-finance' },  // Money — accounts, transactions
   { prefix: 'kit_',        frame: 'f-kitchen' },  // Kitchen — recipes, plans, shopping, pantry
   { prefix: 'home_',       frame: 'f-home'    },  // Home — tasks, completion log, reminder queue

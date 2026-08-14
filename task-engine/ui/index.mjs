@@ -6,11 +6,19 @@ const store = createTaskEngineStore(localStorage);
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const QUEST_INBOX='lifehub_quest_inbox_v1';
+function sendToQuests(task){
+  const id='tasks:'+task.id, saved=JSON.parse(localStorage.getItem('ncg_save_v1')||'null');
+  if(saved?.quests?.some(q=>q.externalRef===id)) return;
+  const inbox=JSON.parse(localStorage.getItem(QUEST_INBOX)||'[]'); if(inbox.some(q=>q.id===id)) return;
+  inbox.push({id,title:task.title,realm:task.context==='home'?'home':task.context==='errands'?'errand':'admin',difficulty:task.priority==='high'?'hard':task.priority==='medium'?'medium':'easy',minutes:task.steps?.length?20:10,source:'Task Engine'});
+  localStorage.setItem(QUEST_INBOX,JSON.stringify(inbox));
+}
 let view = 'today';
 
 function taskCard(task) {
   const links = [task.linkedPlannerId&&'📆 Planner',task.linkedQuestId&&'🌙 Quest'].filter(Boolean).join(' · ');
-  return `<article class="task ${task.completed?'done':''}"><button class="check" data-action="toggle" data-id="${task.id}" aria-label="Complete">${task.completed?'✓':''}</button><div class="grow"><b>${esc(task.title)}</b><div class="meta">${task.priority} · ${task.context}${task.dueDate?' · due '+task.dueDate:''}${links?' · '+links:''}</div>${task.steps?.length?`<div class="steps">${task.steps.map(s=>`<label><input type="checkbox" data-action="step" data-task="${task.id}" data-step="${s.id}" ${s.done?'checked':''}> ${esc(s.title)}</label>`).join('')}</div>`:''}</div><button class="more" data-action="edit" data-id="${task.id}">•••</button></article>`;
+  return `<article class="task ${task.completed?'done':''}"><button class="check" data-action="toggle" data-id="${task.id}" aria-label="Complete">${task.completed?'✓':''}</button><div class="grow"><b>${esc(task.title)}</b><div class="meta">${task.priority} · ${task.context}${task.dueDate?' · due '+task.dueDate:''}${links?' · '+links:''}</div>${task.steps?.length?`<div class="steps">${task.steps.map(s=>`<label><input type="checkbox" data-action="step" data-task="${task.id}" data-step="${s.id}" ${s.done?'checked':''}> ${esc(s.title)}</label>`).join('')}</div>`:''}<button data-action="quest" data-id="${task.id}">🌙 Send to Quests</button></div><button class="more" data-action="edit" data-id="${task.id}">•••</button></article>`;
 }
 function list(title,tasks,empty='Nothing here — lovely.') { return `<section><h2>${title} <span>${tasks.length}</span></h2>${tasks.length?tasks.map(taskCard).join(''):`<div class="empty">${empty}</div>`}</section>`; }
 function todayHtml() { const p=buildTodayPlan(store.getState().tasks); return `<div class="hero"><div><small>GENERATED FOR YOU</small><h1>Today Plan</h1><p>Important first, similar tasks together.</p></div><button class="primary" data-action="add">＋ Add task</button></div>${list('Must do',p.mustDo)}${list('Should do',p.shouldDo)}${list('Could do',p.couldDo)}`; }
@@ -27,6 +35,7 @@ document.addEventListener('click',e=>{ const b=e.target.closest('[data-action]')
   if(a==='nav'){view=b.dataset.view;render();} if(a==='add')openTask(); if(a==='edit')openTask(store.getState().tasks.find(t=>t.id===b.dataset.id)); if(a==='close')close();
   if(a==='save'){const title=$('taskTitle').value.trim();if(!title)return;const old=store.getState().tasks.find(t=>t.id===b.dataset.id);const task={...(old||{}),id:old?.id||uid(),title,description:old?.description||'',steps:old?.steps?.length?old.steps:generateStepsForTask(title),priority:$('taskPriority').value,dueDate:$('taskDue').value||undefined,context:$('taskContext').value,createdAt:old?.createdAt||new Date().toISOString(),completed:old?.completed||false,source:old?.source||'manual'};old?store.updateTask(task):store.addTask(task);close();render();}
   if(a==='toggle'){const t=store.getState().tasks.find(t=>t.id===b.dataset.id);store.updateTask({...t,completed:!t.completed});render();} if(a==='delete'){store.deleteTask(b.dataset.id);close();render();}
+  if(a==='quest'){const t=store.getState().tasks.find(t=>t.id===b.dataset.id);if(t){sendToQuests(t);store.linkTaskToQuest(t.id,'pending:'+t.id);render();}}
   if(a==='idea'){const text=prompt('Capture your idea');if(text?.trim()){store.addIdea({id:uid(),text:text.trim(),createdAt:new Date().toISOString()});render();}} if(a==='idea-link')chooseTask(b.dataset.id); if(a==='choose-idea'){store.linkIdeaToTask(b.dataset.idea,b.dataset.task);close();render();}
 });
 document.addEventListener('change',e=>{if(e.target.dataset.action==='step'){const t=store.getState().tasks.find(t=>t.id===e.target.dataset.task);store.updateTask({...t,steps:t.steps.map(s=>s.id===e.target.dataset.step?{...s,done:e.target.checked}:s)});render();}});

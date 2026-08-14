@@ -256,3 +256,39 @@ test('both finance apps provide a top-left app guide and Matthew overview uses a
   for(const card of ['Right now','Safe to spend','At a glance','Accounts snapshot','Top priorities','Insights','Save & Goals','Debts']) assert.match(partner,new RegExp(card.replace(/[&]/g,'&(?:amp;)?')));
   assert.doesNotMatch(partner,/spend\.forEach\(a=>\{ html\+=partnerAccountForecast\(a\)/);
 });
+
+test('Safe to Spend is an identical Everyday-only calculation in both finance apps', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  assert.match(finance,/function safeSpend\(\)[\s\S]*balance\('everyday'\)[\s\S]*BUFFERS\.everyday[\s\S]*b\.acct==='everyday'[\s\S]*safe: bal-buffer-upcomingBills-pace/);
+  assert.match(finance,/safeSpend:safeSpend\(\)/);
+  assert.match(partner,/const s=SHARED\.safeSpend/);
+  assert.match(partner,/typical everyday spend/);
+  const partnerSafeSpend=partner.match(/function partnerSafeSpend\(\)[\s\S]*?(?=\nfunction )/)?.[0]||'';
+  assert.doesNotMatch(partnerSafeSpend,/sharedAccounts\(/);
+});
+
+test('Life Hub tasks use a deduplicated one-tap Quest inbox with stronger completion rewards', async () => {
+  const [quest,plan,home,admin,taskUi]=await Promise.all([
+    text('src/quest.html'),text('src/plan.html'),text('src/home.html'),text('src/admin.html'),text('src/task-engine/ui/index.mjs')
+  ]);
+  for(const source of [plan,home,admin,taskUi]) {
+    assert.match(source,/Send to Quests/);
+    assert.match(source,/lifehub_quest_inbox_v1/);
+  }
+  for(const marker of ['lifehub_quest_inbox_v1','consumeQuestInbox','externalRef','navigator.vibrate','Three stars']) assert.match(quest,new RegExp(marker.replace(/[.]/g,'\\.')));
+});
+
+test('deployed dashboard contains the compact Quest reminder and direct Quests link', async () => {
+  const pass=(await readFile(new URL('.hub-key',root),'utf8')).trim(),page=await text('hub/index.html');
+  const take=n=>Buffer.from(page.match(new RegExp(`const ${n}\\s*= Uint8Array\\.from\\(atob\\('([^']+)'`))[1],'base64');
+  const salt=take('SALT'),iv=take('IV'),data=take('DATA'),tag=data.subarray(data.length-16),ct=data.subarray(0,-16);
+  const d=createDecipheriv('aes-256-gcm',pbkdf2Sync(pass,salt,300000,32,'sha256'),iv);d.setAuthTag(tag);
+  const html=Buffer.concat([d.update(ct),d.final()]).toString('utf8');
+  for(const marker of ['questTodayCard','Next Quest','Today’s stars','Open Quests','Send to Quests','lifehub_quest_inbox_v1']) assert.match(html,new RegExp(marker));
+});
+
+test('encrypted device sync includes full Quest progress and the one-tap inbox', async () => {
+  const sync=await text('sync.js');
+  assert.match(sync,/prefix:\s*'ncg_'/);
+  assert.match(sync,/prefix:\s*'lifehub_quest_'/);
+});
