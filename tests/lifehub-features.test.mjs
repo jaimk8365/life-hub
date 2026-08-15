@@ -292,3 +292,19 @@ test('encrypted device sync includes full Quest progress and the one-tap inbox',
   assert.match(sync,/prefix:\s*'ncg_'/);
   assert.match(sync,/prefix:\s*'lifehub_quest_'/);
 });
+
+test('Life Hub uses a playful shared Jaimi theme and a distinct Matthew theme', async () => {
+  const jaimi=await text('theme-jaimi.css'), matthew=await text('theme-matthew.css');
+  for(const colour of ['#F7C948','#A78BFA','#2EC4B6','#C94F7C']) assert.match(jaimi,new RegExp(colour));
+  for(const colour of ['#19324D','#E07A3F','#2F6B4F']) assert.match(matthew,new RegExp(colour));
+  assert.match(jaimi,/prefers-reduced-motion/);
+  assert.match(jaimi,/min-height:\s*44px/);
+  assert.doesNotMatch(matthew,/#A78BFA|#C94F7C/);
+  for(const file of ['admin','beauty','course','family','finance','home','kids','kitchen','plan','reading','wardrobe']) {
+    assert.match(await text(`src/${file}.html`),/theme-jaimi\.css/);
+  }
+  assert.match(await text('src/partner-finance.html'),/theme-matthew\.css/);
+  assert.match(await text('index.html'),/theme-jaimi\.css/);
+  const sw=await text('sw.js');
+  assert.match(sw,/theme-jaimi\.css/); assert.match(sw,/theme-matthew\.css/);
+});

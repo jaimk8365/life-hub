@@ -1,0 +1,37 @@
+/* Matthew's shared visual theme: grounded, strong and read-only friendly. */
+:root{
+  --matt-navy:#19324D;
+  --matt-navy-soft:#E5EDF4;
+  --matt-orange:#E07A3F;
+  --matt-orange-soft:#FBE9DE;
+  --matt-forest:#2F6B4F;
+  --matt-forest-soft:#E3EFE8;
+  --paper:#F4F3EE;
+  --paper-2:#FAFAF7;
+  --card:#FFFFFF;
+  --ink:#172A3A;
+  --ink-soft:#56646B;
+  --ink-faint:#879297;
+  --line:#DCE2DF;
+  --line-soft:#EEF1EF;
+  --coral:var(--matt-orange);
+  --mint:var(--matt-forest);
+  --sunshine:var(--matt-orange);
+  --sky:#426E8F;
+  --plum:var(--matt-navy);
+  --good:var(--matt-forest);
+  --warn:#A95C2E;
+  --bad:#A33E32;
+}
+body{background:linear-gradient(145deg,rgba(25,50,77,.07),transparent 25rem),linear-gradient(330deg,rgba(47,107,79,.08),transparent 30rem),var(--paper)}
+.card,.acct,.bsec,.stat,.sheet{border-color:var(--line)!important;box-shadow:0 6px 18px rgba(25,50,77,.08)!important}
+h1,.card h2,.card-title{color:var(--matt-navy)}
+.pills{background:var(--matt-navy-soft)!important}
+.pills button.on{background:var(--matt-navy)!important;color:#fff!important}
+.btn.dark,.primary{background:var(--matt-navy)!important;color:#fff!important}
+.btn.soft,.ghost{background:var(--matt-forest-soft)!important;border-color:#BED5C7!important}
+.bar>i{background:linear-gradient(90deg,var(--matt-forest),var(--matt-orange))!important}
+.flag{border-left:5px solid var(--matt-orange)!important}
+button:not(.close):not(.check):not(.chk),.btn,.acct{min-height:44px}
+button:focus-visible,.btn:focus-visible,.acct:focus-visible{outline:3px solid rgba(224,122,63,.42)!important;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

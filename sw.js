@@ -1,7 +1,7 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v34';
+const CACHE = 'lifehub-v35';
 const PRECACHE = [
-  './', './index.html', './manifest.webmanifest', './sync.js',
+  './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './hub/index.html', './quest/index.html', './course/index.html', './task-engine/index.html',
   './task-engine/models/index.mjs', './task-engine/logic/index.mjs', './task-engine/store/index.mjs', './task-engine/ui/index.mjs'

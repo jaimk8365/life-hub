@@ -1,0 +1,73 @@
+/* Jaimi's shared visual theme: joyful, calm and easy to scan. */
+:root{
+  --joy-yellow:#F7C948;
+  --joy-yellow-soft:#FFF3B8;
+  --joy-lilac:#A78BFA;
+  --joy-lilac-soft:#EEE7FF;
+  --joy-turquoise:#2EC4B6;
+  --joy-turquoise-soft:#DDF8F4;
+  --joy-pink:#C94F7C;
+  --joy-pink-soft:#FBE3EC;
+  --joy-cream:#FFF9EE;
+  --joy-ink:#30263D;
+  --paper:var(--joy-cream)!important;
+  --paper-2:#FFFCF6!important;
+  --card:#FFFFFF!important;
+  --ink:var(--joy-ink)!important;
+  --ink-soft:#675D70!important;
+  --ink-faint:#94889E!important;
+  --line:#E8DFF0!important;
+  --line-soft:#F3EDF7!important;
+  --coral:var(--joy-pink)!important;
+  --mint:var(--joy-turquoise)!important;
+  --sunshine:var(--joy-yellow)!important;
+  --sky:var(--joy-turquoise)!important;
+  --plum:var(--joy-lilac)!important;
+  --good:#178A78;
+  --warn:#B47700;
+  --bad:#B83D68;
+}
+
+body{
+  background:
+    radial-gradient(circle at 8% 3%,rgba(247,201,72,.20),transparent 24rem),
+    radial-gradient(circle at 96% 12%,rgba(167,139,250,.16),transparent 27rem),
+    radial-gradient(circle at 55% 100%,rgba(46,196,182,.12),transparent 32rem),
+    var(--paper);
+}
+
+.card,.scard,.item,.acct,.bsec,.stat,.sheet{
+  border-color:var(--line)!important;
+  box-shadow:0 7px 22px rgba(72,50,90,.07)!important;
+}
+.card h2,.card-title,h1{color:var(--joy-ink)}
+.pills,.tabs{background:var(--joy-lilac-soft)!important}
+.pills button.on,.tab.active{background:var(--joy-ink)!important;color:#fff!important}
+.btn.dark,.btn-primary,.primary{background:linear-gradient(135deg,var(--joy-pink),#A83F73)!important;color:#fff!important}
+.btn.soft,.btn-soft,.ghost{background:var(--joy-lilac-soft);border-color:#D9C9FA!important}
+.bar>i,.progress>i{background:linear-gradient(90deg,var(--joy-turquoise),var(--joy-lilac),var(--joy-pink))!important}
+.chip,.tagchip{border-radius:999px!important}
+.flag{border-left:5px solid var(--joy-yellow)!important}
+.em,.ico{filter:saturate(1.13)}
+
+button:not(.close):not(.check):not(.chk):not(.rbox),
+.btn,.acct,.tab{min-height:44px}
+button:active,.btn:active,.acct:active{transform:scale(.97)}
+button:focus-visible,.btn:focus-visible,.acct:focus-visible{
+  outline:3px solid rgba(167,139,250,.48)!important;
+  outline-offset:2px;
+}
+input[type="checkbox"]:checked{accent-color:var(--joy-turquoise)}
+
+@media (prefers-reduced-motion:no-preference){
+  .card,.item,.acct,.btn,button{transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+  .card:hover{box-shadow:0 10px 28px rgba(72,50,90,.10)!important}
+  input[type="checkbox"]:checked{animation:joy-pop .28s ease-out}
+  @keyframes joy-pop{50%{transform:scale(1.28)}}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+@media(max-width:600px){
+  .tiny{font-size:12px!important;letter-spacing:.035em!important}
+  .card{padding:16px!important}
+}
