@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildAccountForecast, buildBudgetReview, buildMonthlyForecast, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
+import { buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -125,6 +125,77 @@ test('per-account forecast uses recent daily spending without double-counting sc
   assert.equal(result.predictedBalance,1840);
 });
 
+test('weekly Everyday plan funds Bills first and only recommends the remaining safe surplus', () => {
+  const plan=buildWeeklyEverydayPlan({
+    everydayBalance:2000,everydayBuffer:200,billsBalance:100,billsDue:[{name:'Rates',amount:1000}],
+    billsTransfer:700,selectedRegular:[{name:'Groceries',amount:350},{name:'Fuel',amount:100}],
+    oneOffs:[{name:'School excursion',amount:50}]
+  });
+  assert.equal(plan.billsShortfall,200);
+  assert.equal(plan.availableAfterBuffer,1800);
+  assert.equal(plan.committed,1400);
+  assert.equal(plan.remaining,400);
+  assert.equal(plan.safeSavingsSuggestion,400);
+  assert.equal(plan.status,'surplus');
+});
+
+test('budget review can compare seven or thirty days and groups results by account', () => {
+  const budget=[
+    {sec:'Everyday',acct:'everyday',items:[{n:'Groceries',mo:600,category:'groceries'}]},
+    {sec:'Bills',acct:'bills',items:[{n:'Insurance',mo:300,category:'insurance'}]},
+  ];
+  const txns=[
+    {acct:'everyday',date:'2026-08-23',amount:-200,cat:'groceries'},
+    {acct:'everyday',date:'2026-08-10',amount:-100,cat:'groceries'},
+    {acct:'bills',date:'2026-08-22',amount:-50,cat:'insurance'},
+  ];
+  const week=buildAccountBudgetReview({budget,transactions:txns,days:7,asOf:'2026-08-24'});
+  const month=buildAccountBudgetReview({budget,transactions:txns,days:30,asOf:'2026-08-24'});
+  assert.deepEqual(week.accounts.map(x=>x.accountId),['bills','everyday']);
+  assert.equal(week.accounts.find(x=>x.accountId==='everyday').actual,200);
+  assert.equal(month.accounts.find(x=>x.accountId==='everyday').actual,300);
+});
+
+test('shared goals calculate a payment plan and archive with a dated completion', () => {
+  const plan=buildGoalPaymentPlan({target:6000,saved:1200,dueDate:'2027-08-24',asOf:'2026-08-24'});
+  assert.equal(plan.remaining,4800);
+  assert.ok(plan.weekly>91&&plan.weekly<93);
+  assert.ok(plan.monthly>399&&plan.monthly<401);
+  const completed=completeSharedGoal({id:'fiji',name:'Fiji Holiday',status:'active'},'2026-08-24');
+  assert.equal(completed.status,'archived');
+  assert.equal(completed.completedDate,'2026-08-24');
+  assert.equal(completed.archivedDate,'2026-08-24');
+});
+
+test('private repayment plans are excluded from the visible Debts summary', () => {
+  const plans=[{name:'Ordinary plan',remaining:100},{name:'Private plan',remaining:200,private:true}];
+  const split=partitionPrivatePlans(plans);
+  assert.deepEqual(split.visible.map(x=>x.name),['Ordinary plan']);
+  assert.deepEqual(split.private.map(x=>x.name),['Private plan']);
+  assert.equal(split.visible.reduce((s,x)=>s+x.remaining,0),100);
+});
+
+test('recurring patterns require confirmation and respect permanent disregard choices', () => {
+  const patterns=[
+    {key:'netflix',acct:'bills',cat:'subs',cadence:'monthly'},
+    {key:'coles',acct:'everyday',cat:'groceries',cadence:'weekly'},
+    {key:'insurance',acct:'bills',cat:'insurance',cadence:'monthly'},
+  ];
+  const result=classifyDirectDebitPatterns({patterns,confirmedKeys:['insurance'],ignoredKeys:['coles'],eligibleAccounts:['everyday','bills','loanrepay']});
+  assert.deepEqual(result.confirmed.map(x=>x.key),['insurance']);
+  assert.deepEqual(result.suggested.map(x=>x.key),['netflix']);
+  assert.deepEqual(result.ignored.map(x=>x.key),['coles']);
+});
+
+test('affordability advice blocks stale data and returns budget-safe alternatives', () => {
+  assert.equal(buildAffordabilityScenarios({amount:500,dataFresh:false}).status,'stale');
+  const result=buildAffordabilityScenarios({amount:500,dataFresh:true,categoryRemaining:300,everydaySafe:650,sinkingFree:100,urgent:true,flexibleSwaps:[{name:'Eating out',available:250},{name:'Shopping',available:300}]});
+  assert.equal(result.status,'options');
+  assert.equal(result.best.kind,'everyday_safe');
+  assert.equal(result.swaps.reduce((s,x)=>s+x.use,0),500);
+  assert.equal(result.uncovered,0);
+});
+
 test('category budgets are derived from the editable master budget', () => {
   const result=deriveCategoryBudgets([{sec:'Living',items:[{n:'Food',mo:500,category:'groceries'},{n:'Fuel',mo:200,category:'fuel'},{n:'Unknown',mo:50}]}]);
   assert.deepEqual(result,{groceries:500,fuel:200});
@@ -166,7 +237,7 @@ test('Finance and Matthew expose matching per-account forecasts and read-only sh
   for(const marker of ['14-day outlook','accountForecast','Net worth forecast','Loan payment tracking','Minimum expected','Actual repayments']) assert.match(finance,new RegExp(marker));
   for(const marker of ['14-day outlook','accountForecast','Net worth forecast','Loan payment tracking','Read-only']) assert.match(partner,new RegExp(marker));
   assert.match(partner,/Read-only · Jaimi manages income and budgets/);
-  assert.match(partner,/keys:\['finp_shared','finp_matthew'\]/);
+  assert.match(partner,/keys:\['finp_shared','finp_matthew','fin_week_plan_v2','fin_tax_v1','fin_shared_goals_v1'\]/);
 });
 
 test('Planner supports pattern recommendations that can be accepted declined or tweaked', async () => {
@@ -195,7 +266,7 @@ test('shell, Planner, Quests and Finance contain visible integration controls', 
   assert.match(finance, /Budget Review/);
   assert.match(finance, /Minimum income/);
   assert.match(finance, /Overtime/);
-  assert.match(finance, /Adapt over-budget categories to new spending/);
+  assert.match(finance, /adapt over-budget categories/i);
 });
 
 test('affected deployed pages decrypt and contain the new source features', async () => {
@@ -218,8 +289,8 @@ test('Matthew finance has the shared read-only budget controls in source and enc
   const html=Buffer.concat([d.update(ct),d.final()]).toString('utf8');
   assert.match(html,/Budget Review/);
   assert.match(html,/Minimum income/);
-  for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Safe to spend','Accounts snapshot','Top priorities']) assert.match(html,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
-  assert.equal((html.match(/<button data-v=/g)||[]).length,7);
+  for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Tax','Insights','Safe to spend','Accounts snapshot','Top priorities']) assert.match(html,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
+  assert.equal((html.match(/<button data-v=/g)||[]).length,8);
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(html,privateLabel);
 });
 
@@ -228,6 +299,77 @@ test('finance overview help, transfer check, kids accounts and compact insights 
   for(const marker of ['How to use Money together','Last updated','Newest transaction included','Is $700/week enough?','Periodic transfers','Money flow','Everyday is the starting account','Thea Savings','Levi Savings','Money check-up','Live checks','Older notes','insightsMode']) assert.match(finance,new RegExp(marker.replace(/[?$]/g,'\\$&')));
   assert.match(finance,/billsTransferCheck\(700\)/);
   assert.match(finance,/openTransfer\(\)/);
+});
+
+test('children statements update balances and account suffixes without exposing full account numbers', async () => {
+  const finance=await text('src/finance.html');
+  assert.match(finance,/fin_kids_statements_aug24_v1/);
+  assert.match(finance,/thea:\{balance:50\.18,num:'1832'/);
+  assert.match(finance,/levi:\{balance:50\.35,num:'4946'/);
+  assert.match(finance,/2026-08-17/);
+  assert.match(finance,/2026-08-03/);
+});
+
+test('Finance has contextual info help, custom priorities and custom budget categories with icons', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['infoButton','openInfo','How this number works','fin_custom_priorities_v1','Add your own priority','fin_custom_categories_v1','Create a new budget category','Choose an icon']) assert.match(finance,new RegExp(marker));
+});
+
+test('Budget Review supports 7 or 30 days and explains performance by account', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner]) for(const marker of ['Last 7 days','Last 30 days','Budget Review','By account','What went well','What needs improving']) assert.match(source,new RegExp(marker));
+});
+
+test('Funding check account rows open upcoming expense shortfall and surplus details', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner]) for(const marker of ['openFundingDetail','Upcoming expenses','Shortfall','Surplus']) assert.match(source,new RegExp(marker));
+});
+
+test('Tax tab supports both profiles, checklists, deductions, notes and local receipt files', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner]) for(const marker of ['Tax','Jaimi','Matthew','Tax checklist','Deductions budget','Receipt details','Tax notes','fin_tax_v1']) assert.match(source,new RegExp(marker));
+  assert.match(finance,/fin_tax_receipt_files_v1/);
+  assert.doesNotMatch(partner,/fin_tax_receipt_files_v1/);
+  assert.equal((finance.match(/<button data-v=/g)||[]).length,8);
+  assert.equal((partner.match(/<button data-v=/g)||[]).length,8);
+});
+
+test('Plan my week is a shared editable Everyday planner with Bills-first recommendations', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner]) for(const marker of ['fin_week_plan_v2','Bills transfer','Regular spending suggestions','Search past expenses','Add from scratch','Safe to move to savings','buildWeeklyEverydayPlan']) assert.match(source,new RegExp(marker));
+  assert.doesNotMatch(finance,/4 · On direct debit from Everyday/);
+});
+
+test('shared household goals sync both ways with plans, attachments and celebration archiving', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner]) for(const marker of ['fin_shared_goals_v1','Shared goals','Payment plan','Due by','Add attachment','2 MB','markSharedGoalComplete','completedDate','Archived goals','showGoalCelebration']) assert.match(source,new RegExp(marker));
+  assert.match(finance,/keys:\[[^\]]*'fin_shared_goals_v1'/);
+  assert.match(partner,/keys:\[[^\]]*'fin_shared_goals_v1'/);
+  assert.match(finance,/SHARED_GOALS=load\(K_SHARED_GOALS/);
+  assert.match(partner,/SHARED_GOALS=load\(K_SHARED_GOALS/);
+});
+
+test('private debt plans stay out of the Debts DOM until a separate local password succeeds', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['fin_private_debt_lock_v1','openPrivateDebtGate','verifyPrivateDebtPassword','PBKDF2','Private plans unlocked','renderPrivateDebtSection','privateDebtUnlocked']) assert.match(finance,new RegExp(marker));
+  assert.match(finance,/const visiblePlans=PAYOFF\.filter\(p=>!p\.private\)/);
+  assert.match(finance,/const privatePlans=PAYOFF\.filter\(p=>p\.private\)/);
+  assert.doesNotMatch(await text('src/partner-finance.html'),/fin_private_debt_lock_v1/);
+});
+
+test('operating account details show confirmed and suggested direct debits with disregard controls', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['accountDirectDebitsCard','Suggested — confirm or disregard','confirmDirectDebitSuggestion','disregardDirectDebitSuggestion','restoreDirectDebitSuggestion','Last paid','Next debit','Provider']) assert.match(finance,new RegExp(marker));
+  assert.match(finance,/Direct debits &(?:amp;)? subscriptions/);
+  assert.match(finance,/\['everyday','bills','loanrepay'\]\.includes\(id\)/);
+});
+
+test('Overview affordability check requires fresh account data and produces multiple scenarios', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['Can I afford this?','openAffordabilityCheck','submitAffordabilityCheck','Accounts or CSV data needs refreshing','Safest option','Other possible scenarios','What could be swapped','affordabilityFreshness','Budget home']) assert.match(finance,new RegExp(marker.replace(/[?]/g,'\\?')));
+  assert.match(finance,/CSV imports update transactions and balances immediately/);
+  assert.match(finance,/Screenshot uploads sync immediately/);
+  assert.match(finance,/Optional current balance/);
 });
 
 test('Matthew overview mirrors the shared household guidance and compact money check-up', async () => {
@@ -243,8 +385,8 @@ test('Matthew app mirrors Jaimi finance navigation and remains free of private f
   const partner=await text('src/partner-finance.html');
   for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Accounts snapshot','Top priorities','At a glance']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(partner,privateLabel);
-  assert.equal((partner.match(/<button data-v=/g)||[]).length,7);
-  for(const view of ['overview','accounts','budget','save','bills','debts','insights']) assert.match(partner,new RegExp(`<div id="${view}" class="view`));
+  assert.equal((partner.match(/<button data-v=/g)||[]).length,8);
+  for(const view of ['overview','accounts','budget','save','bills','debts','insights','tax']) assert.match(partner,new RegExp(`<div id="${view}" class="view`));
   assert.doesNotMatch(partner,/class="fab"/);
 });
 

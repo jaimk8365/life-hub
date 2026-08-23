@@ -75,6 +75,82 @@ export function buildAccountForecast({balance=0,horizonDays=14,lookbackDays=28,t
   return {horizonDays,lookbackDays,dailySpend,flexibleSpend,scheduled:scheduledTotal,expectedIncome,buffer,predictedBalance:(+balance||0)+(+expectedIncome||0)-flexibleSpend-scheduledTotal-(+buffer||0)};
 }
 
+export function buildWeeklyEverydayPlan({everydayBalance=0,everydayBuffer=0,billsBalance=0,billsDue=[],billsTransfer=0,selectedRegular=[],oneOffs=[]}) {
+  const due=billsDue.reduce((sum,item)=>sum+Math.max(0,+item.amount||0),0);
+  const transfer=Math.max(0,+billsTransfer||0);
+  const billsShortfall=Math.max(0,due-Math.max(0,+billsBalance||0)-transfer);
+  const regular=selectedRegular.reduce((sum,item)=>sum+Math.max(0,+item.amount||0),0);
+  const oneOffTotal=oneOffs.reduce((sum,item)=>sum+Math.max(0,+item.amount||0),0);
+  const availableAfterBuffer=Math.max(0,(+everydayBalance||0)-Math.max(0,+everydayBuffer||0));
+  const committed=transfer+billsShortfall+regular+oneOffTotal;
+  const remaining=availableAfterBuffer-committed;
+  return {due,billsTransfer:transfer,billsShortfall,regular,oneOffTotal,availableAfterBuffer,committed,remaining,
+    safeSavingsSuggestion:Math.max(0,remaining),status:remaining>=0?'surplus':'shortfall'};
+}
+
+export function buildGoalPaymentPlan({target=0,saved=0,dueDate='',asOf=new Date().toISOString().slice(0,10)}) {
+  const remaining=Math.max(0,(+target||0)-(+saved||0));
+  const start=new Date(asOf+'T12:00:00Z'),end=dueDate?new Date(dueDate+'T12:00:00Z'):null;
+  const days=end&&Number.isFinite(end.getTime())?Math.max(0,Math.round((end-start)/86400000)):0;
+  const weeks=days>0?days/7:0,months=days>0?days/(365.25/12):0;
+  return {remaining,days,weekly:weeks>0?remaining/weeks:0,fortnightly:weeks>0?remaining/(weeks/2):0,monthly:months>0?remaining/months:0,onTrack:remaining===0||days>0};
+}
+
+export function completeSharedGoal(goal,completedDate=new Date().toISOString().slice(0,10)) {
+  return {...goal,status:'archived',completedDate,archivedDate:completedDate};
+}
+
+export function partitionPrivatePlans(plans=[]) {
+  return {visible:plans.filter(plan=>!plan.private),private:plans.filter(plan=>plan.private)};
+}
+
+export function classifyDirectDebitPatterns({patterns=[],confirmedKeys=[],ignoredKeys=[],eligibleAccounts=['everyday','bills','loanrepay']}) {
+  const confirmedSet=new Set(confirmedKeys),ignoredSet=new Set(ignoredKeys),eligible=new Set(eligibleAccounts);
+  const relevant=patterns.filter(pattern=>eligible.has(pattern.acct)&&pattern.cadence);
+  return {
+    confirmed:relevant.filter(pattern=>confirmedSet.has(pattern.key)),
+    ignored:relevant.filter(pattern=>ignoredSet.has(pattern.key)),
+    suggested:relevant.filter(pattern=>!confirmedSet.has(pattern.key)&&!ignoredSet.has(pattern.key)),
+  };
+}
+
+export function buildAffordabilityScenarios({amount=0,dataFresh=false,categoryRemaining=0,everydaySafe=0,sinkingFree=0,urgent=false,flexibleSwaps=[]}) {
+  const cost=Math.max(0,+amount||0);
+  if(!dataFresh)return{status:'stale',best:null,scenarios:[],swaps:[],uncovered:cost};
+  const scenarios=[];
+  if(categoryRemaining>=cost)scenarios.push({kind:'category_budget',available:categoryRemaining,impact:'none'});
+  if(everydaySafe>=cost)scenarios.push({kind:'everyday_safe',available:everydaySafe,impact:'cashflow_safe'});
+  if(sinkingFree>=cost)scenarios.push({kind:'unallocated_sinking',available:sinkingFree,impact:'preserves_allocated_goals'});
+  if(!urgent)scenarios.push({kind:'wait_and_save',available:0,impact:'lowest_risk'});
+  let left=cost;const swaps=[];
+  for(const item of flexibleSwaps){if(left<=0)break;const use=Math.min(left,Math.max(0,+item.available||0));if(use>0){swaps.push({...item,use});left-=use;}}
+  if(swaps.length)scenarios.push({kind:'swap_flexible_budget',available:cost-left,impact:left>0?'partial':'budget_neutral'});
+  const priority=['category_budget','everyday_safe','unallocated_sinking','swap_flexible_budget','wait_and_save'];
+  const best=priority.map(kind=>scenarios.find(x=>x.kind===kind)).find(Boolean)||null;
+  return{status:'options',best,scenarios,swaps,uncovered:Math.max(0,left)};
+}
+
+export function buildAccountBudgetReview({budget=[],transactions=[],days=7,asOf=new Date().toISOString().slice(0,10)}) {
+  const safeDays=days===30?30:7,end=new Date(asOf+'T12:00:00Z'),start=new Date(end);start.setUTCDate(start.getUTCDate()-safeDays+1);
+  const startIso=start.toISOString().slice(0,10),categoryPlan=new Map();
+  budget.forEach(section=>(section.items||[]).forEach(item=>{
+    const category=item.category||'other',accountId=item.acct||section.acct||'unassigned',key=accountId+'|'+category;
+    const current=categoryPlan.get(key)||{accountId,category,budgetMonthly:0};current.budgetMonthly+=Math.max(0,+item.mo||0);categoryPlan.set(key,current);
+  }));
+  const actualByKey=new Map();
+  transactions.filter(t=>t.date>=startIso&&t.date<=asOf&&t.amount<0&&t.cat!=='transfer').forEach(t=>{
+    const key=(t.acct||'unassigned')+'|'+(t.cat||'other');actualByKey.set(key,(actualByKey.get(key)||0)+Math.abs(+t.amount||0));
+  });
+  const rows=[...new Set([...categoryPlan.keys(),...actualByKey.keys()])].map(key=>{
+    const planned=categoryPlan.get(key)||{accountId:key.split('|')[0],category:key.split('|')[1],budgetMonthly:0};
+    const budgetForPeriod=planned.budgetMonthly*safeDays/(365.25/12),actual=actualByKey.get(key)||0;
+    return {...planned,budgetForPeriod,actual,variance:budgetForPeriod-actual,status:actual>budgetForPeriod?'over':actual>budgetForPeriod*.9?'watch':'good'};
+  });
+  const byAccount=new Map();rows.forEach(row=>{const current=byAccount.get(row.accountId)||{accountId:row.accountId,budget:0,actual:0,rows:[]};current.budget+=row.budgetForPeriod;current.actual+=row.actual;current.rows.push(row);byAccount.set(row.accountId,current);});
+  const accounts=[...byAccount.values()].sort((a,b)=>a.accountId.localeCompare(b.accountId)).map(a=>({...a,variance:a.budget-a.actual,status:a.actual>a.budget?'over':a.actual>a.budget*.9?'watch':'good'}));
+  return {days:safeDays,start:startIso,end:asOf,accounts,rows};
+}
+
 export function deriveCategoryBudgets(budget) {
   const out={};
   budget.forEach(section=>(section.items||[]).forEach(item=>{if(item.category)out[item.category]=(out[item.category]||0)+(+item.mo||0);}));
