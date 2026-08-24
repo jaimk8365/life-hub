@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
+import { buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -70,6 +70,25 @@ test('finance can group budget lines by spending account and review overspend pa
   assert.deepEqual(review.over.map(x => x.id), ['groceries']);
   assert.deepEqual(review.wentWell.map(x => x.id), ['fuel']);
   assert.equal(review.summary.includes('over budget'), true);
+});
+
+test('transaction insights rank urgent categories and retain their supporting transactions', () => {
+  const insights=buildTransactionInsights({
+    transactions:[
+      {id:'t1',date:'2026-08-02',acct:'everyday',cat:'eating',amount:-180,note:'Takeaway'},
+      {id:'t2',date:'2026-08-09',acct:'everyday',cat:'eating',amount:-220,note:'Dinner'},
+      {id:'t3',date:'2026-08-10',acct:'everyday',cat:'groceries',amount:-100,note:'Groceries'},
+    ],
+    categoryBudgets:{eating:300,groceries:900},
+    categoryNames:{eating:'Takeaway & eating out',groceries:'Groceries'},
+    asOf:'2026-08-15',
+  });
+  assert.equal(insights[0].category,'eating');
+  assert.equal(insights[0].status,'over');
+  assert.equal(insights[0].actual,400);
+  assert.deepEqual(insights[0].transactionIds,['t2','t1']);
+  assert.ok(insights[0].recommendations.length>=2);
+  assert.equal(insights.find(x=>x.category==='groceries').status,'on_track');
 });
 
 test('mortgage offset impact combines linked balances and reduces interest and payoff time', () => {
@@ -370,6 +389,15 @@ test('Overview affordability check requires fresh account data and produces mult
   assert.match(finance,/CSV imports update transactions and balances immediately/);
   assert.match(finance,/Screenshot uploads sync immediately/);
   assert.match(finance,/Optional current balance/);
+});
+
+test('Overview and Insights share live clickable transaction insights in both finance apps', async () => {
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const marker of ['transactionInsights','insightsPreviewCard','allTransactionInsightsCard','openInsight','Transactions included','Budget position','What to do next','Updated from the newest transactions']) assert.match(finance,new RegExp(marker));
+  assert.match(finance,/transactionInsights\(\)\.slice\(0,3\)/);
+  assert.match(finance,/const insights=transactionInsights\(txns\)/);
+  assert.match(finance,/save\(K_SHARED, \{[^}]*insights,/s);
+  for(const marker of ['partnerInsightsPreview','partnerAllInsightsCard','openPartnerInsight','SHARED.insights','Transactions included','What to do next','The same live list']) assert.match(partner,new RegExp(marker.replace(/[.]/g,'\\.')));
 });
 
 test('Matthew overview mirrors the shared household guidance and compact money check-up', async () => {

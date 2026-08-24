@@ -130,6 +130,32 @@ export function buildAffordabilityScenarios({amount=0,dataFresh=false,categoryRe
   return{status:'options',best,scenarios,swaps,uncovered:Math.max(0,left)};
 }
 
+export function buildTransactionInsights({transactions=[],categoryBudgets={},categoryNames={},asOf=new Date().toISOString().slice(0,10)}) {
+  const month=asOf.slice(0,7),day=Math.max(1,+asOf.slice(8,10)||1);
+  const [year,monthNumber]=month.split('-').map(Number);
+  const daysInMonth=new Date(year,monthNumber,0).getDate()||30;
+  const pace=Math.min(1,day/daysInMonth);
+  const byCategory=new Map();
+  transactions.filter(t=>t.date&&t.date.slice(0,7)===month&&t.amount<0&&t.cat!=='transfer').forEach(t=>{
+    const category=t.cat||'other',rows=byCategory.get(category)||[];rows.push(t);byCategory.set(category,rows);
+  });
+  const severity={unbudgeted:4,over:3,tracking_high:2,on_track:1};
+  return [...byCategory].map(([category,rows])=>{
+    const actual=rows.reduce((sum,t)=>sum+Math.abs(+t.amount||0),0),budget=Math.max(0,+categoryBudgets[category]||0);
+    const projected=pace>0?actual/pace:actual;
+    const status=!budget?'unbudgeted':actual>budget?'over':projected>budget*1.08?'tracking_high':'on_track';
+    const remaining=budget-actual,name=categoryNames[category]||category;
+    const recommendations=status==='unbudgeted'
+      ? [`Give ${name} a monthly budget so every expense has a home.`,`Review the listed transactions and recategorise anything that does not belong.`]
+      : status==='over'
+        ? [`Pause optional ${name.toLowerCase()} spending until next month.`,`Choose a flexible budget to reduce by ${Math.ceil(Math.abs(remaining))} if more spending cannot wait.`]
+        : status==='tracking_high'
+          ? [`Set a remaining limit of ${Math.max(0,Math.floor(remaining))} for the rest of the month.`,`Plan the next ${name.toLowerCase()} purchase before spending.`]
+          : [`Keep the current pattern — ${Math.max(0,Math.floor(remaining))} remains in this budget.`,`Check again after the next transaction update.`];
+    return {id:'category_'+category,category,name,actual,budget,remaining,projected,status,severity:severity[status],transactionIds:rows.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(t=>t.id),recommendations};
+  }).sort((a,b)=>b.severity-a.severity||(b.actual-b.budget)-(a.actual-a.budget)||b.actual-a.actual);
+}
+
 export function buildAccountBudgetReview({budget=[],transactions=[],days=7,asOf=new Date().toISOString().slice(0,10)}) {
   const safeDays=days===30?30:7,end=new Date(asOf+'T12:00:00Z'),start=new Date(end);start.setUTCDate(start.getUTCDate()-safeDays+1);
   const startIso=start.toISOString().slice(0,10),categoryPlan=new Map();
