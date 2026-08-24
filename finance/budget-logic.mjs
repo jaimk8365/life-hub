@@ -161,6 +161,13 @@ export function buildYearToDateFlow({transactions=[],year=new Date().getFullYear
   return {year,income,redraw,expenses,bills,allocated:reserved,left,rows:{income:incomeRows,redraw:redrawRows,expenses:rows.filter(t=>+t.amount<0&&!billAccounts.has(t.acct)),bills:rows.filter(t=>+t.amount<0&&billAccounts.has(t.acct))}};
 }
 
+export function calculateBillAllocationPlan({target=0,allocated=0,currentBalance=0,otherAllocated=0,due=null,asOf=new Date().toISOString().slice(0,10),expectedTransfers=0}) {
+  const goal=Math.max(0,+target||0),saved=Math.max(0,+allocated||0),available=Math.max(0,(+currentBalance||0)-Math.max(0,+otherAllocated||0));
+  const projected=saved+Math.max(0,+expectedTransfers||0),shortfall=Math.max(0,goal-projected),surplus=Math.max(0,projected-goal);
+  const days=due?Math.max(1,Math.ceil((new Date(due+'T12:00:00')-new Date(asOf+'T12:00:00'))/86400000)):7,weeks=Math.max(1,Math.ceil(days/7));
+  return {target:goal,allocated:saved,available,expectedTransfers:Math.max(0,+expectedTransfers||0),projected,shortfall,surplus,weeks,weeklyTopUp:shortfall/weeks};
+}
+
 export function buildTransactionInsights({transactions=[],categoryBudgets={},categoryNames={},asOf=new Date().toISOString().slice(0,10)}) {
   const month=asOf.slice(0,7),day=Math.max(1,+asOf.slice(8,10)||1);
   const [year,monthNumber]=month.split('-').map(Number);

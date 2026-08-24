@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildDetailedSwapScenarios, buildYearToDateFlow, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
+import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildDetailedSwapScenarios, buildYearToDateFlow, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateBillAllocationPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -260,6 +260,13 @@ test('year-to-date flow reconciles income, lifestyle expenses, bills and reserve
   assert.deepEqual({income:flow.income,redraw:flow.redraw,expenses:flow.expenses,bills:flow.bills,allocated:flow.allocated,left:flow.left},{income:3000,redraw:800,expenses:500,bills:900,allocated:300,left:1300});
   assert.deepEqual(flow.rows.expenses.map(x=>x.id),['e']);
   assert.deepEqual(flow.rows.redraw.map(x=>x.id),['r']);
+});
+
+test('bill allocation plan predicts due-date surplus, shortfall and weekly top-up',()=>{
+  const short=calculateBillAllocationPlan({target:1200,allocated:300,currentBalance:900,otherAllocated:400,due:'2026-09-21',asOf:'2026-08-24',expectedTransfers:300});
+  assert.deepEqual({available:short.available,projected:short.projected,shortfall:short.shortfall,surplus:short.surplus,weeklyTopUp:short.weeklyTopUp},{available:500,projected:600,shortfall:600,surplus:0,weeklyTopUp:150});
+  const surplus=calculateBillAllocationPlan({target:500,allocated:400,currentBalance:1000,otherAllocated:300,due:'2026-09-07',asOf:'2026-08-24',expectedTransfers:200});
+  assert.equal(surplus.shortfall,0);assert.equal(surplus.surplus,100);
 });
 
 test('category budgets are derived from the editable master budget', () => {
@@ -524,6 +531,12 @@ test('both apps show bill direct debits and calendars while Matthew changes are 
   for(const source of [finance,partner])for(const marker of ['Bills account direct debits','Monthly calendar','Yearly calendar','data-v="income"','data-v="expenses"'])assert.match(source,new RegExp(marker));
   for(const marker of ['recordMatthewChange','Change description','Budget changed','Balance updated','Matthew changes'])assert.match(partner,new RegExp(marker));
   assert.match(finance,/Matthew changes/);
+});
+
+test('both Bills views include allocation, available balance and due-date funding plans',async()=>{
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner])for(const marker of ['Bills allocation','Allocated','Unallocated','Projected by due date','Shortfall','Surplus','Weekly top-up needed','Add bill allocation','Rates'])assert.match(source,new RegExp(marker));
+  assert.match(finance,/billNextDue/);assert.match(finance,/expectedBillsTransfersBefore/);
 });
 
 test('Life Hub tasks use a deduplicated one-tap Quest inbox with stronger completion rewards', async () => {
