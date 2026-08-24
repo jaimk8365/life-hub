@@ -151,11 +151,14 @@ export function buildDetailedSwapScenarios({amount=0,urgent=false,due=null,categ
 
 export function buildYearToDateFlow({transactions=[],year=new Date().getFullYear(),billAccountIds=['bills','loanrepay'],allocated=0}) {
   const prefix=String(year)+'-',billAccounts=new Set(billAccountIds),rows=transactions.filter(t=>String(t.date||'').startsWith(prefix)&&t.cat!=='transfer');
-  const income=rows.filter(t=>+t.amount>0).reduce((s,t)=>s+(+t.amount||0),0);
+  const isRedraw=t=>/EDRAW PROCEEDS FROM A\/C/i.test(String(t.note||''));
+  const redrawRows=rows.filter(t=>+t.amount>0&&isRedraw(t));
+  const incomeRows=rows.filter(t=>+t.amount>0&&!isRedraw(t));
+  const income=incomeRows.reduce((s,t)=>s+(+t.amount||0),0),redraw=redrawRows.reduce((s,t)=>s+(+t.amount||0),0);
   const bills=rows.filter(t=>+t.amount<0&&billAccounts.has(t.acct)).reduce((s,t)=>s+Math.abs(+t.amount||0),0);
   const expenses=rows.filter(t=>+t.amount<0&&!billAccounts.has(t.acct)).reduce((s,t)=>s+Math.abs(+t.amount||0),0);
   const reserved=Math.max(0,+allocated||0),left=income-expenses-bills-reserved;
-  return {year,income,expenses,bills,allocated:reserved,left,rows:{income:rows.filter(t=>+t.amount>0),expenses:rows.filter(t=>+t.amount<0&&!billAccounts.has(t.acct)),bills:rows.filter(t=>+t.amount<0&&billAccounts.has(t.acct))}};
+  return {year,income,redraw,expenses,bills,allocated:reserved,left,rows:{income:incomeRows,redraw:redrawRows,expenses:rows.filter(t=>+t.amount<0&&!billAccounts.has(t.acct)),bills:rows.filter(t=>+t.amount<0&&billAccounts.has(t.acct))}};
 }
 
 export function buildTransactionInsights({transactions=[],categoryBudgets={},categoryNames={},asOf=new Date().toISOString().slice(0,10)}) {
