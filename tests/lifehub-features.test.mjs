@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
+import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildDetailedSwapScenarios, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -239,6 +239,20 @@ test('affordability advice blocks stale data and returns budget-safe alternative
   assert.equal(result.best.kind,'everyday_safe');
   assert.equal(result.swaps.reduce((s,x)=>s+x.use,0),500);
   assert.equal(result.uncovered,0);
+});
+
+test('detailed affordability swaps protect necessities and explain actual trade-offs', () => {
+  const result=buildDetailedSwapScenarios({amount:300,urgent:false,categories:[
+    {name:'Groceries',kind:'essential',budget:800,spent:500},
+    {name:'Eating out',kind:'lifestyle',budget:250,spent:50,consequence:'No eating out for the rest of this month.'},
+    {name:'Clothing',kind:'deferrable',budget:180,spent:50},
+  ],goals:[{name:'Fiji',target:2000,saved:500}]});
+  assert.deepEqual(result.swaps.map(x=>x.name),['Eating out','Clothing']);
+  assert.equal(result.swaps[0].effect,'No eating out for the rest of this month.');
+  assert.equal(result.fullyFunded,true);
+  assert.equal(result.uncovered,0);
+  assert.equal(result.wait.recommended,true);
+  assert.equal(result.affectedGoals[0].name,'Fiji');
 });
 
 test('category budgets are derived from the editable master budget', () => {

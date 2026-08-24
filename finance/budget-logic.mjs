@@ -130,6 +130,25 @@ export function buildAffordabilityScenarios({amount=0,dataFresh=false,categoryRe
   return{status:'options',best,scenarios,swaps,uncovered:Math.max(0,left)};
 }
 
+export function buildDetailedSwapScenarios({amount=0,urgent=false,due=null,categories=[],goals=[]}) {
+  const cost=Math.max(0,+amount||0), ranked=categories
+    .map(x=>({...x,budget:Math.max(0,+x.budget||0),spent:Math.max(0,+x.spent||0),protected:Math.max(0,+x.protected||0)}))
+    .map(x=>({...x,remaining:Math.max(0,x.budget-x.spent),available:Math.max(0,x.budget-x.spent-x.protected)}))
+    .filter(x=>x.available>0&&x.kind!=='essential')
+    .sort((a,b)=>(a.kind==='lifestyle'?0:1)-(b.kind==='lifestyle'?0:1)||b.available-a.available);
+  let left=cost;
+  const swaps=[];
+  for(const item of ranked){
+    if(left<=0)break;
+    const use=Math.min(left,item.available),after=item.remaining-use;
+    swaps.push({...item,use,after,risk:item.kind==='lifestyle'?'low':'medium',effect:item.consequence||`Leaves ${Math.round(after)} in ${item.name} until the budget resets.`});
+    left-=use;
+  }
+  const affectedGoals=goals.filter(g=>(+g.saved||0)<(+g.target||+g.cost||0)).map(g=>({name:g.name,shortfall:Math.max(0,(+g.target||+g.cost||0)-(+g.saved||0)),due:g.due||g.deadline||null}));
+  const waitWeeks=due?Math.max(1,Math.ceil((new Date(due+'T12:00:00')-new Date())/604800000)):Math.max(1,Math.ceil(cost/50));
+  return {swaps,uncovered:Math.max(0,left),fullyFunded:left<=0,wait:{weeks:waitWeeks,perWeek:cost/waitWeeks,recommended:!urgent},affectedGoals};
+}
+
 export function buildTransactionInsights({transactions=[],categoryBudgets={},categoryNames={},asOf=new Date().toISOString().slice(0,10)}) {
   const month=asOf.slice(0,7),day=Math.max(1,+asOf.slice(8,10)||1);
   const [year,monthNumber]=month.split('-').map(Number);
