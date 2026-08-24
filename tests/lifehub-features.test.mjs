@@ -504,6 +504,13 @@ test('both overviews expose auditable year-to-date flow and Matthew has private 
   assert.doesNotMatch(partner,/Upload CSV/);
 });
 
+test('Matthew private account is named M Spending with a distinct icon',async()=>{
+  const partner=await text('src/partner-finance.html');
+  assert.match(partner,/🧢 M Spending/);
+  assert.match(partner,/Update M Spending/);
+  assert.match(partner,/Open M Spending/);
+});
+
 test('Life Hub tasks use a deduplicated one-tap Quest inbox with stronger completion rewards', async () => {
   const [quest,plan,home,admin,taskUi]=await Promise.all([
     text('src/quest.html'),text('src/plan.html'),text('src/home.html'),text('src/admin.html'),text('src/task-engine/ui/index.mjs')
