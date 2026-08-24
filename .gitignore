@@ -5,3 +5,6 @@ src/
 
 .claude/
 .lifehub-backups/
+.refresh-*-source.html
+.reminder-lists.json
+.lifehub-reminders*.log

@@ -1,0 +1,36 @@
+name: Refresh encrypted reminders
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,37 * * * *'
+
+concurrency:
+  group: lifehub-reminders
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Merge encrypted reminder snapshot
+        env:
+          HUB_KEY: ${{ secrets.HUB_KEY }}
+        run: node tools/refresh-reminders-only.mjs
+      - name: Verify encrypted outputs
+        env:
+          HUB_KEY: ${{ secrets.HUB_KEY }}
+        run: node --test tests/automation-refresh.test.mjs
+      - name: Publish changed encrypted pages
+        run: |
+          if git diff --quiet -- hub/index.html plan/index.html; then exit 0; fi
+          git config user.name "Life Hub Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add hub/index.html plan/index.html
+          git commit -m "automated reminders refresh"
+          git push

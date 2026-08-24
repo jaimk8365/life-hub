@@ -15,7 +15,9 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = process.argv[2] || '/Users/jaimikyte/Desktop/jaimi-hq.html';
 const out = process.argv[3] || join(root, 'hub', 'index.html');
-const pass = readFileSync(join(root, '.hub-key'), 'utf8').trim();
+// Local builds use the gitignored key file. Cloud automation supplies the same
+// value as an environment secret so plaintext key material never enters git.
+const pass = (process.env.HUB_KEY || readFileSync(join(root, '.hub-key'), 'utf8')).trim();
 
 let html = readFileSync(src, 'utf8')
   // the dashboard's own absolute manifest path 404s under the Pages subpath
