@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
+import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -89,6 +89,32 @@ test('transaction insights rank urgent categories and retain their supporting tr
   assert.deepEqual(insights[0].transactionIds,['t2','t1']);
   assert.ok(insights[0].recommendations.length>=2);
   assert.equal(insights.find(x=>x.category==='groceries').status,'on_track');
+});
+
+test('screenshot extraction stays draft-only until the user approves corrected transactions', () => {
+  const drafts=stageScreenshotTransactions({extracted:[
+    {srcInbox:'shot1',importKey:'a',date:'2026-08-20',amount:-25,cat:'eating',note:'Takeaway'},
+    {srcInbox:'shot1',importKey:'a',date:'2026-08-20',amount:-25,cat:'eating',note:'Duplicate'},
+  ],existingDrafts:[],importedKeys:[]});
+  assert.equal(drafts.length,1);
+  assert.equal(drafts[0].status,'pending');
+  drafts[0].transactions[0].amount=-22;
+  drafts[0].transactions.push({id:'manual',date:'2026-08-21',amount:-10,cat:'fuel',note:'Missing item',include:true});
+  const approved=approveScreenshotDraft({draft:drafts[0],existingTransactions:[]});
+  assert.equal(approved.transactions.length,2);
+  assert.equal(approved.transactions[0].amount,-22);
+  assert.equal(approved.draft.status,'approved');
+});
+
+test('on-device OCR text becomes editable transaction and balance candidates', () => {
+  const parsed=parseScreenshotOcrText(`Current balance $1,245.60\n20 Aug 2026\nMcDonalds Brisbane\n-$25.40\n19 Aug 2026 Woolworths $104.20`,'2026-08-20');
+  assert.equal(parsed.balance,1245.60);
+  assert.equal(parsed.transactions.length,2);
+  assert.deepEqual(parsed.transactions.map(t=>t.date),['2026-08-20','2026-08-19']);
+  assert.equal(parsed.transactions[0].amount,-25.40);
+  assert.equal(parsed.transactions[0].cat,'eating');
+  assert.equal(parsed.transactions[1].cat,'groceries');
+  assert.ok(parsed.transactions.every(t=>t.confidence>0&&t.confidence<=1));
 });
 
 test('mortgage offset impact combines linked balances and reduces interest and payoff time', () => {
@@ -389,6 +415,20 @@ test('Overview affordability check requires fresh account data and produces mult
   assert.match(finance,/CSV imports update transactions and balances immediately/);
   assert.match(finance,/Screenshot uploads sync immediately/);
   assert.match(finance,/Optional current balance/);
+});
+
+test('screenshot review requires approval and balance-only updates create a visible missing-data adjustment', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['fin_screenshot_review_v1','openScreenshotReview','saveScreenshotDraftRow','addScreenshotDraftRow','approveScreenshotReview','Approve and import','Extracted transactions — review before importing','Balance adjustment only — transaction details missing','needsDetails']) assert.match(finance,new RegExp(marker.replace(/[—]/g,'—')));
+  assert.match(finance,/cat:'transfer'.*src:'balance-adjustment'/s);
+  assert.doesNotMatch(finance,/merge Claude's screenshot-extracted transactions into the local log/);
+});
+
+test('screenshot upload runs pinned on-device OCR and opens the approval screen automatically', async () => {
+  const finance=await text('src/finance.html');
+  for(const marker of ['tesseract.js@7','loadOcrEngine','processScreenshotNow','Reading screenshot on this device','OCR confidence','parseScreenshotText','openScreenshotReview','extractedBalance']) assert.match(finance,new RegExp(marker.replace(/[.@]/g,'\\$&')));
+  assert.match(finance,/processScreenshotNow\(item\.id\)/);
+  assert.match(finance,/Nothing is imported until you approve/);
 });
 
 test('Overview and Insights share live clickable transaction insights in both finance apps', async () => {

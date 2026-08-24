@@ -156,6 +156,29 @@ export function buildTransactionInsights({transactions=[],categoryBudgets={},cat
   }).sort((a,b)=>b.severity-a.severity||(b.actual-b.budget)-(a.actual-a.budget)||b.actual-a.actual);
 }
 
+export function stageScreenshotTransactions({extracted=[],existingDrafts=[],importedKeys=[]}) {
+  const imported=new Set(importedKeys),known=new Set(existingDrafts.flatMap(d=>(d.transactions||[]).map(t=>t.importKey).filter(Boolean))),grouped=new Map();
+  extracted.forEach(row=>{if(!row.importKey||imported.has(row.importKey)||known.has(row.importKey))return;known.add(row.importKey);const inboxId=row.srcInbox||'unmatched',rows=grouped.get(inboxId)||[];rows.push({...row,id:row.id||row.importKey,include:row.include!==false});grouped.set(inboxId,rows);});
+  return [...existingDrafts,...[...grouped].map(([inboxId,transactions])=>({id:'review_'+inboxId,inboxId,status:'pending',transactions}))];
+}
+
+export function approveScreenshotDraft({draft,existingTransactions=[]}) {
+  const keys=new Set(existingTransactions.map(t=>t.importKey).filter(Boolean)),transactions=[...existingTransactions];
+  (draft.transactions||[]).filter(t=>t.include!==false).forEach(t=>{if(t.importKey&&keys.has(t.importKey))return;if(t.importKey)keys.add(t.importKey);transactions.push({...t,src:'screenshot-review'});});
+  return {transactions,draft:{...draft,status:'approved',approvedAt:new Date().toISOString()}};
+}
+
+export function parseScreenshotOcrText(text='',asOf=new Date().toISOString().slice(0,10)) {
+  const months={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  const isoDate=value=>{let m=value.match(/\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})\b/);if(m){let y=+m[3];if(y<100)y+=2000;const mo=months[m[2].slice(0,3).toLowerCase()];return mo?`${y}-${String(mo).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`:null;}m=value.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);if(!m)return null;let y=m[3]?+m[3]:+asOf.slice(0,4);if(y<100)y+=2000;return `${y}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`;};
+  const money=value=>{const matches=[...value.matchAll(/([+\-−]?)[\s]*\$?\s*(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})\b/g)];if(!matches.length)return null;const m=matches.at(-1),n=+(m[2].replace(/,/g,'')+'.'+m[3]);return m[1]==='+'?n:-n;};
+  const category=note=>{const s=note.toLowerCase();if(/mcdonald|kfc|hungry jack|subway|sushi|takeaway|restaurant|cafe|coffee|boost/.test(s))return'eating';if(/woolworth|coles|aldi|iga|grocer/.test(s))return'groceries';if(/ampol|caltex|shell|bp\b|petrol|fuel/.test(s))return'fuel';if(/chemist|pharmacy|medical|doctor/.test(s))return'medical';if(/netflix|spotify|subscription/.test(s))return'subs';if(/petbarn|veterinary| vet\b/.test(s))return'pets';return'other';};
+  const lines=String(text).split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean),blocks=[];let block=null,balance=null;
+  lines.forEach(line=>{if(/\bbalance\b/i.test(line)){const v=money(line);if(v!==null)balance=Math.abs(v);return;}const date=isoDate(line);if(date){if(block)blocks.push(block);block={date,lines:[line]};}else if(block)block.lines.push(line);});if(block)blocks.push(block);
+  const transactions=blocks.map((b,index)=>{const joined=b.lines.join(' '),amount=money(joined);if(amount===null)return null;let note=joined.replace(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}\b/g,'').replace(/\b\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?\b/g,'').replace(/([+\-−]?)[\s]*\$?\s*(\d{1,3}(?:,\d{3})*|\d+)\.\d{2}\b/g,'').replace(/\s+/g,' ').trim();if(!note)note='Description needs checking';const positive=/\b(refund|salary|pay|credit|deposit|transfer in)\b/i.test(note);return{id:'ocr_'+index,date:b.date,amount:positive?Math.abs(amount):amount,cat:category(note),note,confidence:note==='Description needs checking'?.55:.82,include:true};}).filter(Boolean);
+  return {balance,transactions};
+}
+
 export function buildAccountBudgetReview({budget=[],transactions=[],days=7,asOf=new Date().toISOString().slice(0,10)}) {
   const safeDays=days===30?30:7,end=new Date(asOf+'T12:00:00Z'),start=new Date(end);start.setUTCDate(start.getUTCDate()-safeDays+1);
   const startIso=start.toISOString().slice(0,10),categoryPlan=new Map();
