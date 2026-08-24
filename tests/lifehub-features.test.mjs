@@ -5,7 +5,7 @@ import { pbkdf2Sync, createDecipheriv } from 'node:crypto';
 
 import { generateStepsForTask, buildTodayPlan } from '../task-engine/logic/index.mjs';
 import { createTaskEngineStore } from '../task-engine/store/index.mjs';
-import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildDetailedSwapScenarios, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
+import { approveScreenshotDraft, buildAccountForecast, buildAccountBudgetReview, buildBudgetReview, buildGoalPaymentPlan, completeSharedGoal, partitionPrivatePlans, buildAffordabilityScenarios, buildDetailedSwapScenarios, buildYearToDateFlow, buildTransactionInsights, classifyDirectDebitPatterns, buildMonthlyForecast, buildWeeklyEverydayPlan, calculateOffsetImpact, classifyPayAgainstBase, compareAccountFunding, deriveCategoryBudgets, parseScreenshotOcrText, stageScreenshotTransactions, summarisePayDeposits, projectNetWorth, summariseLoanPayments, groupBudgetByAccount, escapeHtml } from '../finance/budget-logic.mjs';
 
 const root = new URL('../', import.meta.url);
 const text = path => readFile(new URL(path, root), 'utf8');
@@ -255,6 +255,12 @@ test('detailed affordability swaps protect necessities and explain actual trade-
   assert.equal(result.affectedGoals[0].name,'Fiji');
 });
 
+test('year-to-date flow reconciles income, lifestyle expenses, bills and reserved money',()=>{
+  const flow=buildYearToDateFlow({year:2026,allocated:300,transactions:[{id:'i',date:'2026-01-02',acct:'everyday',amount:3000,cat:'income'},{id:'e',date:'2026-02-01',acct:'everyday',amount:-500,cat:'groceries'},{id:'b',date:'2026-02-02',acct:'bills',amount:-900,cat:'insurance'},{id:'x',date:'2025-12-01',acct:'everyday',amount:-99,cat:'shopping'},{id:'t',date:'2026-02-03',acct:'bills',amount:-700,cat:'transfer'}]});
+  assert.deepEqual({income:flow.income,expenses:flow.expenses,bills:flow.bills,allocated:flow.allocated,left:flow.left},{income:3000,expenses:500,bills:900,allocated:300,left:1300});
+  assert.deepEqual(flow.rows.expenses.map(x=>x.id),['e']);
+});
+
 test('category budgets are derived from the editable master budget', () => {
   const result=deriveCategoryBudgets([{sec:'Living',items:[{n:'Food',mo:500,category:'groceries'},{n:'Fuel',mo:200,category:'fuel'},{n:'Unknown',mo:50}]}]);
   assert.deepEqual(result,{groceries:500,fuel:200});
@@ -465,7 +471,7 @@ test('Matthew overview mirrors the shared household guidance and compact money c
 
 test('Matthew app mirrors Jaimi finance navigation and remains free of private finance labels', async () => {
   const partner=await text('src/partner-finance.html');
-  for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Accounts snapshot','Top priorities','At a glance']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
+  for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Accounts snapshot','Top priorities','money flow']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(partner,privateLabel);
   assert.equal((partner.match(/<button data-v=/g)||[]).length,8);
   for(const view of ['overview','accounts','budget','save','bills','debts','insights','tax']) assert.match(partner,new RegExp(`<div id="${view}" class="view`));
@@ -477,7 +483,7 @@ test('both finance apps provide a top-left app guide and Matthew overview uses a
   for(const source of [finance,partner]) for(const marker of ['📖 Guide','What each section does','Best weekly routine','Get the most from it']) assert.match(source,new RegExp(marker));
   assert.match(finance,/class="guide-link" onclick="openFinanceHelp\(\)"/);
   assert.match(partner,/class="guide-link" onclick="openPartnerHelp\(\)"/);
-  for(const card of ['Right now','Safe to spend','At a glance','Accounts snapshot','Top priorities','Insights','Save & Goals','Debts']) assert.match(partner,new RegExp(card.replace(/[&]/g,'&(?:amp;)?')));
+  for(const card of ['Right now','Safe to spend','money flow','Accounts snapshot','Top priorities','Insights','Save & Goals','Debts']) assert.match(partner,new RegExp(card.replace(/[&]/g,'&(?:amp;)?')));
   assert.doesNotMatch(partner,/spend\.forEach\(a=>\{ html\+=partnerAccountForecast\(a\)/);
 });
 
@@ -489,6 +495,13 @@ test('Safe to Spend is an identical Everyday-only calculation in both finance ap
   assert.match(partner,/typical everyday spend/);
   const partnerSafeSpend=partner.match(/function partnerSafeSpend\(\)[\s\S]*?(?=\nfunction )/)?.[0]||'';
   assert.doesNotMatch(partnerSafeSpend,/sharedAccounts\(/);
+});
+
+test('both overviews expose auditable year-to-date flow and Matthew has private screenshot and minimum controls',async()=>{
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner])for(const marker of ['Income','Expenses · lifestyle & everyday','Bills paid','Allocated · not paid yet','Left unallocated','Tap for'])assert.match(source,new RegExp(marker.replace(/[·]/g,'·')));
+  for(const marker of ['openMineScreenshot','readMineScreenshot','approveMineScreenshot','minBalance','below your minimum','tesseract.js@7.0.0'])assert.match(partner,new RegExp(marker.replace(/[.]/g,'\\.')));
+  assert.doesNotMatch(partner,/Upload CSV/);
 });
 
 test('Life Hub tasks use a deduplicated one-tap Quest inbox with stronger completion rewards', async () => {

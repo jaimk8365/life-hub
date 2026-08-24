@@ -149,6 +149,15 @@ export function buildDetailedSwapScenarios({amount=0,urgent=false,due=null,categ
   return {swaps,uncovered:Math.max(0,left),fullyFunded:left<=0,wait:{weeks:waitWeeks,perWeek:cost/waitWeeks,recommended:!urgent},affectedGoals};
 }
 
+export function buildYearToDateFlow({transactions=[],year=new Date().getFullYear(),billAccountIds=['bills','loanrepay'],allocated=0}) {
+  const prefix=String(year)+'-',billAccounts=new Set(billAccountIds),rows=transactions.filter(t=>String(t.date||'').startsWith(prefix)&&t.cat!=='transfer');
+  const income=rows.filter(t=>+t.amount>0).reduce((s,t)=>s+(+t.amount||0),0);
+  const bills=rows.filter(t=>+t.amount<0&&billAccounts.has(t.acct)).reduce((s,t)=>s+Math.abs(+t.amount||0),0);
+  const expenses=rows.filter(t=>+t.amount<0&&!billAccounts.has(t.acct)).reduce((s,t)=>s+Math.abs(+t.amount||0),0);
+  const reserved=Math.max(0,+allocated||0),left=income-expenses-bills-reserved;
+  return {year,income,expenses,bills,allocated:reserved,left,rows:{income:rows.filter(t=>+t.amount>0),expenses:rows.filter(t=>+t.amount<0&&!billAccounts.has(t.acct)),bills:rows.filter(t=>+t.amount<0&&billAccounts.has(t.acct))}};
+}
+
 export function buildTransactionInsights({transactions=[],categoryBudgets={},categoryNames={},asOf=new Date().toISOString().slice(0,10)}) {
   const month=asOf.slice(0,7),day=Math.max(1,+asOf.slice(8,10)||1);
   const [year,monthNumber]=month.split('-').map(Number);
