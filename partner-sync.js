@@ -15,13 +15,21 @@
   function write(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
   const token = () => localStorage.getItem(T_KEY);
 
-  const b64e = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const b64e = buf => {
+    const bytes = new Uint8Array(buf); let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(binary);
+  };
   const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
   function init(fixedKeyB64, opts){
     opts = opts || {};
     const KEYS = opts.keys || [];   // exact localStorage key names this instance syncs — a whitelist, not a prefix scan
+    const allowed = new Set(KEYS);
     let meta = read(M_KEY, {});
+    // Remember values, not just timestamps: rendering or saving a different
+    // section must not make an unchanged shared snapshot win a conflict.
+    const observed = new Map(KEYS.map(k => [k, localStorage.getItem(k)]));
     let cryptoKeyPromise = null, busy = false, queued = false, pushTimer = null;
     let state = { status: 'off', detail: '' };
     function setState(s, d){ state = { status: s, detail: d }; document.dispatchEvent(new CustomEvent('partner-sync-state', { detail: state })); }
@@ -61,15 +69,26 @@
       localStorage.setItem(G_KEY, id);
       return id;
     }
+    function detectChanges(){
+      let changed = false;
+      KEYS.forEach(k => {
+        const v = localStorage.getItem(k); if (v == null) return;
+        if (!meta[k] || observed.get(k) !== v) {
+          meta[k] = Math.max(Date.now(), (+meta[k] || 0) + 1);
+          observed.set(k, v); changed = true;
+        }
+      });
+      if (changed) write(M_KEY, meta);
+      return changed;
+    }
     function localMap(){
-      const out = {}; let stamped = false;
+      detectChanges();
+      const out = {};
       KEYS.forEach(k => { const v = localStorage.getItem(k); if (v == null) return;
-        if (!meta[k]) { meta[k] = Date.now(); stamped = true; }
         out[k] = { v, t: meta[k] }; });
-      if (stamped) write(M_KEY, meta);
       return out;
     }
-    function applyRemote(k, entry){ localStorage.setItem(k, entry.v); meta[k] = entry.t; write(M_KEY, meta); }
+    function applyRemote(k, entry){ localStorage.setItem(k, entry.v); observed.set(k, entry.v); meta[k] = entry.t; write(M_KEY, meta); }
 
     async function runSync(){
       if (!token()) { setState('off',''); return; }
@@ -87,9 +106,12 @@
           catch(e){ throw new Error('Could not decrypt partner sync data.'); }
         }
         const local = localMap();
-        const merged = {}; let needPush = false, changed = false;
+        const merged = Object.create(null); let needPush = false, changed = false;
         for (const k of new Set([...Object.keys(remote), ...Object.keys(local)])){
           const r = remote[k], l = local[k];
+          // Another profile can own records in this channel. Preserve them in
+          // the encrypted envelope, but never apply them to this profile.
+          if (!allowed.has(k)) { if (r) merged[k] = r; continue; }
           if (r && (!l || r.t > l.t)) { applyRemote(k, r); merged[k] = r; changed = true; }
           else if (l) { merged[k] = l; if (!r || l.t > r.t) needPush = true; }
         }
@@ -104,7 +126,7 @@
 
     return {
       state: () => ({ ...state, last: read(LAST_KEY, 0), on: !!token() }),
-      markDirty(){ KEYS.forEach(k => { meta[k] = Date.now(); }); write(M_KEY, meta); schedulePush(1500); },
+      markDirty(){ if (detectChanges()) schedulePush(1500); },
       syncNow: () => runSync(),
       startPolling(ms){ runSync(); setInterval(runSync, ms || 90000); },
       async connect(tok){

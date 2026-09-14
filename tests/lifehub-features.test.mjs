@@ -22,7 +22,8 @@ test('Task Engine breaks down tasks and builds a capped priority/context plan', 
     { id:'d', title:'Done', steps:[], priority:'high', context:'home', createdAt:now.toISOString(), completed:true },
   ];
   const plan = buildTodayPlan(tasks, now);
-  assert.deepEqual(plan.mustDo.map(t => t.id), ['a','c']);
+  // Overdue work now precedes undated high-priority work before the visible cap.
+  assert.deepEqual(plan.mustDo.map(t => t.id), ['c','a']);
   assert.deepEqual(plan.shouldDo.map(t => t.id), ['b']);
   assert.deepEqual(plan.groupedByContext.admin.map(t => t.id), ['a']);
   assert.equal(plan.groupedByContext.home.some(t => t.id === 'd'), false);
@@ -464,7 +465,9 @@ test('Overview and Insights share live clickable transaction insights in both fi
   for(const marker of ['transactionInsights','insightsPreviewCard','allTransactionInsightsCard','openInsight','Transactions included','Budget position','What to do next','Updated from the newest transactions']) assert.match(finance,new RegExp(marker));
   assert.match(finance,/transactionInsights\(\)\.slice\(0,3\)/);
   assert.match(finance,/const insights=transactionInsights\(txns\)/);
-  assert.match(finance,/save\(K_SHARED, \{[^}]*insights,/s);
+  // The deduplicating publisher retains the same insight snapshot without
+  // stamping an unchanged page render as a new financial edit.
+  assert.equal(/storeSharedSnapshot\(\{[^}]*insights,/s.test(finance),true);
   for(const marker of ['partnerInsightsPreview','partnerAllInsightsCard','openPartnerInsight','SHARED.insights','Transactions included','What to do next','The same live list']) assert.match(partner,new RegExp(marker.replace(/[.]/g,'\\.')));
 });
 
@@ -497,9 +500,11 @@ test('both finance apps provide a top-left app guide and Matthew overview uses a
 
 test('Safe to Spend is an identical Everyday-only calculation in both finance apps', async () => {
   const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
-  assert.match(finance,/function safeSpend\(\)[\s\S]*balance\('everyday'\)[\s\S]*BUFFERS\.everyday[\s\S]*b\.acct==='everyday'[\s\S]*safe: bal-buffer-upcomingBills-pace/);
+  // Runtime tests prove the amounts; this check verifies both screens use that engine.
+  assert.ok(/function safeSpend\(\)[\s\S]*?everydayCommitments\(\)/.test(finance));
+  assert.ok(/function buildWeeklyEverydayPlan\(\)[\s\S]*?everydayCommitments\(\)/.test(finance));
   assert.match(finance,/safeSpend:safeSpend\(\)/);
-  assert.match(partner,/const s=SHARED\.safeSpend/);
+  assert.ok(/const s=partnerLiveSafeSpend\(\)/.test(partner));
   assert.match(partner,/typical everyday spend/);
   const partnerSafeSpend=partner.match(/function partnerSafeSpend\(\)[\s\S]*?(?=\nfunction )/)?.[0]||'';
   assert.doesNotMatch(partnerSafeSpend,/sharedAccounts\(/);
@@ -523,7 +528,7 @@ test('finance exposes income and expense workspaces, richer reviews and transact
   const finance=await text('src/finance.html');
   for(const marker of ['data-v="income"','data-v="expenses"','id="income" class="view"','id="expenses" class="view"','Overtime this pay','Overtime total to date','Overtime budget','Redraw budget','Allocate overtime','Lifestyle expenses','Living expenses','Monthly calendar','Yearly calendar','Week','Fortnight','Month','Year','Why this happened','Action for next week','Delete wishlist item'])assert.match(finance,new RegExp(marker));
   assert.match(finance,/EDRAW PROCEEDS FROM A/i);
-  assert.match(finance,/\['everyday','loanrepay','jspend','sinking','bills'\]/);
+  assert.ok(/\['everyday','loanrepay','jspend','savings','bills'\]/.test(finance),'Offset links must use the real Sinking Funds account ID');
 });
 
 test('both apps show bill direct debits and calendars while Matthew changes are auditable',async()=>{

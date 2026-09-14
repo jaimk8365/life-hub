@@ -40,13 +40,14 @@
     background:rgba(252,250,245,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-top:1px solid var(--line);display:flex;gap:6px;z-index:10;
   }
-  nav button{
+  nav button, nav .finance-link{
     flex:1;border:0;background:transparent;font-family:inherit;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     border-radius:14px;color:var(--ink-faint);font-size:10.5px;font-weight:700;letter-spacing:.04em;
-    transition:all .15s;padding:4px 0;
+    transition:all .15s;padding:4px 0;text-decoration:none;
   }
-  nav button .ico{font-size:21px;line-height:1;filter:grayscale(.85);opacity:.75;transition:all .15s}
+  nav button .ico, nav .finance-link .ico{font-size:21px;line-height:1;filter:grayscale(.85);opacity:.75;transition:all .15s}
+  nav button:focus-visible, nav .finance-link:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
   nav button.active{color:var(--ink);background:rgba(232,146,124,.13)}
   nav button.active .ico{filter:none;opacity:1;transform:scale(1.08)}
 
@@ -63,8 +64,8 @@
       font-family:'Fraunces',serif;font-weight:600;font-size:19px;letter-spacing:-.01em;
       display:block;padding:6px 10px 18px;color:var(--ink);
     }
-    nav button{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:11px;padding:12px 13px;font-size:14px;letter-spacing:0;border-radius:13px}
-    nav button .ico{font-size:19px}
+    nav button, nav .finance-link{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:11px;padding:12px 13px;font-size:14px;letter-spacing:0;border-radius:13px}
+    nav button .ico, nav .finance-link .ico{font-size:19px}
     nav .spacer{flex:1}
     nav .foot{font-size:11px;color:var(--ink-faint);padding:0 10px;line-height:1.5}
   }
@@ -112,7 +113,6 @@
     <iframe id="f-hub" title="Life Hub"></iframe>
     <iframe id="f-quest" title="Night Court Questkeeper"></iframe>
     <iframe id="f-course" title="Brain — mental health"></iframe>
-    <iframe id="f-finance" title="Money"></iframe>
     <iframe id="f-kitchen" title="Kitchen"></iframe>
     <iframe id="f-home" title="Home"></iframe>
     <iframe id="f-admin" title="Life Admin"></iframe>
@@ -130,7 +130,7 @@
     <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Planner</span></button>
     <button id="b-tasks" onclick="show('tasks')"><span class="ico">✅</span><span>Tasks</span></button>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
-    <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Money</span></button>
+    <a id="b-finance" class="finance-link" href="./finance/app.html" target="_blank" rel="noopener"><span class="ico" aria-hidden="true">💰</span><span>Open Finance ↗</span></a>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
     <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
@@ -165,8 +165,11 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', finance:'./finance/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
   function show(which){
+    // Keep old user-click navigation calls working without embedding Finance again.
+    if (which === 'finance'){ window.open('./finance/app.html', '_blank', 'noopener'); return; }
+    if (!Object.prototype.hasOwnProperty.call(SRC, which)) which = 'hub';
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);
       const on = k === which;
@@ -197,7 +200,14 @@
   });
   // wait for the sync engine's first pull (or its ready signal) so sections open on fresh data
   let booted = false;
-  const boot = () => { if (booted) return; booted = true; show(localStorage.getItem('lifehub_tab') || 'hub'); };
+  const boot = () => {
+    if (booted) return;
+    booted = true;
+    let saved = 'hub';
+    try { saved = localStorage.getItem('lifehub_tab') || 'hub'; } catch(e){}
+    // A previously saved Money tab must not launch a popup during startup.
+    show(saved === 'finance' ? 'hub' : saved);
+  };
   window.addEventListener('lifehub-sync-ready', boot, { once: true });
   setTimeout(boot, 7000);
 

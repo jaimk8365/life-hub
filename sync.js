@@ -38,9 +38,18 @@ function write(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(
 const token = () => localStorage.getItem(T_KEY);
 const pass  = () => localStorage.getItem('hub_key');
 const isTracked = k => TRACKED.some(t => k.startsWith(t.prefix));
+const observed = new Map();
+for (let i = 0; i < localStorage.length; i++) {
+  const k = localStorage.key(i);
+  if (isTracked(k)) observed.set(k, localStorage.getItem(k));
+}
 
 /* ---------- crypto ---------- */
-const b64e = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const b64e = buf => {
+  const bytes = new Uint8Array(buf); let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+};
 const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 async function getKey(salt){
   if (cryptoKey && saltB64 === salt) return cryptoKey;
@@ -101,14 +110,19 @@ function localMap(){
   for (let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
     if (!isTracked(k)) continue;
-    if (!meta[k]) { meta[k] = Date.now(); stamped = true; }   // pre-sync data gets stamped on first sight
-    out[k] = { v: localStorage.getItem(k), t: meta[k] };
+    const v = localStorage.getItem(k);
+    if (!meta[k] || observed.get(k) !== v) {
+      meta[k] = Math.max(Date.now(), (+meta[k] || 0) + 1); stamped = true;
+      observed.set(k, v);
+    }
+    out[k] = { v, t: meta[k] };
   }
   if (stamped) write(M_KEY, meta);
   return out;
 }
 function applyRemote(k, entry){
   localStorage.setItem(k, entry.v);
+  observed.set(k, entry.v);
   meta[k] = entry.t; write(M_KEY, meta);
   const spec = TRACKED.find(t => k.startsWith(t.prefix));
   const f = spec && document.getElementById(spec.frame);
@@ -138,10 +152,13 @@ async function runSync(){
       catch(e){ throw new Error('Could not decrypt the sync data — was the passcode changed? Unlock with the current passcode on every device.'); }
     }
     const local = localMap();
-    const merged = {};
+    const merged = Object.create(null);
     let needPush = false;
     for (const k of new Set([...Object.keys(remote), ...Object.keys(local)])){
       const r = remote[k], l = local[k];
+      // Ignore non-app records locally while preserving the existing envelope.
+      // In particular, a remote payload must never replace device credentials.
+      if (!isTracked(k)) { if (r) merged[k] = r; continue; }
       if (r && (!l || r.t > l.t)) { applyRemote(k, r); merged[k] = r; }
       else if (l) { merged[k] = l; if (!r || l.t > r.t) needPush = true; }
     }
@@ -168,7 +185,9 @@ function schedulePush(ms){
 window.addEventListener('storage', (e) => {
   if (e.key === 'hub_key' && e.newValue && token()) { runSync(); return; }  // unlocked → sync can start
   if (!e.key || !isTracked(e.key) || e.newValue === null || e.newValue === e.oldValue) return;
-  meta[e.key] = Date.now(); write(M_KEY, meta);
+  if (observed.get(e.key) === e.newValue) return;
+  observed.set(e.key, e.newValue);
+  meta[e.key] = Math.max(Date.now(), (+meta[e.key] || 0) + 1); write(M_KEY, meta);
   dirty = true;
   schedulePush(2500);
 });
