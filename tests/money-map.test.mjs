@@ -20,5 +20,20 @@ test('transfer history counts both sides once and never invents ambiguous destin
 });
 test('cycles are bounded and every configured connection is described',()=>{
  const m=buildMoneyMap({accounts,transfers:[{fromAcct:'everyday',toAcct:'bills',amount:10,frequency:'weekly'},{fromAcct:'bills',toAcct:'everyday',amount:10,frequency:'weekly'}]});
- const html=renderMoneyMap(m);assert.match(html,/Already shown/);assert.ok(html.length<20000);
+ const html=renderMoneyMap(m,{mode:'flow'});assert.match(html,/Already shown/);assert.ok(html.length<20000);
+});
+
+test('money map supports separate income destinations, sinking allocations and two accessible views',()=>{
+ const m=buildMoneyMap({
+  accounts:[...accounts,{id:'savings',name:'Sinking Funds',balance:800},{id:'mspend',name:'M Spending transfer',private:true,balance:999}],
+  income:[{name:'Matthew',weekly:2000,toAcct:'everyday'},{name:'Jaimi',weekly:950,toAcct:'bills'}],
+  transfers:[{name:'Bills transfer',fromAcct:'everyday',toAcct:'bills',amount:700,frequency:'weekly'},{name:'Sinking transfer',fromAcct:'everyday',toAcct:'savings',amount:100,frequency:'weekly'}],
+  allocations:[{accountId:'savings',name:'Rates',emoji:'🏛️',amount:47,frequency:'weekly'},{accountId:'savings',name:'Birthdays',emoji:'🎂',amount:0,frequency:'weekly',tbd:true}]
+ });
+ assert.equal(m.sources.find(x=>x.name==='Jaimi').toAcct,'bills');
+ assert.equal(m.allocationsByAccount.savings[0].weekly,47);
+ const simple=renderMoneyMap(m,{mode:'simple'}),flow=renderMoneyMap(m,{mode:'flow'});
+ for(const html of [simple,flow]){assert.match(html,/Simple/);assert.match(html,/Flow/);assert.match(html,/Rates/);assert.match(html,/To work out/);}
+ assert.match(simple,/mm-simple/);assert.match(flow,/mm-flow/);assert.match(flow,/mm-flow-dot/);
+ assert.doesNotMatch(simple,/$999/);assert.match(simple,/Private balance/);
 });

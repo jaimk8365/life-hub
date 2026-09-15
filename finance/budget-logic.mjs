@@ -254,7 +254,17 @@ export function summariseLoanPayments({minimumWeekly=0,transactions=[],weeks=4,m
   const minimumExpected=Math.max(0,+minimumWeekly||0)*Math.max(0,+weeks||0);
   const actualPaid=transactions.reduce((s,t)=>s+Math.max(0,+t.amount||0),0);
   const manualExtra=manualExtras.reduce((s,t)=>s+Math.max(0,+t.amount||0),0);
-  return {minimumExpected,actualPaid,manualExtra,extraPaid:Math.max(0,actualPaid-minimumExpected)+manualExtra,shortfall:Math.max(0,minimumExpected-actualPaid)};
+  const weekKey=date=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return'undated';const d=new Date(date+'T12:00:00Z'),day=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-day);return d.toISOString().slice(0,10);};
+  const grouped=new Map();transactions.forEach(t=>{const key=weekKey(t.date),rows=grouped.get(key)||[];rows.push(t);grouped.set(key,rows);});
+  const extraTransactions=[];
+  const periods=[...grouped].sort(([a],[b])=>a.localeCompare(b)).map(([weekStart,rows])=>{
+    let covered=0;const payments=rows.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).map(t=>{const paid=Math.max(0,+t.amount||0),minimumPart=Math.min(paid,Math.max(0,(+minimumWeekly||0)-covered)),extra=Math.max(0,paid-minimumPart);covered+=minimumPart;if(extra>0)extraTransactions.push({id:t.id,date:t.date,weekStart,amount:extra,source:'detected'});return {id:t.id,date:t.date,amount:paid,minimumPart,extra};});
+    const actual=payments.reduce((s,p)=>s+p.amount,0),minimum=Math.max(0,+minimumWeekly||0);
+    return {weekStart,minimum,actual,extra:Math.max(0,actual-minimum),shortfall:Math.max(0,minimum-actual),payments};
+  });
+  const detectedExtraPaid=Math.max(0,actualPaid-minimumExpected);
+  const manualExtraTransactions=manualExtras.map(t=>({id:t.id,date:t.date,weekStart:weekKey(t.date),amount:Math.max(0,+t.amount||0),source:'manual'})).filter(t=>t.amount>0);
+  return {minimumExpected,actualPaid,manualExtra,detectedExtraPaid,extraPaid:detectedExtraPaid+manualExtra,shortfall:Math.max(0,minimumExpected-actualPaid),periods,extraTransactions,manualExtraTransactions};
 }
 
 export function escapeHtml(value) {

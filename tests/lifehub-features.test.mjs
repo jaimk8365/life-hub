@@ -282,6 +282,28 @@ test('net worth projection and loan payment summary use actual transaction patte
   assert.equal(loan.minimumExpected,1000);
   assert.equal(loan.actualPaid,1150);
   assert.equal(loan.extraPaid,250);
+  assert.equal(loan.detectedExtraPaid,150);
+  assert.equal(loan.periods.length,2);
+  assert.deepEqual(loan.extraTransactions.map(x=>x.amount),[100,50]);
+});
+
+test('Finance has a dedicated two-mode Money Map and a guarded multi-file CSV review',async()=>{
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const source of [finance,partner])for(const marker of ['data-v="money-map"','id="money-map" class="view"','Simple','Flow','Internal transfers'])assert.match(source,new RegExp(marker));
+  for(const marker of ['multiple=true','buildCsvBatchReview','Review all files','Import all matched files','Choose account'])assert.match(finance,new RegExp(marker));
+  assert.doesNotMatch(finance,/accountsUpdateControls\(\)\+moneyMapCard\(\)/);
+});
+
+test('Money Map uses the confirmed Sinking Funds split rather than the older transfer amounts',async()=>{
+  const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
+  for(const marker of ['fin_money_map_routes_v2','Council rates','rates.amount=47','carFund.amount=40','christmasLuna.amount=250'])assert.match(finance,new RegExp(marker));
+  for(const source of [finance,partner])for(const marker of ['Kubota equipment loan','79.60','kubota-plan'])assert.match(source,new RegExp(marker));
+});
+
+test('Goal Savings is safely consolidated and every loan publishes detected extra repayments',async()=>{
+  const finance=await text('src/finance.html');
+  for(const marker of ['fin_goal_savings_consolidated_v2','fin_archived_accounts_v1','consolidateLegacyAccount','Detected extra repayments','extraTransactions'])assert.match(finance,new RegExp(marker));
+  assert.match(finance,/ACCTS\.filter\(a=>a\.type==='loan'\)\.map/);
 });
 
 test('user and imported text can be displayed safely without changing stored content', () => {
@@ -364,7 +386,7 @@ test('Matthew finance has shared budget controls in source and encrypted output'
   assert.match(html,/Budget Review/);
   assert.match(html,/Minimum income/);
   for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Tax','Insights','Safe to spend','Accounts snapshot','Top priorities']) assert.match(html,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
-  assert.equal((html.match(/<button data-v=/g)||[]).length,10);
+  assert.equal((html.match(/<button data-v=/g)||[]).length,11);
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(html,privateLabel);
 });
 
@@ -404,8 +426,8 @@ test('Tax tab supports both profiles, checklists, deductions, notes and local re
   for(const source of [finance,partner]) for(const marker of ['Tax','Jaimi','Matthew','Tax checklist','Deductions budget','Receipt details','Tax notes','fin_tax_v1']) assert.match(source,new RegExp(marker));
   assert.match(finance,/fin_tax_receipt_files_v1/);
   assert.doesNotMatch(partner,/fin_tax_receipt_files_v1/);
-  assert.equal((finance.match(/<button data-v=/g)||[]).length,10);
-  assert.equal((partner.match(/<button data-v=/g)||[]).length,10);
+  assert.equal((finance.match(/<button data-v=/g)||[]).length,11);
+  assert.equal((partner.match(/<button data-v=/g)||[]).length,11);
 });
 
 test('Plan my week is a shared editable Everyday planner with Bills-first recommendations', async () => {
@@ -484,7 +506,7 @@ test('Matthew app mirrors Jaimi finance navigation and remains free of private f
   const partner=await text('src/partner-finance.html');
   for(const marker of ['Overview','Accounts','Budget','Save & Goals','Bills','Debts','Insights','Accounts snapshot','Top priorities','money flow']) assert.match(partner,new RegExp(marker.replace(/[&]/g,'&(?:amp;)?')));
   for(const privateLabel of [/\bzip\b/i,/latitude\s*pay/i,/pay[- ]?in[- ]?4/i,/my spendings?/i]) assert.doesNotMatch(partner,privateLabel);
-  assert.equal((partner.match(/<button data-v=/g)||[]).length,10);
+  assert.equal((partner.match(/<button data-v=/g)||[]).length,11);
   for(const view of ['overview','accounts','budget','income','expenses','save','bills','debts','insights','tax']) assert.match(partner,new RegExp(`<div id="${view}" class="view`));
   assert.doesNotMatch(partner,/class="fab"/);
 });

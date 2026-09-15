@@ -1,11 +1,11 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v38';
+const CACHE = 'lifehub-v39';
 const PRECACHE = [
   './finance/app.html', './finance/standalone.js', './finance/manifest.webmanifest',
   './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './hub/index.html', './finance/index.html', './partner/index.html', './plan/index.html',
-  './partner-sync.js', './finance/money-map.js', './finance/money-map.css', './finance/shared-budget.js', './finance/ui-safety.js', './finance/wealth-coach.js',
+  './partner-sync.js', './finance/money-map.js', './finance/money-map.css', './finance/csv-batch.js', './finance/account-migrations.js', './finance/shared-budget.js', './finance/ui-safety.js', './finance/wealth-coach.js',
   './quest/index.html', './course/index.html', './task-engine/index.html',
   './task-engine/models/index.mjs', './task-engine/logic/index.mjs', './task-engine/store/index.mjs', './task-engine/ui/index.mjs'
 ];

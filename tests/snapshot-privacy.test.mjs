@@ -18,3 +18,18 @@ test('Identical shared snapshots do not stamp a new edit over another device',()
  vm.runInContext(fn,ctx);vm.runInContext('storeSharedSnapshot({accounts:[],updatedAt:"new"})',ctx);
  assert.equal(saved,0);assert.equal(dirty,0);vm.runInContext('storeSharedSnapshot({accounts:[{id:"everyday"}],updatedAt:"new"})',ctx);assert.equal(saved,1);assert.equal(dirty,1);
 });
+test('Recurring-payment scan can publish a partner snapshot without a temporal-dead-zone error',()=>{
+ const ctx=vm.createContext({
+  TXNS:[
+   {amount:-20,cat:'subscriptions',acct:'bills',date:'2026-07-01',note:'Example streaming'},
+   {amount:-20,cat:'subscriptions',acct:'bills',date:'2026-08-01',note:'Example streaming'}
+  ],
+  catOf:()=>({n:'Subscriptions'}),BNPL_RE:/(zip|latitude)/i,normMerchant:s=>String(s||'').toLowerCase()
+ });
+ const start=source.indexOf('function recurringScan(){');
+ const end=source.indexOf('\nfunction recurringCard(){',start);
+ vm.runInContext(source.slice(start,end),ctx);
+ const rows=vm.runInContext('recurringScan()',ctx);
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].key,'example streaming');
+});
