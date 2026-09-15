@@ -56,8 +56,11 @@ before publishing. The quiet reporter avoids printing private HTML in failed ass
 Back up first, pull remote changes immediately before committing, and stage only the exact
 reviewed release files. Preserve newer reminder feeds. `node tools/build-page-repairs.mjs`
 applies idempotent code repairs to the latest encrypted Hub/Planner pages without rebuilding
-them from an older desktop data snapshot. The separate Wealth Coach brief is not implemented
-by the Finance launcher; external AI access must be approved before transmitting financial data.
+them from an older desktop data snapshot. Finance includes a deterministic Wealth Review that
+calculates locally from reviewed transactions, balances, budgets, goals, investments and loans.
+It shows assumptions and missing-data confidence and never calls an external AI service. Its
+settings and review history use the existing encrypted Finance sync and are not in Matthew's
+shared snapshot.
 
 ## Refreshing (Claude does this on "refresh my hub")
 
