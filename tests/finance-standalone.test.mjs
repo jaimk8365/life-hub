@@ -16,3 +16,20 @@ test('Standalone Finance waits for its existing encrypted sync engine before ope
  assert.equal(frame.src,'');events['lifehub-sync-ready']();assert.equal(frame.src,'./index.html');frame.src='unchanged';timers[0]();assert.equal(frame.src,'unchanged');
  assert.ok(status.textContent.includes('Synced'));assert.equal(syncs,0);
 });
+test('An invalid saved sync token can be replaced without disconnecting the encrypted Gist',async()=>{
+ const events={},docEvents={},timers=[];let current={on:true,status:'err',detail:'GitHub says the token is invalid or was revoked.',last:0},disconnects=0;
+ const connected=[],content={innerHTML:'',insertAdjacentHTML(_position,html){this.innerHTML+=html;}},panel={hidden:true,setAttribute(){}},token={value:'dummy-replacement-token'};
+ const els={
+  'f-finance':{src:'',classList:{add(){}}},'finance-sync-status':{textContent:'',setAttribute(){},focus(){}},'finance-loading':{hidden:false},
+  'finance-sync-panel':panel,'finance-sync-content':content,'finance-sync-message':{textContent:''},'finance-sync-token':token,'private-sync-detail':{textContent:''}
+ };
+ const doc={getElementById:id=>els[id],addEventListener:(kind,fn)=>docEvents[kind]=fn};
+ const win={addEventListener:(kind,fn)=>events[kind]=fn,LifeHubSync:{state:()=>current,async connect(value){connected.push(value);current={on:true,status:'ok',last:1};},disconnect(){disconnects++;}}};
+ vm.runInNewContext(readFileSync(path('standalone.js'),'utf8'),{window:win,document:doc,navigator:{},setTimeout:fn=>timers.push(fn),Date,console});
+ win.FinanceStandalone.toggleSync();
+ assert.match(content.innerHTML,/Replace sync token/);
+ assert.match(content.innerHTML,/does not change your encrypted Gist, balances or password/);
+ await win.FinanceStandalone.connect();
+ assert.deepEqual(connected,['dummy-replacement-token']);
+ assert.equal(disconnects,0,'Replacing a token must not disconnect or forget the existing Gist');
+});

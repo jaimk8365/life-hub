@@ -1,5 +1,5 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v37';
+const CACHE = 'lifehub-v38';
 const PRECACHE = [
   './finance/app.html', './finance/standalone.js', './finance/manifest.webmanifest',
   './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
