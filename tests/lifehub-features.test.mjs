@@ -306,6 +306,12 @@ test('Goal Savings is safely consolidated and every loan publishes detected extr
   assert.match(finance,/ACCTS\.filter\(a=>a\.type==='loan'\)\.map/);
 });
 
+test('the transferred legacy account is restored as a shared Savings account',async()=>{
+  const finance=await text('src/finance.html');
+  for(const marker of ['fin_savings_account_restored_v1','restoreArchivedAccount'])assert.match(finance,new RegExp(marker));
+  assert.match(finance,/SHARED_ACCT_IDS=.*'goals'/);
+});
+
 test('user and imported text can be displayed safely without changing stored content', () => {
   const raw='<img src=x onerror=alert(1)> & Landscaping';
   assert.equal(escapeHtml(raw),'&lt;img src=x onerror=alert(1)&gt; &amp; Landscaping');

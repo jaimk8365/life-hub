@@ -4,6 +4,14 @@
   function shouldRestoreSeedAccount(account,archives=[]){
     return !archives.some(item=>(item&&item.account&&item.account.id)===account.id);
   }
+  function restoreArchivedAccount({accounts=[],transactions=[],archives=[],accountId,name}={}){
+    const archived=[...archives].reverse().find(item=>item&&item.account&&item.account.id===accountId);
+    if(!archived)return {changed:false,accounts:[...accounts],transactions:[...transactions]};
+    const current=accounts.find(a=>a.id===accountId);
+    const clean=account=>{const restored={...account,name:name||account.name,note:'Savings account kept visible. Money already transferred to Sinking Funds stays there.'};delete restored.legacy;delete restored.budgetMo;delete restored.check;return restored;};
+    if(current){const restored=clean(current),changed=JSON.stringify(restored)!==JSON.stringify(current);return {changed,accounts:accounts.map(a=>a.id===accountId?restored:a),transactions:[...transactions]};}
+    return {changed:true,accounts:[...accounts,clean(archived.account)],transactions:[...transactions]};
+  }
   function accountBalance(account,transactions){return amount((Number(account.openBal)||0)+transactions.filter(t=>t.acct===account.id).reduce((sum,t)=>sum+(Number(t.amount)||0),0));}
   function consolidateLegacyAccount({accounts=[],transactions=[],fromId,toId,date,idFactory}={}){
     const from=accounts.find(a=>a.id===fromId),to=accounts.find(a=>a.id===toId);
@@ -20,5 +28,5 @@
     const archive={account:{...from},archivedAt:transferDate,consolidatedInto:toId,transferredAmount,closedBalance:0,migrationKey,transactionIds:ids};
     return {changed:true,accounts:accounts.filter(a=>a.id!==fromId),transactions:nextTransactions,archive,transferredAmount};
   }
-  return {accountBalance,consolidateLegacyAccount,shouldRestoreSeedAccount};
+  return {accountBalance,consolidateLegacyAccount,restoreArchivedAccount,shouldRestoreSeedAccount};
 });
