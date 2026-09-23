@@ -114,6 +114,7 @@
     <iframe id="f-quest" title="Night Court Questkeeper"></iframe>
     <iframe id="f-course" title="Brain — mental health"></iframe>
     <iframe id="f-kitchen" title="Kitchen"></iframe>
+    <iframe id="f-recipes" title="Recipes"></iframe>
     <iframe id="f-home" title="Home"></iframe>
     <iframe id="f-admin" title="Life Admin"></iframe>
     <iframe id="f-plan" title="My Planner"></iframe>
@@ -133,6 +134,7 @@
     <a id="b-finance" class="finance-link" href="./finance/app.html" target="_blank" rel="noopener"><span class="ico" aria-hidden="true">💰</span><span>Open Finance ↗</span></a>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
+    <button id="b-recipes" class="sec" onclick="show('recipes')"><span class="ico">📖</span><span>Recipes</span></button>
     <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
     <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📖</span><span>Books</span></button>
@@ -149,6 +151,7 @@
   <div class="morepanel" id="morePanel" hidden>
     <h2>More</h2>
     <button onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
+    <button onclick="showFromMore('recipes')"><span class="ico">📖</span>Recipes</button>
     <button onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
     <button onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
     <button onclick="showFromMore('reading')"><span class="ico">📖</span>Book Journal</button>
@@ -165,7 +168,7 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
+  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
   function show(which){
     // Keep old user-click navigation calls working without embedding Finance again.
     if (which === 'finance'){ window.open('./finance/app.html', '_blank', 'noopener'); return; }
@@ -180,7 +183,7 @@
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
     // on phone, highlight "More" when a tucked-away section is showing
-    const inMore = ['kitchen','home','admin','reading','beauty','kids','wardrobe','family'].includes(which);
+    const inMore = ['kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family'].includes(which);
     const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
