@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Recipes · Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F7F3EC;--card:#fff;--ink:#2B2722;--soft:#6B655C;--line:#E7E0D4;--coral:#E8927C;--mint:#7FB79B;--lav:#EEE8FA}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:"Hanken Grotesk",system-ui,sans-serif}
+.wrap{max-width:980px;margin:auto;padding:28px 18px 90px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+h1{font:600 clamp(32px,6vw,52px)/1.05 "Fraunces",serif;margin:5px 0 8px}.sub{color:var(--soft);line-height:1.5;max-width:720px}
+.toolbar{position:sticky;top:0;z-index:5;background:rgba(247,243,236,.94);backdrop-filter:blur(12px);padding:12px 0}
+input{width:100%;border:1px solid var(--line);border-radius:14px;padding:13px 14px;font:inherit;background:#fff;outline:none}
+.chips{display:flex;gap:7px;overflow:auto;padding:10px 0 2px}.chip{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;font:600 12px inherit;cursor:pointer}.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stats{font-size:12px;color:var(--soft);margin:12px 2px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 4px 16px rgba(43,39,34,.04);display:flex;flex-direction:column;min-height:210px}
+.card h2{font:600 20px/1.15 "Fraunces",serif;margin:8px 0}.meta{font-size:12px;color:var(--soft);line-height:1.45}.tags{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.tag{font-size:10.5px;background:var(--lav);border-radius:999px;padding:5px 7px}.actions{margin-top:auto;display:flex;gap:7px;align-items:center}
+.open{flex:1;text-align:center;text-decoration:none;background:var(--ink);color:#fff;border-radius:11px;padding:9px;font-size:12px;font-weight:700}.fav{border:1px solid var(--line);background:#fff;border-radius:11px;padding:8px 10px;font-size:17px;cursor:pointer}
+.note{margin-top:20px;background:#fff7e6;border:1px solid #ead7a5;border-radius:14px;padding:13px;font-size:12px;color:var(--soft);line-height:1.5}
+.empty{text-align:center;color:var(--soft);padding:50px 10px}.source{font-size:11px;color:var(--soft)}
+</style></head><body><main class="wrap">
+<div class="eyebrow">Jaimi's Life Hub · Kitchen</div><h1>Recipe Library</h1>
+<p class="sub">Easy family food plus a dedicated caravan & camping collection. Search by meal, ingredient or cooking setup. ❤️ favourites stay on this device.</p>
+<div class="toolbar"><input id="q" type="search" placeholder="Search chicken, one pot, camping, fish…"><div class="chips" id="chips"></div></div>
+<div class="stats" id="stats"></div><div class="grid" id="grid"></div>
+<div class="note">Public-source recipes open on the creator’s original page so attribution stays intact. Tuna is excluded. Fish and mushrooms are included; lamb is left out of the family collection.</div>
+</main>
+<script>
+const R=[
+["Camp Oven Chicken Curry","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/recipes/camp-oven-chicken-curry",["Camping","Camp oven","Chicken","One pot","Family"]],
+["Camp Oven Nachos","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/recipes/camp-oven-nachos",["Camping","Camp oven","Beef","Family"]],
+["Camp Oven Damper","Coles","Camping & Caravan · Baking","https://www.coles.com.au/recipes-inspiration/recipes/camp-oven-damper",["Camping","Camp oven","Baking","Budget"]],
+["Camp Oven Beef Stew with Damper Dumplings","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/recipes/camp-oven-beef-stew-with-damper-dumplings",["Camping","Camp oven","Beef","One pot"]],
+["One Pot Chicken and Rice","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","One pot","Chicken","Family","Quick"]],
+["Sausage Pizza Pasta","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","One pot","Pasta","Family","Quick"]],
+["Speedy Chicken Cassoulet","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","One pot","Chicken","Quick"]],
+["Beef Fajitas","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","BBQ","Beef","Quick","Family"]],
+["Chicken & Rice Burritos","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","Chicken","Family","Quick"]],
+["Chicken Satay Skewers","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","BBQ","Chicken","Quick"]],
+["BBQ Prawns with Lemon & Caper Dressing","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","BBQ","Fish & seafood","Quick"]],
+["Creamy Sundried Tomato Gnocchi","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","One pan","Vegetarian","Quick"]],
+["Chorizo & Baked Bean Quesadillas","Coles","Camping & Caravan · Dinner","https://www.coles.com.au/recipes-inspiration/collections/easy-camping-dinner-recipes",["Camping","BBQ","Family"]],
+["Classic Camp Oven Beef Stew","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes/classic-camp-oven-beef-stew",["Camping","Camp oven","Beef","One pot","Family"]],
+["Camp Oven Beef Stroganoff","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes/camp-oven-beef-stroganoff",["Camping","Camp oven","Beef","Mushrooms"]],
+["Camp Oven Beef Curry","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes/camp-oven-beef-curry",["Camping","Camp oven","Beef","One pot"]],
+["Camp Oven Roast Chicken & Veggies","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes/camp-oven-roast-chicken-veggies",["Camping","Camp oven","Chicken","Family"]],
+["Camp Oven Cottage Pie","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes/camp-oven-shepherds-pie",["Camping","Camp oven","Beef","Family"]],
+["Warm Chicken Salad","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes",["Camping","BBQ","Chicken","Quick"]],
+["Smoked Veggies with Gnocchi","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes",["Camping","BBQ","Vegetarian","Quick"]],
+["Southern BBQ Chicken","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes",["Camping","BBQ","Chicken"]],
+["Short Ribs in Cola","Camping Australia","Camping & Caravan · Dinner","https://campingaustralia.com.au/blogs/recipes",["Camping","Camp oven","Beef","Slow cook"]],
+["One Pot Creamy Chicken","Cook with Kels","Family Dinner","https://www.cookwithkels.com.au/blogs/recipes/one-pot-creamy-chicken",["One pot","Chicken","Family","Quick"]],
+["Creamy Chicken & Rice","Cook with Kels","Family Dinner","https://www.cookwithkels.com.au/blogs/recipes",["One pot","Chicken","Family"]],
+["Chicken & Spinach Feta Pasta","Cook with Kels","Family Dinner","https://www.cookwithkels.com.au/blogs/recipes",["Pasta","Chicken","Family","Quick"]],
+["Creamy Chicken Pasta","Cook with Kels","Family Dinner","https://www.cookwithkels.com.au/blogs/recipes",["Pasta","Chicken","Family","Quick"]],
+["Lunchbox Bacon & Cheese Rolls","Cook with Kels","Lunchbox","https://www.cookwithkels.com.au/blogs/recipes",["Lunchbox","Baking","Freezer friendly","Kids"]],
+["Banana Choc Chip Mini Loaves","Cook with Kels","Lunchbox","https://www.cookwithkels.com.au/blogs/recipes",["Lunchbox","Baking","Freezer friendly","Kids"]],
+["Family Mexican Eggs","Cook with Kels","Breakfast / Dinner","https://www.cookwithkels.com.au/blogs/recipes",["Breakfast","One pan","Family"]],
+["No-Fuss Sushi Bowls","Cook with Kels","Family Dinner","https://www.cookwithkels.com.au/blogs/recipes",["Quick","Family","Rice"]],
+["Easy Family Recipe Index","Simple Home Edit","Family collection","https://simplehomeedit.com/recipe-index/",["Family","Quick","One pot","Freezer friendly"]],
+["Slow Cooker Recipe Collection","Simple Home Edit","Slow cooker collection","https://simplehomeedit.com/category/slow-cooker/",["Slow cooker","Family","Freezer friendly"]],
+["One-pan Chicken & Garlic Rice","Simple Home Edit","Family Dinner","https://simplehomeedit.com/recipe-index/",["One pan","Chicken","Rice","Family"]],
+["One-pan Satay Chicken & Rice","Simple Home Edit","Family Dinner","https://simplehomeedit.com/recipe-index/",["One pan","Chicken","Rice","Family"]],
+["One-pot Creamy Bolognese","Simple Home Edit","Family Dinner","https://simplehomeedit.com/recipe-index/",["One pot","Beef","Pasta","Family"]],
+["Hidden Veggie Bolognese","Simple Home Edit","Family Dinner","https://simplehomeedit.com/recipe-index/",["Beef","Pasta","Kids","Freezer friendly"]],
+["Chicken Quesadillas","Simple Home Edit","Family Dinner","https://simplehomeedit.com/recipe-index/",["Chicken","Quick","Kids","Family"]],
+["Easy Butter Chicken","Simple Home Edit","Family Dinner","https://simplehomeedit.com/recipe-index/",["Chicken","Family","Freezer friendly"]],
+["Homemade Sausage Rolls","Simple Home Edit","Lunchbox / Dinner","https://simplehomeedit.com/recipe-index/",["Lunchbox","Freezer friendly","Kids"]],
+["Mini Lunchbox Pizzas","Simple Home Edit","Lunchbox","https://simplehomeedit.com/recipe-index/",["Lunchbox","Freezer friendly","Kids"]],
+["Zucchini Slice","Simple Home Edit","Lunchbox","https://simplehomeedit.com/recipe-index/",["Lunchbox","Freezer friendly","Kids","Vegetarian"]],
+["Slow Cooker Recipe Collection","Wholesome by Sarah","Slow cooker collection","https://wholesomebysarah.com.au/my-most-loved-slow-cooker-recipes",["Slow cooker","Family","Freezer friendly"]],
+["Slow Cooker Mexican Beef Mince with Macaroni","Wholesome by Sarah","Family Dinner","https://wholesomebysarah.com.au/recipes/slow-cooker-mexican-beef-mince-with-macaroni",["Slow cooker","Beef","Pasta","Family"]],
+["Healthy Snack Collection","Health and Wellbeing Queensland","Snacks","https://hw.qld.gov.au/healthy-snacks/",["Lunchbox","Snacks","Budget","Kids"]]
+].map((x,i)=>({id:i+1,title:x[0],source:x[1],group:x[2],url:x[3],tags:x[4]}));
+const filters=["All","❤️ Favourites","Camping","Quick","One pot","One pan","Slow cooker","Camp oven","BBQ","Chicken","Beef","Fish & seafood","Vegetarian","Lunchbox","Freezer friendly","Kids","Budget"];
+let active="All";let favs=new Set(JSON.parse(localStorage.getItem("lifehub_recipe_favs")||"[]"));
+const chips=document.getElementById("chips"),grid=document.getElementById("grid"),q=document.getElementById("q");
+function drawChips(){chips.innerHTML=filters.map(f=>'<button class="chip '+(f===active?'on':'')+'" data-f="'+f+'">'+f+'</button>').join("");chips.querySelectorAll("button").forEach(b=>b.onclick=()=>{active=b.dataset.f;drawChips();render()})}
+function render(){const s=q.value.trim().toLowerCase();const list=R.filter(r=>{const hit=!s||[r.title,r.source,r.group,...r.tags].join(" ").toLowerCase().includes(s);const filt=active==="All"||(active==="❤️ Favourites"?favs.has(r.id):r.tags.includes(active));return hit&&filt});document.getElementById("stats").textContent=list.length+" recipes shown · "+R.length+" in the starter library";grid.innerHTML=list.length?list.map(r=>'<article class="card"><div class="source">'+r.source+'</div><h2>'+r.title+'</h2><div class="meta">'+r.group+'</div><div class="tags">'+r.tags.map(t=>'<span class="tag">'+t+'</span>').join("")+'</div><div class="actions"><a class="open" href="'+r.url+'" target="_blank" rel="noopener">Open recipe ↗</a><button class="fav" data-id="'+r.id+'" aria-label="Favourite">'+(favs.has(r.id)?"❤️":"♡")+'</button></div></article>').join(""):'<div class="empty">No recipes match that search.</div>';grid.querySelectorAll(".fav").forEach(b=>b.onclick=()=>{const id=+b.dataset.id;favs.has(id)?favs.delete(id):favs.add(id);localStorage.setItem("lifehub_recipe_favs",JSON.stringify([...favs]));render()})}
+q.oninput=render;drawChips();render();
+</script></body></html>
