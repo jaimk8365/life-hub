@@ -1,0 +1,50 @@
+{
+  "name": "Jaimi Life OS",
+  "version": 1,
+  "design": {
+    "mood": "warm, calm, feminine, uncluttered, family-friendly",
+    "palette": ["oat", "rose", "sage", "clay", "soft blue"],
+    "principles": ["today-first", "one-screen daily use", "progressive disclosure", "mobile friendly", "low visual noise"],
+    "hero": "seasonal family/lifestyle image",
+    "widgets": ["clock", "weather", "calendar", "weekly progress", "countdown"]
+  },
+  "navigation": [
+    {"title":"Today","icon":"☀️"},
+    {"title":"Planner","icon":"📅"},
+    {"title":"Family","icon":"👨‍👩‍👧‍👦"},
+    {"title":"Health","icon":"❤️"},
+    {"title":"Food","icon":"🍽️"},
+    {"title":"Money","icon":"💰"},
+    {"title":"Home","icon":"🏡"},
+    {"title":"Life Hub","icon":"✨"}
+  ],
+  "databases": {
+    "Tasks": ["Name","Status","Date","Priority","Area","Person","Recurring","Source","Life Hub URL"],
+    "Daily Planner": ["Date","Top 3","Energy","Notes","Day Rating"],
+    "Routines": ["Name","Time of Day","Days","Person","Active"],
+    "Family": ["Item","Person","Type","Date","Status","Notes"],
+    "Health Log": ["Date","Person","Tracker","AM Dose Time","Lunch Dose Time","Focus","Distractibility","Impulsivity","Restlessness","Emotional Regulation","Appetite","Sleep","Rebound","Side Effects","Notes"],
+    "Meals": ["Date","Meal","Recipe","Prep","Family Rating","Life Hub URL"],
+    "Recipes": ["Recipe","Category","Protein","Cook Method","Camping","Kid Friendly","Cost","Life Hub URL"],
+    "Money Actions": ["Item","Due","Status","Type","Amount","Life Hub URL"],
+    "Home Projects": ["Project","Area","Status","Next Action","Target Date","Life Hub URL"],
+    "Quick Capture": ["Capture","Created","Area","Processed"]
+  },
+  "views": {
+    "Today": ["Today's tasks","Top 3","Today's events","Meals","Morning routine","Evening routine","Quick capture"],
+    "Planner": ["This week","Calendar","Recurring","Someday"],
+    "Family": ["Thea","Levi","School & sport","Family admin"],
+    "Health": ["Current trackers","Medication trial","Appointments","Doctor review"],
+    "Food": ["This week meals","Recipes","Camping meals","Shopping"],
+    "Money": ["This week","Bills","Goals","Money Hub link"],
+    "Home": ["Next actions","Maintenance","Projects","Caravan","Pets"],
+    "Life Hub": ["Open Life Hub","Recent updates","GitHub development"]
+  },
+  "syncPolicy": {
+    "LifeHub": "source of truth for encrypted/private app data and rich recipe/finance modules",
+    "Notion": "source of truth for planning, dashboards, tasks and lightweight trackers",
+    "AppleCalendar": "source of truth for timed events",
+    "AppleReminders": "source of truth for Siri/time-sensitive alerts",
+    "AppleNotes": "quick capture only"
+  }
+}
