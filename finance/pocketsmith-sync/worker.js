@@ -84,11 +84,12 @@ async function getTransactions(userId, env, updatedSince) {
 function safeAccount(account) {
   return {
     id: account.id,
-    title: account.title,
-    type: account.type,
-    currencyCode: account.currency_code,
-    currentBalance: account.current_balance,
-    currentBalanceDate: account.current_balance_date
+    title: account.name || account.title || account.account?.title || "PocketSmith account",
+    type: account.type || account.account?.type || null,
+    currencyCode: account.currency_code || account.account?.currency_code || null,
+    currentBalance: account.current_balance ?? account.balance ?? null,
+    currentBalanceDate: account.current_balance_date || account.balance_date || null,
+    parentAccountId: account.account?.id || account.account_id || null
   };
 }
 
@@ -184,16 +185,39 @@ export default {
         const updatedSince =
           url.searchParams.get("updated_since") || "";
 
-        const [accounts, transactions] = await Promise.all([
-          pocketSmith(`/users/${me.id}/accounts`, env),
-          getTransactions(me.id, env, updatedSince)
-        ]);
+        const accounts = await pocketSmith(`/users/${me.id}/transaction_accounts`, env);
+        if (!Array.isArray(accounts)) {
+          return json(
+            {
+              error: "unexpected_response",
+              message: "PocketSmith account response needs attention.",
+              stage: "transaction_accounts_shape",
+              upstreamStatus: 200
+            },
+            502,
+            origin
+          );
+        }
+
+        const transactions = await getTransactions(me.id, env, updatedSince);
+        if (!Array.isArray(transactions)) {
+          return json(
+            {
+              error: "unexpected_response",
+              message: "PocketSmith transaction response needs attention.",
+              stage: "transactions_shape",
+              upstreamStatus: 200
+            },
+            502,
+            origin
+          );
+        }
 
         return json(
           {
             generatedAt: new Date().toISOString(),
             updatedSince: updatedSince || null,
-            accounts: (accounts || []).map(safeAccount),
+            accounts: accounts.map(safeAccount),
             transactions: transactions.map(safeTransaction)
           },
           200,
