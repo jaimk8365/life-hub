@@ -53,7 +53,14 @@ async function pocketSmith(path, env) {
     throw error;
   }
 
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    const error = new Error("PocketSmith returned an unreadable response.");
+    error.upstreamStatus = response.status;
+    error.path = path.split("?")[0];
+    throw error;
+  }
 }
 
 async function getTransactions(userId, env, updatedSince) {
@@ -82,8 +89,9 @@ async function getTransactions(userId, env, updatedSince) {
 }
 
 function safeAccount(account) {
+  if (!account || typeof account !== "object") return null;
   return {
-    id: account.id,
+    id: account.id ?? null,
     title: account.name || account.title || account.account?.title || "PocketSmith account",
     type: account.type || account.account?.type || null,
     currencyCode: account.currency_code || account.account?.currency_code || null,
@@ -94,22 +102,23 @@ function safeAccount(account) {
 }
 
 function safeTransaction(transaction) {
+  if (!transaction || typeof transaction !== "object") return null;
   return {
-    id: transaction.id,
-    date: transaction.date,
-    amount: transaction.amount,
-    payee: transaction.payee,
-    type: transaction.type,
-    status: transaction.status,
-    needsReview: transaction.needs_review,
+    id: transaction.id ?? null,
+    date: transaction.date || null,
+    amount: transaction.amount ?? null,
+    payee: transaction.payee || "",
+    type: transaction.type || null,
+    status: transaction.status || null,
+    needsReview: transaction.needs_review ?? null,
     category: transaction.category
       ? {
-          id: transaction.category.id,
-          title: transaction.category.title
+          id: transaction.category.id ?? null,
+          title: transaction.category.title || ""
         }
       : null,
     transactionAccountId:
-      transaction.transaction_account?.id || null,
+      transaction.transaction_account?.id || transaction.transaction_account_id || null,
     updatedAt: transaction.updated_at || null
   };
 }
@@ -217,8 +226,8 @@ export default {
           {
             generatedAt: new Date().toISOString(),
             updatedSince: updatedSince || null,
-            accounts: accounts.map(safeAccount),
-            transactions: transactions.map(safeTransaction)
+            accounts: accounts.map(safeAccount).filter(Boolean),
+            transactions: transactions.map(safeTransaction).filter(Boolean)
           },
           200,
           origin
