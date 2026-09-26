@@ -84,7 +84,7 @@
 
   function categoryFor(t){
     const type=norm(t?.type),cat=norm(t?.category?.title),payee=norm(t?.payee),all=[type,cat,payee].join(' ');
-    if(/transfer|internal transfer/.test(all))return'transfer';
+    if(t?.isTransfer===true||/transfer|internal transfer/.test(all))return'transfer';
     if(Number(t?.amount)>0&&/salary|wage|payroll|income|deposit/.test(all))return'income';
     if(/grocery|supermarket|woolworth|coles|aldi|iga/.test(all))return'groceries';
     if(/restaurant|cafe|coffee|takeaway|fast food|dining/.test(all))return'eating';
