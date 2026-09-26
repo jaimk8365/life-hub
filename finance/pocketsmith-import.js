@@ -161,6 +161,7 @@
       mappings:mapping.mappings,
       balances:(snapshot.accounts||[]).filter(a=>mapping.map[String(a.id)]&&Number.isFinite(Number(a.currentBalance))).map(a=>({financeId:mapping.map[String(a.id)],pocketsmithId:String(a.id),balance:round2(a.currentBalance),asAt:a.currentBalanceDate||null})),
       additions:plan.additions,
+      updates:plan.updates,
       links:plan.links
     };
     try{
@@ -171,6 +172,13 @@
         for(const link of payload.links){
           const row=TXNS.find(t=>String(t.id)===String(link.existingId));
           if(row){row.pocketsmithId=link.pocketsmithId;row.importKey=link.importKey;row.pocketsmithLinked=true;}
+        }
+        let updated=0;
+        for(const next of payload.updates||[]){
+          const row=TXNS.find(t=>String(t.id)===String(next.existingId));
+          if(!row)continue;
+          Object.assign(row,{acct:next.acct,date:next.date,amount:next.amount,cat:next.cat,note:next.note,src:'pocketsmith',pocketsmithId:next.pocketsmithId,importKey:next.importKey});
+          updated++;
         }
         const known=new Set(TXNS.map(t=>t.importKey).filter(Boolean));
         let added=0;
@@ -202,7 +210,7 @@
         }
         if(typeof publishPartnerSnapshot==="function"){try{publishPartnerSnapshot();}catch(_){}}
         if(typeof render==="function"){try{render();}catch(_){}}
-        return {ok:true,added,linked:payload.links.length,balances:balanceResults};
+        return {ok:true,added,updated,linked:payload.links.length,balances:balanceResults};
       })()`);
     }finally{
       try{delete w.__PS_IMPORT_PAYLOAD__;}catch(_){}
@@ -226,8 +234,8 @@
       if(badBalances.length)throw new Error('A synced account did not reconcile to the PocketSmith balance.');
       const detail=mapping.unmatched.length
         ? `Updated ${applied.balances.length} account(s); ${mapping.unmatched.length} PocketSmith account(s) still need matching.`
-        : `Updated ${applied.balances.length} account(s) and imported ${applied.added} new transaction(s).`;
-      return setState(mapping.unmatched.length?'attention':'ok',detail,{mapping,plan:{added:applied.added,linked:applied.linked,skipped:plan.skipped.length},balances:applied.balances});
+        : `Updated ${applied.balances.length} account(s), imported ${applied.added} new transaction(s) and refreshed ${applied.updated||0} changed transaction(s).`;
+      return setState(mapping.unmatched.length?'attention':'ok',detail,{mapping,plan:{added:applied.added,updated:applied.updated||0,linked:applied.linked,skipped:plan.skipped.length},balances:applied.balances});
     }catch(e){
       return setState('error',e.message||'PocketSmith data could not be applied to Finance.');
     }
