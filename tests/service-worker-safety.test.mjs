@@ -27,8 +27,8 @@ test('service worker leaves a genuine network failure when no offline copy exist
  const w=worker({offline:true,cached:null});await assert.rejects(w.event('fetch',{method:'GET',url:'https://example.test/life-hub/new-page/'}),/offline/);
 });
 test('service worker cleans only old Life Hub cache versions',async()=>{
- const w=worker();await w.event('activate');assert.deepEqual(w.deleted,['lifehub-v35','lifehub-v36','lifehub-v37','lifehub-v38','lifehub-v39']);
+ const w=worker();await w.event('activate');assert.deepEqual(w.deleted,['lifehub-v35','lifehub-v36','lifehub-v37','lifehub-v38','lifehub-v39','lifehub-v40']);
 });
 test('service worker precaches encrypted finance profiles and their shared assets',async()=>{
- const w=worker();await w.event('install');for(const path of ['finance/index.html','partner/index.html','plan/index.html','finance/money-map.js','finance/money-map.css','finance/csv-batch.js','finance/account-migrations.js','finance/shared-budget.js','finance/ui-safety.js','finance/wealth-coach.js','partner-sync.js'])assert.ok(w.precache.includes('./'+path),path);
+ const w=worker();await w.event('install');for(const path of ['finance/index.html','partner/index.html','plan/index.html','finance/pocketsmith-client.js','finance/pocketsmith-import.js','finance/money-map.js','finance/money-map.css','finance/csv-batch.js','finance/account-migrations.js','finance/shared-budget.js','finance/ui-safety.js','finance/wealth-coach.js','partner-sync.js'])assert.ok(w.precache.includes('./'+path),path);
 });
