@@ -108,18 +108,22 @@
       if(t?.pocketsmithId!=null)byExternal.set(String(t.pocketsmithId),t);
       if(String(t?.importKey||'').startsWith('pocketsmith:'))byExternal.set(String(t.importKey).slice(12),t);
     }
-    const additions=[],links=[],skipped=[];
+    const additions=[],updates=[],links=[],skipped=[];
     for(const src of snapshotTransactions){
       const psId=String(src?.id??'');
       const acct=accountMap[String(src?.transactionAccountId??'')];
       if(!psId||!acct||!/^\d{4}-\d{2}-\d{2}/.test(String(src?.date||''))||!Number.isFinite(Number(src?.amount))){skipped.push(psId||'unknown');continue;}
-      if(byExternal.has(psId))continue;
       const row={id:'ps_'+psId,acct,date:String(src.date).slice(0,10),amount:round2(src.amount),cat:categoryFor(src),note:String(src.payee||src.category?.title||'PocketSmith transaction'),src:'pocketsmith',pocketsmithId:psId,importKey:'pocketsmith:'+psId};
+      const linked=byExternal.get(psId);
+      if(linked){
+        updates.push({existingId:linked.id,...row,id:linked.id});
+        continue;
+      }
       const match=existingMatch(existing,row);
       if(match&&match.id!=null)links.push({existingId:match.id,pocketsmithId:psId,importKey:row.importKey});
       else additions.push(row);
     }
-    return {additions,links,skipped};
+    return {additions,updates,links,skipped};
   }
 
   let state={status:'idle',detail:'',result:null};
