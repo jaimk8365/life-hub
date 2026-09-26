@@ -39,14 +39,16 @@ test('transaction planner links an existing same-day amount instead of duplicati
  assert.equal(plan.links[0].existingId,'old');
 });
 
-test('transaction planner skips already-linked PocketSmith IDs and unmapped accounts',()=>{
- const existing=[{id:'a',acct:'everyday',date:'2026-09-25',amount:-10,note:'Cafe',pocketsmithId:'1'}];
+test('transaction planner refreshes already-linked PocketSmith rows and skips unmapped accounts',()=>{
+ const existing=[{id:'a',acct:'everyday',date:'2026-09-25',amount:-10,note:'Old cafe name',pocketsmithId:'1'}];
  const snap=[
-  {id:1,transactionAccountId:1,date:'2026-09-25',amount:-10,payee:'Cafe'},
+  {id:1,transactionAccountId:1,date:'2026-09-25',amount:-12,payee:'Cafe updated'},
   {id:2,transactionAccountId:999,date:'2026-09-25',amount:-20,payee:'Other'}
  ];
  const plan=planTransactions(existing,snap,{'1':'everyday'});
  assert.equal(plan.additions.length,0);
+ assert.equal(plan.updates.length,1);
+ assert.equal(plan.updates[0].amount,-12);
  assert.equal(plan.skipped.length,1);
 });
 
