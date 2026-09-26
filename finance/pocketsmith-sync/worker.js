@@ -66,8 +66,14 @@ async function pocketSmith(path, env) {
 async function getTransactions(userId, env, updatedSince) {
   const transactions = [];
 
-  for (let page = 1; page <= 50; page++) {
-    const params = new URLSearchParams({ page: String(page) });
+  // PocketSmith defaults to only 30 rows/page. Use its supported 1000-row
+  // page size so the initial history import stays well below Cloudflare
+  // Free's 50 external-subrequest limit.
+  for (let page = 1; page <= 40; page++) {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: "1000"
+    });
 
     if (updatedSince) {
       params.set("updated_since", updatedSince);
@@ -82,7 +88,7 @@ async function getTransactions(userId, env, updatedSince) {
 
     transactions.push(...batch);
 
-    if (batch.length < 30) break;
+    if (batch.length < 1000) break;
   }
 
   return transactions;
