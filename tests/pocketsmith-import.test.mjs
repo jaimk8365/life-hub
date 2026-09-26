@@ -58,3 +58,18 @@ test('PocketSmith categories map to Finance category IDs used by existing calcul
  assert.equal(categoryFor({amount:2000,category:{title:'Salary'}}),'income');
  assert.equal(categoryFor({amount:-15,category:{title:'Streaming subscription'}}),'subs');
 });
+
+test('manual account mapping overrides safely resolve ambiguous PocketSmith names',()=>{
+ const ps=[{id:1,title:'NAB Offset',type:'bank'},{id:2,title:'NAB Offset',type:'bank'}];
+ const finance=[{id:'everyday',name:'Everyday'},{id:'bills',name:'Bills'}];
+ const auto=buildAccountMapping(ps,finance);
+ assert.equal(auto.mappings.length,0);
+ const manual=buildAccountMapping(ps,finance,{'1':'everyday','2':'bills'});
+ assert.equal(manual.map['1'],'everyday');
+ assert.equal(manual.map['2'],'bills');
+ assert.equal(manual.unmatched.length,0);
+});
+
+test('PocketSmith transfer flag wins over merchant/category guesses',()=>{
+ assert.equal(categoryFor({amount:-100,isTransfer:true,payee:'Woolworths',category:{title:'Groceries'}}),'transfer');
+});
