@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "purpose": "Safe summary contract for Jaimi's HQ > Money Hub. Never include raw transactions, credentials, account numbers, PINs or security data.",
+  "destination": {
+    "notionPage": "Money Hub",
+    "pageId": "3e4fcd35-0e18-8129-8a43-ce6694628616"
+  },
+  "sync": {
+    "accounts": [
+      "displayName",
+      "purpose",
+      "balance",
+      "bufferTarget",
+      "bufferProgressPct"
+    ],
+    "loans": [
+      "displayName",
+      "balance",
+      "interestRate",
+      "repaymentAmount",
+      "repaymentFrequency"
+    ],
+    "goals": [
+      "name",
+      "saved",
+      "target",
+      "progressPct",
+      "dueDate",
+      "requiredWeekly",
+      "status"
+    ],
+    "cashFlow": [
+      "plannedWeeklyCommitments",
+      "estimatedWeeklySurplus",
+      "estimatedFortnightlySurplus"
+    ],
+    "attention": [
+      "label",
+      "reason",
+      "priority"
+    ],
+    "meta": [
+      "generatedAt",
+      "financeDataAsAt"
+    ]
+  },
+  "exclusions": [
+    "rawTransactions",
+    "bankAccountNumbers",
+    "BSB",
+    "passwords",
+    "PINs",
+    "API tokens",
+    "GitHub tokens",
+    "Notion tokens",
+    "security answers"
+  ],
+  "rules": [
+    "Finance app remains the detailed source; Notion is the action/summary layer.",
+    "Only sync changed summary values.",
+    "Do not create duplicate Money Hub pages or finance databases.",
+    "Secrets must never be committed to this repository or embedded in browser JavaScript."
+  ]
+}
