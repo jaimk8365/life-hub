@@ -30,7 +30,14 @@
     });
     if (res.status === 401) throw new Error('PocketSmith app token needs replacing.');
     if (res.status === 403) throw new Error('This Finance address is not allowed by the secure bridge.');
-    if (!res.ok) throw new Error('PocketSmith feed needs attention.');
+    if (!res.ok) {
+      let body = null;
+      try { body = await res.json(); } catch (_) {}
+      const detail = body && body.stage
+        ? 'PocketSmith feed needs attention at ' + body.stage + (body.upstreamStatus ? ' (PocketSmith ' + body.upstreamStatus + ')' : '') + '.'
+        : 'PocketSmith feed needs attention (HTTP ' + res.status + ').';
+      throw new Error(detail);
+    }
     return res.json();
   }
 
