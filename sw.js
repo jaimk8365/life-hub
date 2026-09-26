@@ -1,7 +1,7 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v41';
+const CACHE = 'lifehub-v42';
 const PRECACHE = [
-  './finance/app.html', './finance/standalone.js', './finance/manifest.webmanifest',
+  './finance/app.html', './finance/standalone.js', './finance/pocketsmith-client.js', './finance/pocketsmith-import.js', './finance/manifest.webmanifest',
   './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './hub/index.html', './finance/index.html', './partner/index.html', './plan/index.html',
