@@ -6,6 +6,7 @@
   if(typeof module==='object'&&module.exports) module.exports=api;
   else root.PocketSmithImporter=api;
 })(typeof window==='object'?window:globalThis,function(root){
+  const MAP_KEY='fin_pocketsmith_account_map_v1';
   const aliases={
     everyday:['everyday','everyday expenses','main offset','everyday offset'],
     bills:['bills','bills offset'],
@@ -40,23 +41,45 @@
     return overlap?40+overlap*10:0;
   }
 
-  function buildAccountMapping(psAccounts=[],financeAccounts=[]){
-    const candidates=[];
-    for(const ps of psAccounts){
-      for(const finance of financeAccounts){
-        const score=scoreAccount(ps,finance);
-        if(score>0)candidates.push({psId:String(ps.id),financeId:finance.id,score,psTitle:ps.title||ps.name||'',financeName:finance.name||finance.id});
-      }
-    }
-    candidates.sort((a,b)=>b.score-a.score);
+  function buildAccountMapping(psAccounts=[],financeAccounts=[],overrides={}){
+    const financeById=new Map(financeAccounts.map(a=>[String(a.id),a]));
     const usedPs=new Set(),usedFinance=new Set(),mappings=[];
-    for(const c of candidates){
-      if(usedPs.has(c.psId)||usedFinance.has(c.financeId))continue;
-      usedPs.add(c.psId);usedFinance.add(c.financeId);mappings.push(c);
+
+    for(const ps of psAccounts){
+      const psId=String(ps.id);
+      const target=overrides&&overrides[psId]!=null?String(overrides[psId]):'';
+      const finance=financeById.get(target);
+      if(!finance||usedFinance.has(finance.id))continue;
+      mappings.push({psId,financeId:finance.id,score:1000,manual:true,psTitle:ps.title||ps.name||'',financeName:finance.name||finance.id});
+      usedPs.add(psId);usedFinance.add(finance.id);
     }
+
+    const byPs=new Map();
+    for(const ps of psAccounts){
+      const psId=String(ps.id);
+      if(usedPs.has(psId))continue;
+      const rows=[];
+      for(const finance of financeAccounts){
+        if(usedFinance.has(finance.id))continue;
+        const score=scoreAccount(ps,finance);
+        if(score>=80)rows.push({psId,financeId:finance.id,score,manual:false,psTitle:ps.title||ps.name||'',financeName:finance.name||finance.id});
+      }
+      rows.sort((a,b)=>b.score-a.score);
+      byPs.set(psId,rows);
+    }
+
+    const ordered=[...byPs.entries()].sort((a,b)=>(b[1][0]?.score||0)-(a[1][0]?.score||0));
+    for(const [psId,rows] of ordered){
+      const available=rows.filter(x=>!usedFinance.has(x.financeId));
+      if(!available.length)continue;
+      const top=available[0],runner=available[1];
+      if(runner&&runner.score===top.score)continue;
+      mappings.push(top);usedPs.add(psId);usedFinance.add(top.financeId);
+    }
+
     const map=Object.fromEntries(mappings.map(x=>[x.psId,x.financeId]));
     const unmatched=psAccounts.filter(a=>!usedPs.has(String(a.id))).map(a=>({id:String(a.id),title:a.title||a.name||'PocketSmith account',type:a.type||null,currentBalance:a.currentBalance}));
-    return {map,mappings,unmatched};
+    return {map,mappings,unmatched,financeAccounts:financeAccounts.map(a=>({id:a.id,name:a.name,type:a.type||null}))};
   }
 
   function categoryFor(t){
@@ -192,7 +215,9 @@
     if(!await waitReady())return setState('attention','Unlock My Finance so the bank data can be applied.');
     try{
       const model=financeModel();
-      const mapping=buildAccountMapping(snapshot.accounts,model.accounts);
+      let overrides={};
+      try{overrides=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
+      const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
       const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map);
       const applied=applyOps(snapshot,mapping,plan);
@@ -208,7 +233,14 @@
     }
   }
 
+  function setMapping(psId,financeId){
+    let map={};
+    try{map=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
+    if(financeId)map[String(psId)]=String(financeId);else delete map[String(psId)];
+    if(root.localStorage)root.localStorage.setItem(MAP_KEY,JSON.stringify(map));
+    return map;
+  }
   function getState(){return {...state};}
-  const api={norm,buildAccountMapping,categoryFor,planTransactions,apply,state:getState};
+  const api={norm,buildAccountMapping,categoryFor,planTransactions,apply,setMapping,state:getState,MAP_KEY};
   return api;
 });
