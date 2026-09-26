@@ -1,0 +1,189 @@
+const API = "https://api.pocketsmith.com/v2";
+
+function json(body, status = 200, origin = "") {
+  const headers = {
+    "content-type": "application/json",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff"
+  };
+
+  if (origin) {
+    headers["access-control-allow-origin"] = origin;
+    headers["vary"] = "Origin";
+  }
+
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+function allowedOrigin(request, env) {
+  const origin = request.headers.get("Origin") || "";
+  return origin && origin === env.ALLOWED_ORIGIN ? origin : "";
+}
+
+function authorised(request, env) {
+  const supplied = request.headers.get("Authorization") || "";
+  return supplied === `Bearer ${env.APP_SYNC_TOKEN}`;
+}
+
+async function pocketSmith(path, env) {
+  const response = await fetch(API + path, {
+    headers: {
+      "X-Developer-Key": env.POCKETSMITH_DEVELOPER_KEY,
+      accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`PocketSmith request failed (${response.status})`);
+  }
+
+  return response.json();
+}
+
+async function getTransactions(userId, env, updatedSince) {
+  const transactions = [];
+
+  for (let page = 1; page <= 50; page++) {
+    const params = new URLSearchParams({ page: String(page) });
+
+    if (updatedSince) {
+      params.set("updated_since", updatedSince);
+    }
+
+    const batch = await pocketSmith(
+      `/users/${userId}/transactions?${params}`,
+      env
+    );
+
+    if (!Array.isArray(batch) || batch.length === 0) break;
+
+    transactions.push(...batch);
+
+    if (batch.length < 30) break;
+  }
+
+  return transactions;
+}
+
+function safeAccount(account) {
+  return {
+    id: account.id,
+    title: account.title,
+    type: account.type,
+    currencyCode: account.currency_code,
+    currentBalance: account.current_balance,
+    currentBalanceDate: account.current_balance_date
+  };
+}
+
+function safeTransaction(transaction) {
+  return {
+    id: transaction.id,
+    date: transaction.date,
+    amount: transaction.amount,
+    payee: transaction.payee,
+    type: transaction.type,
+    status: transaction.status,
+    needsReview: transaction.needs_review,
+    category: transaction.category
+      ? {
+          id: transaction.category.id,
+          title: transaction.category.title
+        }
+      : null,
+    transactionAccountId:
+      transaction.transaction_account?.id || null,
+    updatedAt: transaction.updated_at || null
+  };
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/health") {
+      if (!authorised(request, env)) {
+        return json({ error: "unauthorised" }, 401);
+      }
+
+      try {
+        const me = await pocketSmith("/me", env);
+
+        return json({
+          ok: true,
+          pocketSmithConnected: Boolean(me?.id)
+        });
+      } catch {
+        return json(
+          {
+            error: "upstream_error",
+            message: "PocketSmith connection needs attention."
+          },
+          502
+        );
+      }
+    }
+
+    const origin = allowedOrigin(request, env);
+
+    if (request.method === "OPTIONS") {
+      if (!origin) {
+        return new Response(null, { status: 403 });
+      }
+
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": origin,
+          "access-control-allow-methods": "GET, OPTIONS",
+          "access-control-allow-headers": "Authorization",
+          "access-control-max-age": "600",
+          vary: "Origin"
+        }
+      });
+    }
+
+    if (!origin) {
+      return json({ error: "origin_not_allowed" }, 403);
+    }
+
+    if (!authorised(request, env)) {
+      return json({ error: "unauthorised" }, 401, origin);
+    }
+
+    try {
+      if (url.pathname === "/snapshot") {
+        const me = await pocketSmith("/me", env);
+        const updatedSince =
+          url.searchParams.get("updated_since") || "";
+
+        const [accounts, transactions] = await Promise.all([
+          pocketSmith(`/users/${me.id}/accounts`, env),
+          getTransactions(me.id, env, updatedSince)
+        ]);
+
+        return json(
+          {
+            generatedAt: new Date().toISOString(),
+            updatedSince: updatedSince || null,
+            accounts: (accounts || []).map(safeAccount),
+            transactions: transactions.map(safeTransaction)
+          },
+          200,
+          origin
+        );
+      }
+
+      return json({ error: "not_found" }, 404, origin);
+    } catch {
+      return json(
+        {
+          error: "upstream_error",
+          message: "PocketSmith sync needs attention."
+        },
+        502,
+        origin
+      );
+    }
+  }
+};
