@@ -3,8 +3,36 @@
  const el=id=>document.getElementById(id);
  let booted=false;
  const state=()=>window.LifeHubSync?window.LifeHubSync.state():{on:false,status:'starting'};
+ const money=n=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(Math.max(0,Number(n)||0));
+ function baliData(){
+  try{
+   const w=el('f-finance')&&el('f-finance').contentWindow;
+   const candidates=[
+    w&&w.safeSavingsSuggestion,w&&w.financeState&&w.financeState.safeSavingsSuggestion,
+    w&&w.state&&w.state.safeSavingsSuggestion,w&&w.budget&&w.budget.safeSavingsSuggestion
+   ];
+   const raw=candidates.find(v=>v!=null);
+   if(typeof raw==='number')return {safe:Math.max(0,raw)};
+   if(raw&&typeof raw==='object'){
+    const safe=Number(raw.amount??raw.safe??raw.surplus??raw.available??raw.value);
+    if(Number.isFinite(safe))return {safe:Math.max(0,safe),balance:raw.balance??raw.everydayBalance,protected:raw.protected??raw.required??raw.keep};
+   }
+  }catch(e){}
+  return null;
+ }
+ function renderBali(){
+  const card=el('bali-sweep-card'); if(!card)return;
+  const d=baliData();
+  if(!d){card.hidden=true;return;}
+  card.hidden=false;
+  el('bali-sweep-amount').textContent=money(d.safe);
+  el('bali-sweep-note').textContent=d.safe>0?'Safe surplus after your existing Finance protections.':'Keep this money in Everyday for now.';
+  const detail=el('bali-sweep-detail');
+  detail.textContent=(d.balance!=null&&d.protected!=null)?('Everyday '+money(d.balance)+' · Protected/needed '+money(d.protected)):'Your existing buffer and upcoming commitments stay protected.';
+ }
+
  function refreshStatus(){const s=state();el('finance-sync-status').textContent=({ok:'✓ Synced',busy:'↻ Syncing',locked:'🔒 Unlock to sync',err:'⚠ Sync needs attention',off:'Set up sync',starting:'Checking sync'})[s.status]||'Sync';}
- function boot(){if(booted)return;booted=true;const frame=el('f-finance');frame.src='./index.html';frame.hidden=false;frame.classList.add('active');el('finance-loading').hidden=true;refreshStatus();}
+ function boot(){if(booted)return;booted=true;const frame=el('f-finance');frame.src='./index.html';frame.hidden=false;frame.classList.add('active');el('finance-loading').hidden=true;refreshStatus();frame.addEventListener('load',()=>{renderBali();setInterval(renderBali,5000)},{once:true});}
  window.addEventListener('lifehub-sync-ready',boot,{once:true});
  setTimeout(boot,7000);
  document.addEventListener('lifehub-sync-state',refreshStatus);
