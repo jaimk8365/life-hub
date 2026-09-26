@@ -47,7 +47,10 @@ async function pocketSmith(path, env) {
   });
 
   if (!response.ok) {
-    throw new Error(`PocketSmith request failed (${response.status})`);
+    const error = new Error(`PocketSmith request failed (${response.status})`);
+    error.upstreamStatus = response.status;
+    error.path = path.split("?")[0];
+    throw error;
   }
 
   return response.json();
@@ -199,11 +202,13 @@ export default {
       }
 
       return json({ error: "not_found" }, 404, origin);
-    } catch {
+    } catch (error) {
       return json(
         {
           error: "upstream_error",
-          message: "PocketSmith sync needs attention."
+          message: "PocketSmith sync needs attention.",
+          stage: error?.path || "unknown",
+          upstreamStatus: error?.upstreamStatus || null
         },
         502,
         origin
