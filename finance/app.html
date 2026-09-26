@@ -16,7 +16,7 @@
  header{height:calc(58px + env(safe-area-inset-top));padding:calc(8px + env(safe-area-inset-top)) 14px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:#f4edff}
  header b{font-size:16px;margin-right:auto}a{color:inherit}header a{font-size:12px;text-decoration:none;padding:9px}button{font:inherit;cursor:pointer;border:1px solid var(--line);border-radius:12px;background:white;color:var(--ink);padding:9px 12px;min-height:40px}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #008f85;outline-offset:3px}
  #finance-sync-status{font-size:12px}#f-finance{position:fixed;top:calc(58px + env(safe-area-inset-top));left:0;width:100%;height:calc(100dvh - 58px - env(safe-area-inset-top));border:0;background:var(--paper)}
- #finance-loading{padding:32px;text-align:center;color:#675973}
+ #finance-loading{padding:32px;text-align:center;color:#675973}#bali-sweep-card{position:fixed;z-index:2;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));max-width:520px;margin:auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:0 10px 28px #30253f22}#bali-sweep-card b{font-size:14px}#bali-sweep-amount{font-size:26px;font-weight:800;margin:2px 0}#bali-sweep-detail,#bali-sweep-note{font-size:12px;color:#675973;margin:2px 0}
  #finance-sync-panel{position:fixed;top:calc(65px + env(safe-area-inset-top));right:12px;width:min(430px,calc(100vw - 24px));max-height:calc(100dvh - 95px);overflow:auto;z-index:3;background:white;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 12px 35px #30253f28}
  h2{font-size:19px;margin:0 0 14px}p{line-height:1.5;font-size:14px}input{font:inherit;display:block;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:8px 0 12px}label{font-size:13px}.actions{display:flex;gap:8px;flex-wrap:wrap}.close{float:right}.primary{background:var(--ink);color:white}.hint{font-size:12px;color:#675973}#finance-sync-message{min-height:1em;font-size:13px}
  @media(max-width:420px){header{gap:3px;padding-left:10px;padding-right:10px}header b{font-size:14px}header a{padding:7px;font-size:11px}#finance-sync-status{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
@@ -24,7 +24,7 @@
 </head>
 <body>
 <header><b>💰 My Finance</b><a href="../" target="_blank" rel="noopener" aria-label="Open Life Hub separately">Life Hub ↗</a><button id="finance-sync-status" onclick="FinanceStandalone.toggleSync()" aria-controls="finance-sync-panel" aria-expanded="false">Sync</button></header>
-<p id="finance-loading" role="status">Checking your existing encrypted sync…</p>
+<p id="finance-loading" role="status">Checking your existing encrypted sync…</p><section id="bali-sweep-card" hidden aria-live="polite"><b>🌴 Available for Bali</b><div id="bali-sweep-amount">$0</div><p id="bali-sweep-detail"></p><p id="bali-sweep-note"></p></section>
 <iframe id="f-finance" title="My Finance — encrypted personal accounts" hidden></iframe>
 <section id="finance-sync-panel" hidden aria-labelledby="finance-sync-heading"><button class="close" onclick="FinanceStandalone.toggleSync()" aria-label="Close sync settings">✕</button><h2 id="finance-sync-heading">Your private device sync</h2><div id="finance-sync-content"></div><p id="finance-sync-message" role="status"></p></section>
 <script src="./standalone.js"></script>
