@@ -4,6 +4,7 @@
  let booted=false;
  const state=()=>window.LifeHubSync?window.LifeHubSync.state():{on:false,status:'starting'};
  const money=n=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(Math.max(0,Number(n)||0));
+ const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  function baliData(){
   try{
    const w=el('f-finance')&&el('f-finance').contentWindow;
@@ -42,14 +43,18 @@
   } else {
    const last=s.lastSync?new Date(s.lastSync).toLocaleString('en-AU'):'Not yet';
    const imp=window.PocketSmithImporter&&window.PocketSmithImporter.state?window.PocketSmithImporter.state():null;
-   const summary=imp&&imp.result&&imp.result.mapping?'<p class="hint">'+imp.result.mapping.mappings.length+' Finance account(s) matched'+(imp.result.mapping.unmatched.length?' · '+imp.result.mapping.unmatched.length+' PocketSmith account(s) unmatched':'')+'.</p>':'';
-   content.innerHTML='<p><b>Connected.</b> Last successful Finance update: '+last+'.</p><div class="actions"><button class="primary" onclick="FinanceStandalone.refreshBankFeed()">Update now</button><button onclick="FinanceStandalone.disconnectBankFeed()">Disconnect this device</button></div>'+summary+'<p class="hint">PocketSmith updates automatically when Finance opens or returns to the foreground. A sync is only marked complete after the downloaded balances and transactions have been applied to Finance.</p>';
+   const mapping=imp&&imp.result&&imp.result.mapping?imp.result.mapping:null;
+   const summary=mapping?'<p class="hint">'+mapping.mappings.length+' Finance account(s) matched'+(mapping.unmatched.length?' · '+mapping.unmatched.length+' PocketSmith account(s) unmatched':'')+'.</p>':'';
+   const mappingUi=mapping&&mapping.unmatched.length?'<div class="bank-map"><p><b>Match these accounts once</b></p>'+mapping.unmatched.map(a=>'<label>'+esc(a.title)+'<select data-ps-account="'+esc(a.id)+'"><option value="">Choose Finance account…</option>'+mapping.financeAccounts.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name||f.id)+'</option>').join('')+'</select></label>').join('')+'<p class="hint">Only unmatched accounts are shown. Saved mappings are kept with your Finance data and future updates use them automatically.</p></div>':'';
+   content.innerHTML='<p><b>Connected.</b> Last successful Finance update: '+last+'.</p><div class="actions"><button class="primary" onclick="FinanceStandalone.refreshBankFeed()">Update now</button><button onclick="FinanceStandalone.disconnectBankFeed()">Disconnect this device</button></div>'+summary+mappingUi+'<p class="hint">PocketSmith updates automatically when Finance opens or returns to the foreground. A sync is only marked complete after the downloaded balances and transactions have been applied to Finance.</p>';
+   content.querySelectorAll('select[data-ps-account]').forEach(select=>select.addEventListener('change',()=>{if(select.value)saveBankAccountMapping(select.dataset.psAccount,select.value);}));
   }
   if(msg)msg.textContent=s.detail||'';
  }
  function toggleBankFeed(){const p=el('bank-feed-panel');if(!p)return;p.hidden=!p.hidden;el('bank-feed-status').setAttribute('aria-expanded',String(!p.hidden));if(!p.hidden)renderBankFeed();}
  async function connectBankFeed(){const input=el('bank-feed-token'),msg=el('bank-feed-message');if(!input||!input.value.trim())return;msg.textContent='Connecting securely…';try{await window.PocketSmithFinance.connect(input.value);input.value='';refreshBankStatus();renderBankFeed();msg.textContent=bankState().detail||'PocketSmith connected.';}catch(e){msg.textContent=e.message||'Could not connect PocketSmith.';refreshBankStatus();}}
  async function refreshBankFeed(){const msg=el('bank-feed-message');if(msg)msg.textContent='Updating…';try{await window.PocketSmithFinance.syncNow(true);refreshBankStatus();renderBankFeed();if(msg)msg.textContent=bankState().detail||'Bank data updated.';}catch(e){if(msg)msg.textContent=e.message||'Bank feed needs attention.';refreshBankStatus();}}
+ async function saveBankAccountMapping(psId,financeId){const msg=el('bank-feed-message');try{window.PocketSmithImporter.setMapping(psId,financeId);if(msg)msg.textContent='Saving account match and refreshing full history…';await window.PocketSmithFinance.syncNow(true);refreshBankStatus();renderBankFeed();if(msg)msg.textContent=bankState().detail||'Account matched.';}catch(e){if(msg)msg.textContent=e.message||'Could not save that account match.';refreshBankStatus();}}
  function disconnectBankFeed(){window.PocketSmithFinance.disconnect();refreshBankStatus();renderBankFeed();}
  function boot(){if(booted)return;booted=true;const frame=el('f-finance');frame.src='./index.html';frame.hidden=false;frame.classList.add('active');el('finance-loading').hidden=true;refreshStatus();refreshBankStatus();frame.addEventListener('load',()=>{renderBali();if(window.PocketSmithFinance&&window.PocketSmithFinance.state().connected)window.PocketSmithFinance.syncNow(true).catch(()=>{});setInterval(renderBali,5000)},{once:true});}
  window.addEventListener('lifehub-sync-ready',boot,{once:true});
@@ -75,6 +80,6 @@
  async function syncNow(){if(!window.LifeHubSync)return;await window.LifeHubSync.syncNow();refreshStatus();renderSync();}
  async function connect(){const token=el('finance-sync-token');if(!token||!token.value.trim())return;const message=el('finance-sync-message');message.textContent='Connecting securely…';try{await window.LifeHubSync.connect(token.value);token.value='';renderSync();message.textContent='Connected. Your existing encrypted data is in use.';}catch(error){message.textContent=error.message||'Could not connect. Existing data was kept.';}refreshStatus();}
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!el('finance-sync-panel').hidden){toggleSync();el('finance-sync-status').focus();}});
- window.FinanceStandalone={toggleSync,syncNow,connect,toggleBankFeed,connectBankFeed,refreshBankFeed,disconnectBankFeed};
+ window.FinanceStandalone={toggleSync,syncNow,connect,toggleBankFeed,connectBankFeed,refreshBankFeed,saveBankAccountMapping,disconnectBankFeed};
  if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js').catch(()=>{});
 })();
