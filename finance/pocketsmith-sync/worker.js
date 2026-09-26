@@ -17,7 +17,20 @@ function json(body, status = 200, origin = "") {
 
 function allowedOrigin(request, env) {
   const origin = request.headers.get("Origin") || "";
-  return origin && origin === env.ALLOWED_ORIGIN ? origin : "";
+  if (!origin) return "";
+
+  const configured = String(env.ALLOWED_ORIGIN || "").replace(/\/+$/, "");
+  const current = origin.replace(/\/+$/, "");
+
+  // Primary allow-list comes from Cloudflare. The GitHub Pages origin is also
+  // accepted explicitly so an accidental trailing slash in the variable
+  // cannot break the installed Finance app.
+  const allowed = new Set([
+    configured,
+    "https://jaimk8365.github.io"
+  ].filter(Boolean));
+
+  return allowed.has(current) ? origin : "";
 }
 
 function authorised(request, env) {
