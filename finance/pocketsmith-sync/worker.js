@@ -117,6 +117,7 @@ function safeTransaction(transaction) {
     type: transaction.type || null,
     status: transaction.status || null,
     needsReview: transaction.needs_review ?? null,
+    isTransfer: transaction.is_transfer ?? null,
     category: transaction.category
       ? {
           id: transaction.category.id ?? null,
