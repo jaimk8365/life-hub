@@ -100,32 +100,10 @@ function safeTransaction(transaction) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    if (url.pathname === "/health") {
-      if (!authorised(request, env)) {
-        return json({ error: "unauthorised" }, 401);
-      }
-
-      try {
-        const me = await pocketSmith("/me", env);
-
-        return json({
-          ok: true,
-          pocketSmithConnected: Boolean(me?.id)
-        });
-      } catch {
-        return json(
-          {
-            error: "upstream_error",
-            message: "PocketSmith connection needs attention."
-          },
-          502
-        );
-      }
-    }
-
+    const rawOrigin = request.headers.get("Origin") || "";
     const origin = allowedOrigin(request, env);
 
+    // Browser requests with Authorization trigger a CORS preflight first.
     if (request.method === "OPTIONS") {
       if (!origin) {
         return new Response(null, { status: 403 });
@@ -141,6 +119,39 @@ export default {
           vary: "Origin"
         }
       });
+    }
+
+    // Allow Cloudflare's tester (no Origin header) or the approved Finance origin.
+    if (url.pathname === "/health") {
+      if (rawOrigin && !origin) {
+        return json({ error: "origin_not_allowed" }, 403);
+      }
+
+      if (!authorised(request, env)) {
+        return json({ error: "unauthorised" }, 401, origin);
+      }
+
+      try {
+        const me = await pocketSmith("/me", env);
+
+        return json(
+          {
+            ok: true,
+            pocketSmithConnected: Boolean(me?.id)
+          },
+          200,
+          origin
+        );
+      } catch {
+        return json(
+          {
+            error: "upstream_error",
+            message: "PocketSmith connection needs attention."
+          },
+          502,
+          origin
+        );
+      }
     }
 
     if (!origin) {
