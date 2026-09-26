@@ -237,7 +237,11 @@
     let map={};
     try{map=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
     if(financeId)map[String(psId)]=String(financeId);else delete map[String(psId)];
-    if(root.localStorage)root.localStorage.setItem(MAP_KEY,JSON.stringify(map));
+    if(root.localStorage){
+      root.localStorage.setItem(MAP_KEY,JSON.stringify(map));
+      root.localStorage.removeItem('finance_pocketsmith_import_version');
+      root.localStorage.removeItem('finance_pocketsmith_last_sync');
+    }
     return map;
   }
   function getState(){return {...state};}
