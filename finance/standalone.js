@@ -32,10 +32,29 @@
  }
 
  function refreshStatus(){const s=state();el('finance-sync-status').textContent=({ok:'✓ Synced',busy:'↻ Syncing',locked:'🔒 Unlock to sync',err:'⚠ Sync needs attention',off:'Set up sync',starting:'Checking sync'})[s.status]||'Sync';}
- function boot(){if(booted)return;booted=true;const frame=el('f-finance');frame.src='./index.html';frame.hidden=false;frame.classList.add('active');el('finance-loading').hidden=true;refreshStatus();frame.addEventListener('load',()=>{renderBali();setInterval(renderBali,5000)},{once:true});}
+ function bankState(){return window.PocketSmithFinance?window.PocketSmithFinance.state():{status:'off',connected:false,detail:'PocketSmith feed unavailable.'};}
+ function refreshBankStatus(){const s=bankState(),b=el('bank-feed-status');if(!b)return;b.textContent=({ok:'🏦 Feed ✓',busy:'🏦 Updating…',err:'🏦 Attention',off:'🏦 Connect'})[s.status]||'🏦 Bank feed';}
+ function renderBankFeed(){
+  const content=el('bank-feed-content'),msg=el('bank-feed-message'); if(!content)return;
+  const s=bankState();
+  if(!s.connected){
+   content.innerHTML='<p>Connect this trusted device to the secure PocketSmith bridge. Use the separate <b>APP_SYNC_TOKEN</b> you saved in Cloudflare — never your PocketSmith developer key.</p><label for="bank-feed-token">APP_SYNC_TOKEN</label><input id="bank-feed-token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your Cloudflare app token"><button class="primary" onclick="FinanceStandalone.connectBankFeed()">Connect PocketSmith</button><p class="hint">The PocketSmith developer key stays in Cloudflare. This device stores only the separate app token. Raw transactions are not committed to GitHub or sent to Notion.</p>';
+  } else {
+   const last=s.lastSync?new Date(s.lastSync).toLocaleString('en-AU'):'Not yet';
+   content.innerHTML='<p><b>Connected.</b> Last bank update: '+last+'.</p><div class="actions"><button class="primary" onclick="FinanceStandalone.refreshBankFeed()">Update now</button><button onclick="FinanceStandalone.disconnectBankFeed()">Disconnect this device</button></div><p class="hint">PocketSmith updates automatically when Finance opens or returns to the foreground. The secure bridge only exposes the fields Finance needs.</p>';
+  }
+  if(msg)msg.textContent=s.detail||'';
+ }
+ function toggleBankFeed(){const p=el('bank-feed-panel');if(!p)return;p.hidden=!p.hidden;el('bank-feed-status').setAttribute('aria-expanded',String(!p.hidden));if(!p.hidden)renderBankFeed();}
+ async function connectBankFeed(){const input=el('bank-feed-token'),msg=el('bank-feed-message');if(!input||!input.value.trim())return;msg.textContent='Connecting securely…';try{await window.PocketSmithFinance.connect(input.value);input.value='';refreshBankStatus();renderBankFeed();msg.textContent='PocketSmith connected and bank data refreshed.';}catch(e){msg.textContent=e.message||'Could not connect PocketSmith.';refreshBankStatus();}}
+ async function refreshBankFeed(){const msg=el('bank-feed-message');if(msg)msg.textContent='Updating…';try{await window.PocketSmithFinance.syncNow(true);refreshBankStatus();renderBankFeed();if(msg)msg.textContent='Bank data updated.';}catch(e){if(msg)msg.textContent=e.message||'Bank feed needs attention.';refreshBankStatus();}}
+ function disconnectBankFeed(){window.PocketSmithFinance.disconnect();refreshBankStatus();renderBankFeed();}
+ function boot(){if(booted)return;booted=true;const frame=el('f-finance');frame.src='./index.html';frame.hidden=false;frame.classList.add('active');el('finance-loading').hidden=true;refreshStatus();refreshBankStatus();frame.addEventListener('load',()=>{renderBali();if(window.PocketSmithFinance&&window.PocketSmithFinance.state().connected)window.PocketSmithFinance.syncNow(true).catch(()=>{});setInterval(renderBali,5000)},{once:true});}
  window.addEventListener('lifehub-sync-ready',boot,{once:true});
  setTimeout(boot,7000);
  document.addEventListener('lifehub-sync-state',refreshStatus);
+ document.addEventListener('pocketsmith-finance-state',()=>{refreshBankStatus();if(el('bank-feed-panel')&&!el('bank-feed-panel').hidden)renderBankFeed();});
+ document.addEventListener('pocketsmith:snapshot',renderBali);
  function renderSync(){
   const s=state(),content=el('finance-sync-content');
   const needsReplacement=s.status==='err';
@@ -53,6 +72,6 @@
  async function syncNow(){if(!window.LifeHubSync)return;await window.LifeHubSync.syncNow();refreshStatus();renderSync();}
  async function connect(){const token=el('finance-sync-token');if(!token||!token.value.trim())return;const message=el('finance-sync-message');message.textContent='Connecting securely…';try{await window.LifeHubSync.connect(token.value);token.value='';renderSync();message.textContent='Connected. Your existing encrypted data is in use.';}catch(error){message.textContent=error.message||'Could not connect. Existing data was kept.';}refreshStatus();}
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!el('finance-sync-panel').hidden){toggleSync();el('finance-sync-status').focus();}});
- window.FinanceStandalone={toggleSync,syncNow,connect};
+ window.FinanceStandalone={toggleSync,syncNow,connect,toggleBankFeed,connectBankFeed,refreshBankFeed,disconnectBankFeed};
  if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js').catch(()=>{});
 })();
