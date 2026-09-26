@@ -5,6 +5,8 @@
   const WORKER_URL = 'https://jaimi-finance-pocketsmith-sync.jaimi-kyte.workers.dev';
   const TOKEN_KEY = 'finance_pocketsmith_app_token';
   const LAST_SYNC_KEY = 'finance_pocketsmith_last_sync';
+  const IMPORT_VERSION_KEY = 'finance_pocketsmith_import_version';
+  const IMPORT_VERSION = '1';
   const MAX_AGE_MS = 15 * 60 * 1000;
 
   let snapshot = null;
@@ -53,20 +55,17 @@
     return true;
   }
 
-  function deliver(data) {
+  async function deliver(data) {
     snapshot = data;
-    const frame = document.getElementById('f-finance');
-    try {
-      const w = frame && frame.contentWindow;
-      if (w) {
-        w.postMessage({ type: 'pocketsmith:snapshot', payload: data }, location.origin);
-        w.dispatchEvent(new CustomEvent('pocketsmith:snapshot', { detail: data }));
-        if (typeof w.receivePocketSmithSnapshot === 'function') {
-          w.receivePocketSmithSnapshot(data);
-        }
-      }
-    } catch (_) {}
     document.dispatchEvent(new CustomEvent('pocketsmith:snapshot', { detail: data }));
+    if (!window.PocketSmithImporter || typeof window.PocketSmithImporter.apply !== 'function') {
+      throw new Error('PocketSmith importer is not available. Refresh My Finance and try again.');
+    }
+    const result = await window.PocketSmithImporter.apply(data);
+    if (!result || !['ok','attention'].includes(result.status)) {
+      throw new Error(result?.detail || 'PocketSmith data could not be applied to Finance.');
+    }
+    return result;
   }
 
   async function syncNow(force = false) {
@@ -75,17 +74,21 @@
     }
     if (inFlight) return inFlight;
     const last = localStorage.getItem(LAST_SYNC_KEY);
-    if (!force && last && Date.now() - Date.parse(last) < MAX_AGE_MS && snapshot) return snapshot;
+    const importerCurrent = localStorage.getItem(IMPORT_VERSION_KEY) === IMPORT_VERSION;
+    if (!force && importerCurrent && last && Date.now() - Date.parse(last) < MAX_AGE_MS && snapshot) return snapshot;
 
     status = 'busy'; detail = 'Updating bank feed…'; emit();
     inFlight = (async () => {
       try {
-        const qs = last ? '?updated_since=' + encodeURIComponent(last) : '';
+        const qs = importerCurrent && last ? '?updated_since=' + encodeURIComponent(last) : '';
         const data = await call('/snapshot' + qs);
-        deliver(data);
+        const imported = await deliver(data);
         const stamp = data.generatedAt || new Date().toISOString();
         localStorage.setItem(LAST_SYNC_KEY, stamp);
-        status = 'ok'; detail = 'PocketSmith bank feed is up to date.'; emit();
+        localStorage.setItem(IMPORT_VERSION_KEY, IMPORT_VERSION);
+        status = imported.status === 'attention' ? 'attention' : 'ok';
+        detail = imported.detail || 'PocketSmith bank feed is up to date.';
+        emit();
         return data;
       } catch (err) {
         status = 'err'; detail = err.message || 'PocketSmith feed needs attention.'; emit();
@@ -110,6 +113,7 @@
   function disconnect() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(LAST_SYNC_KEY);
+    localStorage.removeItem(IMPORT_VERSION_KEY);
     snapshot = null; status = 'off'; detail = 'PocketSmith disconnected on this device.'; emit();
   }
 
