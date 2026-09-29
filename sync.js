@@ -82,9 +82,9 @@ async function gh(path, opts = {}){
     ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
   }});
   if (!r.ok) throw new Error(
-    r.status === 401 ? 'GitHub says the token is invalid or was revoked.' :
-    r.status === 403 ? 'GitHub refused (rate limit or missing gist permission).' :
-    'GitHub error ' + r.status);
+    r.status === 401 ? 'GitHub did not accept this token. It may be expired or revoked.' :
+    r.status === 403 ? 'GitHub accepted the token but it does not have permission to read/write Gists, or GitHub rate-limited the request.' :
+    'GitHub sync error ' + r.status);
   return r.json();
 }
 async function findOrCreateGist(){
@@ -205,8 +205,10 @@ window.LifeHubSync = {
     if (!tok) throw new Error('Paste the token in first.');
     if (!pass()) throw new Error('First unlock the Life Hub tab on this device — sync uses your passcode to encrypt everything.');
     localStorage.setItem(T_KEY, tok);
-    try { await gh('/user'); }
-    catch(e){ localStorage.removeItem(T_KEY); throw new Error('GitHub didn’t accept that token — check it copied fully.'); }
+    // Validate the permission this app actually needs. A Gist-only token does not
+    // need to pass an unrelated /user profile check.
+    try { await gh('/gists?per_page=1'); }
+    catch(e){ localStorage.removeItem(T_KEY); throw e; }
     await runSync();
     if (state.status === 'err'){
       const msg = state.detail;
