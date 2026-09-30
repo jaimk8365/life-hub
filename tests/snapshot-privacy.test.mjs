@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import vm f
 const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
 test('Allocation provenance retains its account so generic private wishlist names can be excluded',()=>{
  const ctx=vm.createContext({TXNS:[],BILLS:[],ONEOFFS:[],FUNDS:[],GOALS:[],WISH:[{name:'Generic item',saved:50,acct:'jspend'},{name:'Shared item',saved:80,acct:'everyday'},{name:'Legacy private',saved:10}],todayISO:()=> '2026-09-14',goalSaved:()=>0});
- vm.runInContext(source.split('\n').find(l=>l.startsWith('function yearToDateFlowData(')),ctx);
+ vm.runInContext(source.split('\n').find(l=>l.startsWith('function isActualIncome('))+';'+source.split('\n').find(l=>l.startsWith('function yearToDateFlowData(')),ctx);
  const rows=vm.runInContext('yearToDateFlowData().allocRows',ctx);
  assert.equal(rows[0].accountId,'jspend');assert.equal(rows[1].accountId,'everyday');assert.equal(rows[2].accountId,'jspend');
  assert.equal(source.includes('safeAllocRows=flow.allocRows.filter(x=>SHARED_ACCT_IDS.includes(x.accountId)'),true);

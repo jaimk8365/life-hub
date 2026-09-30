@@ -3,7 +3,7 @@
  * Mirrors the three apps' localStorage keys into ONE private GitHub Gist,
  * encrypted on-device (PBKDF2 + AES-256-GCM, keyed by the hub passcode)
  * before upload — GitHub only ever stores ciphertext.
- * Conflict model: last-write-wins per key, timestamps kept in lifehub_sync_meta.
+ * Conflict model: per-record versions for finance collections, preserved alternatives; per-key versions otherwise.
  */
 (() => {
 const FILE = 'lifehub-sync.enc.json';
@@ -34,11 +34,36 @@ let dirty = false, pushTimer = null, busy = false, queued = false;
 let state = { status: 'off', detail: '' };
 
 function read(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } }
-function write(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function write(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 const token = () => localStorage.getItem(T_KEY);
 const pass  = () => localStorage.getItem('hub_key');
-const isTracked = k => TRACKED.some(t => k.startsWith(t.prefix));
+const isTracked = k => k!=='fin_private_debt_lock_v1' && TRACKED.some(t => k.startsWith(t.prefix));
+const RECORD_KEY='lifehub_record_versions_v1';
+let recordVersions=read(RECORD_KEY,{});
 const observed = new Map();
+function fingerprint(value){const text=JSON.stringify(value);let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}return text.length+':'+(a>>>0)+':'+(b>>>0);}
+function recordArray(key,value){if(!key.startsWith('fin_'))return null;try{const rows=JSON.parse(value);return Array.isArray(rows)&&rows.every(x=>x&&typeof x==='object'&&x.id!=null)&&new Set(rows.map(x=>String(x.id))).size===rows.length?rows:null;}catch(_){return null;}}
+function versionRecords(key,entry){
+ const rows=recordArray(key,entry.v);if(!rows)return entry;
+ const previous=recordVersions[key]||{},records={},ids=new Set(rows.map(x=>String(x.id)));
+ for(const row of rows){const id=String(row.id),hash=fingerprint(row),old=previous[id];records[id]=old&&old.hash===hash&&!old.deleted?old:{t:Math.max(entry.t,(old?.t||0)+1),hash,parentHash:old?.hash||null,deleted:false};}
+ for(const [id,old] of Object.entries(previous))if(!ids.has(id))records[id]=old.deleted?old:{t:Math.max(entry.t,(old.t||0)+1),deleted:true};
+ recordVersions[key]=records;return {...entry,records};
+}
+function mergeRecords(key,left,right){
+ const l=left&&recordArray(key,left.v),r=right&&recordArray(key,right.v);if(!l||!r)return null;
+ const lm=new Map(l.map(x=>[String(x.id),x])),rm=new Map(r.map(x=>[String(x.id),x]));
+ const lv=left.records||Object.fromEntries(l.map(x=>[String(x.id),{t:left.t,hash:fingerprint(x)}])),rv=right.records||Object.fromEntries(r.map(x=>[String(x.id),{t:right.t,hash:fingerprint(x)}]));
+ const records={},rows=[],conflicts=[...(left.conflicts||[]),...(right.conflicts||[])];
+ for(const id of [...new Set([...Object.keys(lv),...Object.keys(rv)])].sort()){
+  const a=lv[id],b=rv[id],remote=!!b&&(!a||b.t>a.t||b.t===a.t&&String(b.hash||'')>String(a.hash||'')),winner=remote?b:a;
+  records[id]=winner;
+  if(a&&b&&a.hash!==b.hash&&a.parentHash!==b.hash&&b.parentHash!==a.hash&&!a.deleted&&!b.deleted&&lm.has(id)&&rm.has(id))conflicts.push({id,kept:remote?'remote':'local',at:Math.max(a.t,b.t),alternative:remote?lm.get(id):rm.get(id)});
+  if(!winner.deleted){const row=remote?rm.get(id):lm.get(id);if(row)rows.push(row);else throw new Error('Sync record is incomplete. Your local records were kept.');}
+ }
+ const unique=new Map(conflicts.map(x=>[x.id+':'+x.at+':'+fingerprint(x.alternative),x]));
+ return {v:JSON.stringify(rows),t:Math.max(left.t,right.t),records,conflicts:[...unique.values()].map(c=>({...c,key,conflictId:key+':'+c.id+':'+c.at+':'+fingerprint(c.alternative)})).slice(-100)};
+}
 for (let i = 0; i < localStorage.length; i++) {
   const k = localStorage.key(i);
   if (isTracked(k)) observed.set(k, localStorage.getItem(k));
@@ -115,13 +140,15 @@ function localMap(){
       meta[k] = Math.max(Date.now(), (+meta[k] || 0) + 1); stamped = true;
       observed.set(k, v);
     }
-    out[k] = { v, t: meta[k] };
+    out[k] = versionRecords(k,{ v, t: meta[k] });
   }
+  write(RECORD_KEY,recordVersions);
   if (stamped) write(M_KEY, meta);
   return out;
 }
 function applyRemote(k, entry){
   localStorage.setItem(k, entry.v);
+  if(entry.records){recordVersions[k]=entry.records;write(RECORD_KEY,recordVersions);}
   observed.set(k, entry.v);
   meta[k] = entry.t; write(M_KEY, meta);
   const spec = TRACKED.find(t => k.startsWith(t.prefix));
@@ -151,16 +178,40 @@ async function runSync(){
       try { remote = (await decrypt(content)).keys || {}; }
       catch(e){ throw new Error('Could not decrypt the sync data — was the passcode changed? Unlock with the current passcode on every device.'); }
     }
+    if(localStorage.getItem('lifehub_finance_pending_commit'))throw new Error('Finish recovering the interrupted Finance save before syncing.');
     const local = localMap();
     const merged = Object.create(null);
-    let needPush = false;
+    let needPush = false;const pending=[],allConflicts=[];
     for (const k of new Set([...Object.keys(remote), ...Object.keys(local)])){
       const r = remote[k], l = local[k];
       // Ignore non-app records locally while preserving the existing envelope.
       // In particular, a remote payload must never replace device credentials.
       if (!isTracked(k)) { if (r) merged[k] = r; continue; }
-      if (r && (!l || r.t > l.t)) { applyRemote(k, r); merged[k] = r; }
+      const combined=mergeRecords(k,l,r);
+      if(combined){
+        if(combined.v!==l.v||JSON.stringify(combined.records)!==JSON.stringify(l.records))pending.push([k,combined]);
+        merged[k]=combined;
+        if(combined.v!==r.v||JSON.stringify(combined.records)!==JSON.stringify(r.records)||JSON.stringify(combined.conflicts)!==JSON.stringify(r.conflicts||[]))needPush=true;
+        allConflicts.push(...combined.conflicts);
+        continue;
+      }
+      if (r && (!l || r.t > l.t)) { pending.push([k,r]); merged[k] = r; }
       else if (l) { merged[k] = l; if (!r || l.t > r.t) needPush = true; }
+    }
+    // Commit the entire pull together. Preserve old values until every write succeeds.
+    const recovery={};for(const [k]of pending)recovery[k]=localStorage.getItem(k);
+    for(const k of [M_KEY,RECORD_KEY,'lifehub_finance_sync_conflicts'])recovery[k]=localStorage.getItem(k);
+    if(pending.length)localStorage.setItem('lifehub_finance_pending_commit',JSON.stringify(recovery));
+    try{
+      for(const [k,entry]of pending)applyRemote(k,entry);
+      const resolved=new Set(read('fin_sync_resolutions_v1',[]).map(x=>x.id));
+      write('lifehub_finance_sync_conflicts',allConflicts.filter(c=>!resolved.has(c.conflictId)));
+      if(pending.length)localStorage.removeItem('lifehub_finance_pending_commit');
+    }catch(error){
+      for(const [k,v]of Object.entries(recovery)){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}
+      meta=read(M_KEY,{});recordVersions=read(RECORD_KEY,{});
+      for(const [k]of pending)observed.set(k,localStorage.getItem(k));
+      localStorage.removeItem('lifehub_finance_pending_commit');throw error;
     }
     if (needPush){
       await gh('/gists/' + id, { method: 'PATCH', body: JSON.stringify({
@@ -168,7 +219,7 @@ async function runSync(){
     }
     dirty = false;
     localStorage.setItem(LAST_KEY, String(Date.now()));
-    setState('ok', '');
+    const conflicts=read('lifehub_finance_sync_conflicts',[]);setState(conflicts.length?'attention':'ok',conflicts.length?'Some records changed on two devices. Both versions were preserved; review sync conflicts in Finance.':'');
   } catch(e){
     setState('err', e.message || String(e));
   } finally {
@@ -225,6 +276,7 @@ window.LifeHubSync = {
   /* ---- full local backup/restore — every tracked key, plaintext JSON,
      downloaded to the device (not uploaded anywhere). Separate from the
      encrypted gist sync above; this is a manual "just in case" copy. ---- */
+  async exportEncrypted(){return encrypt({keys:localMap(),exportedAt:new Date().toISOString()});},
   exportAll(){
     const out = { exportedAt: new Date().toISOString(), keys: {} };
     for (let i = 0; i < localStorage.length; i++){

@@ -8,7 +8,7 @@ test('Finance has its own install identity and keeps the existing encrypted page
 });
 test('Standalone Finance waits for its existing encrypted sync engine before opening data',()=>{
  assert.equal(existsSync(path('standalone.js')),true,'Standalone Finance lifecycle is missing');
- const events={},docEvents={},timers=[],frame={src:'',classList:{add(){}}},status={textContent:''};let syncs=0;
+ const events={},docEvents={},timers=[],frame={src:'',classList:{add(){}},addEventListener(){}},status={textContent:''};let syncs=0;
  const els={'f-finance':frame,'finance-sync-status':status,'finance-loading':{hidden:false},'finance-sync-panel':{hidden:true},'finance-sync-content':{},'finance-sync-message':{}};
  const doc={getElementById:id=>els[id],addEventListener:(k,fn)=>docEvents[k]=fn};
  const win={addEventListener:(k,fn)=>events[k]=fn,LifeHubSync:{state:()=>({on:true,status:'ok',last:1}),syncNow:()=>syncs++}};

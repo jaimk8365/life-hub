@@ -12,7 +12,7 @@
   const T_KEY = 'finp_gh_token', G_KEY = 'finp_gist_id', M_KEY = 'finp_sync_meta', LAST_KEY = 'finp_sync_last';
 
   function read(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } }
-  function write(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  function write(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
   const token = () => localStorage.getItem(T_KEY);
 
   const b64e = buf => {
@@ -29,6 +29,31 @@
     let meta = read(M_KEY, {});
     // Remember values, not just timestamps: rendering or saving a different
     // section must not make an unchanged shared snapshot win a conflict.
+    const RECORD_KEY='finp_record_versions_v1';let recordVersions=read(RECORD_KEY,{});
+function fingerprint(value){const text=JSON.stringify(value);let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}return text.length+':'+(a>>>0)+':'+(b>>>0);}
+function recordArray(key,value){if(!key.startsWith('fin_'))return null;try{const rows=JSON.parse(value);return Array.isArray(rows)&&rows.every(x=>x&&typeof x==='object'&&x.id!=null)&&new Set(rows.map(x=>String(x.id))).size===rows.length?rows:null;}catch(_){return null;}}
+function versionRecords(key,entry){
+ const rows=recordArray(key,entry.v);if(!rows)return entry;
+ const previous=recordVersions[key]||{},records={},ids=new Set(rows.map(x=>String(x.id)));
+ for(const row of rows){const id=String(row.id),hash=fingerprint(row),old=previous[id];records[id]=old&&old.hash===hash&&!old.deleted?old:{t:Math.max(entry.t,(old?.t||0)+1),hash,parentHash:old?.hash||null,deleted:false};}
+ for(const [id,old] of Object.entries(previous))if(!ids.has(id))records[id]=old.deleted?old:{t:Math.max(entry.t,(old.t||0)+1),deleted:true};
+ recordVersions[key]=records;return {...entry,records};
+}
+function mergeRecords(key,left,right){
+ const l=left&&recordArray(key,left.v),r=right&&recordArray(key,right.v);if(!l||!r)return null;
+ const lm=new Map(l.map(x=>[String(x.id),x])),rm=new Map(r.map(x=>[String(x.id),x]));
+ const lv=left.records||Object.fromEntries(l.map(x=>[String(x.id),{t:left.t,hash:fingerprint(x)}])),rv=right.records||Object.fromEntries(r.map(x=>[String(x.id),{t:right.t,hash:fingerprint(x)}]));
+ const records={},rows=[],conflicts=[...(left.conflicts||[]),...(right.conflicts||[])];
+ for(const id of [...new Set([...Object.keys(lv),...Object.keys(rv)])].sort()){
+  const a=lv[id],b=rv[id],remote=!!b&&(!a||b.t>a.t||b.t===a.t&&String(b.hash||'')>String(a.hash||'')),winner=remote?b:a;
+  records[id]=winner;
+  if(a&&b&&a.hash!==b.hash&&a.parentHash!==b.hash&&b.parentHash!==a.hash&&!a.deleted&&!b.deleted&&lm.has(id)&&rm.has(id))conflicts.push({id,kept:remote?'remote':'local',at:Math.max(a.t,b.t),alternative:remote?lm.get(id):rm.get(id)});
+  if(!winner.deleted){const row=remote?rm.get(id):lm.get(id);if(row)rows.push(row);else throw new Error('Sync record is incomplete. Your local records were kept.');}
+ }
+ const unique=new Map(conflicts.map(x=>[x.id+':'+x.at+':'+fingerprint(x.alternative),x]));
+ return {v:JSON.stringify(rows),t:Math.max(left.t,right.t),records,conflicts:[...unique.values()].slice(-100)};
+}
+
     const observed = new Map(KEYS.map(k => [k, localStorage.getItem(k)]));
     let cryptoKeyPromise = null, busy = false, queued = false, pushTimer = null;
     let state = { status: 'off', detail: '' };
@@ -85,10 +110,11 @@
       detectChanges();
       const out = {};
       KEYS.forEach(k => { const v = localStorage.getItem(k); if (v == null) return;
-        out[k] = { v, t: meta[k] }; });
+        out[k] = versionRecords(k,{ v, t: meta[k] }); });
+      write(RECORD_KEY,recordVersions);
       return out;
     }
-    function applyRemote(k, entry){ localStorage.setItem(k, entry.v); observed.set(k, entry.v); meta[k] = entry.t; write(M_KEY, meta); }
+    function applyRemote(k, entry){ localStorage.setItem(k, entry.v);if(entry.records){recordVersions[k]=entry.records;write(RECORD_KEY,recordVersions);} observed.set(k, entry.v); meta[k] = entry.t; write(M_KEY, meta); }
 
     async function runSync(){
       if (!token()) { setState('off',''); return; }
@@ -112,6 +138,8 @@
           // Another profile can own records in this channel. Preserve them in
           // the encrypted envelope, but never apply them to this profile.
           if (!allowed.has(k)) { if (r) merged[k] = r; continue; }
+          const combined=mergeRecords(k,l,r);
+          if(combined){if(combined.v!==l.v||JSON.stringify(combined.records)!==JSON.stringify(l.records)){applyRemote(k,combined);changed=true;}merged[k]=combined;if(combined.v!==r.v||JSON.stringify(combined.records)!==JSON.stringify(r.records))needPush=true;continue;}
           if (r && (!l || r.t > l.t)) { applyRemote(k, r); merged[k] = r; changed = true; }
           else if (l) { merged[k] = l; if (!r || l.t > r.t) needPush = true; }
         }

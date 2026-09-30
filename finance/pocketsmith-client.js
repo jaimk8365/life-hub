@@ -6,7 +6,7 @@
   const TOKEN_KEY = 'finance_pocketsmith_app_token';
   const LAST_SYNC_KEY = 'finance_pocketsmith_last_sync';
   const IMPORT_VERSION_KEY = 'finance_pocketsmith_import_version';
-  const IMPORT_VERSION = '1';
+  const IMPORT_VERSION = '2';
   const MAX_AGE_MS = 15 * 60 * 1000;
 
   let snapshot = null;
@@ -28,7 +28,7 @@
     const res = await fetch(WORKER_URL + path, {
       method: 'GET',
       headers: { 'Authorization': 'Bearer ' + t },
-      cache: 'no-store'
+      cache: 'no-store', signal: AbortSignal.timeout(45000)
     });
     if (res.status === 401) throw new Error('PocketSmith app token needs replacing.');
     if (res.status === 403) throw new Error('This Finance address is not allowed by the secure bridge.');
@@ -47,7 +47,7 @@
     const res = await fetch(WORKER_URL + '/health', {
       method: 'GET',
       headers: { 'Authorization': 'Bearer ' + candidate },
-      cache: 'no-store'
+      cache: 'no-store', signal: AbortSignal.timeout(45000)
     });
     if (!res.ok) throw new Error(res.status === 401 ? 'That app token did not match.' : 'Could not verify PocketSmith.');
     const body = await res.json();
@@ -62,7 +62,7 @@
       throw new Error('PocketSmith importer is not available. Refresh My Finance and try again.');
     }
     const result = await window.PocketSmithImporter.apply(data);
-    if (!result || !['ok','attention'].includes(result.status)) {
+    if (!result || result.status !== 'ok') {
       throw new Error(result?.detail || 'PocketSmith data could not be applied to Finance.');
     }
     return result;
@@ -80,10 +80,14 @@
     status = 'busy'; detail = 'Updating bank feed…'; emit();
     inFlight = (async () => {
       try {
-        const qs = importerCurrent && last ? '?updated_since=' + encodeURIComponent(last) : '';
+        const fullAt=localStorage.getItem('finance_pocketsmith_full_sync');
+        const full=!importerCurrent||!fullAt||Date.now()-Date.parse(fullAt)>86400000;
+        const qs = !full && last ? '?updated_since=' + encodeURIComponent(new Date(Date.parse(last)-300000).toISOString()) : '';
+        const startedAt=new Date().toISOString();
         const data = await call('/snapshot' + qs);
         const imported = await deliver(data);
-        const stamp = data.generatedAt || new Date().toISOString();
+        const stamp = data.watermark || startedAt;
+        if(!qs)localStorage.setItem('finance_pocketsmith_full_sync',stamp);
         localStorage.setItem(LAST_SYNC_KEY, stamp);
         localStorage.setItem(IMPORT_VERSION_KEY, IMPORT_VERSION);
         status = imported.status === 'attention' ? 'attention' : 'ok';

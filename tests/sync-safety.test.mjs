@@ -100,3 +100,14 @@ for (const kind of ['partner','hub']) {
     assert.equal((await h.remote()).fin_shared_goals_v1.v,attachment);
   });
 }
+
+test('hub merges independent transaction IDs from two devices',async()=>{
+ const h=await harness('hub',{fin_txns:JSON.stringify([{id:'b',amount:-20}]),lifehub_sync_meta:JSON.stringify({fin_txns:10})},{fin_txns:{v:JSON.stringify([{id:'a',amount:-10}]),t:20}});
+ await h.engine.syncNow();assert.deepEqual(JSON.parse(h.map.get('fin_txns')).map(x=>x.id).sort(),['a','b']);
+ assert.deepEqual(JSON.parse((await h.remote()).fin_txns.v).map(x=>x.id).sort(),['a','b']);
+});
+test('hub propagates a transaction deletion without deleting independent additions',async()=>{
+ const h=await harness('hub',{fin_txns:JSON.stringify([{id:'a'},{id:'b'}])},{});await h.engine.syncNow();
+ h.map.set('fin_txns',JSON.stringify([{id:'b'}]));await h.engine.syncNow();
+ const r=(await h.remote()).fin_txns;assert.deepEqual(JSON.parse(r.v).map(x=>x.id),['b']);assert.equal(r.records.a.deleted,true);
+});

@@ -14,7 +14,7 @@
     const items=files.map(file=>{
       const match=matchAccountForCsv({filename:file.name,accountNumber:file.accountNumber,accounts});
       const rows=Array.isArray(file.rows)?file.rows:[];
-      return {name:String(file.name||'Statement.csv'),accountId:match.accountId,confidence:match.confidence,reason:match.reason,candidates:match.candidates,rowCount:rows.length,duplicateCount:rows.filter(r=>r.importKey&&existing.has(r.importKey)).length,min:file.min||null,max:file.max||null,latestBal:file.latestBal??null,rows};
+      return {name:String(file.name||'Statement.csv'),accountId:match.accountId,confidence:match.confidence,reason:match.reason,candidates:match.candidates,rowCount:rows.length,duplicateCount:rows.filter(r=>r.importKey&&existing.has(r.importKey)).length,min:file.min||null,max:file.max||null,latestBal:file.latestBal??null,balanceDate:file.balanceDate||null,rows};
     });
     return {items,unmatchedCount:items.filter(x=>!x.accountId).length,transactionCount:items.reduce((sum,x)=>sum+x.rowCount,0),duplicateCount:items.reduce((sum,x)=>sum+x.duplicateCount,0)};
   }

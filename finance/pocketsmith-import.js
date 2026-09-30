@@ -20,6 +20,7 @@
     kubota:['kubota','kubota loan']
   };
 
+  const validDate=v=>{const text=String(v||'').slice(0,10);const d=new Date(text+'T00:00:00Z');return /^\d{4}-\d{2}-\d{2}$/.test(text)&&Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===text;};
   const norm=v=>String(v??'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim();
   const cents=v=>Math.round((Number(v)||0)*100);
   const round2=v=>Math.round((Number(v)||0)*100)/100;
@@ -47,7 +48,8 @@
 
     for(const ps of psAccounts){
       const psId=String(ps.id);
-      const target=overrides&&overrides[psId]!=null?String(overrides[psId]):'';
+      const saved=financeAccounts.find(a=>String(a.pocketSmithAccountId||'')===psId);
+      const target=overrides&&overrides[psId]!=null?String(overrides[psId]):saved?String(saved.id):'';
       const finance=financeById.get(target);
       if(!finance||usedFinance.has(finance.id))continue;
       mappings.push({psId,financeId:finance.id,score:1000,manual:true,psTitle:ps.title||ps.name||'',financeName:finance.name||finance.id});
@@ -74,6 +76,7 @@
       if(!available.length)continue;
       const top=available[0],runner=available[1];
       if(runner&&runner.score===top.score)continue;
+      if([...byPs.entries()].some(([other,candidates])=>other!==psId&&!usedPs.has(other)&&candidates.some(c=>c.financeId===top.financeId&&c.score===top.score)))continue;
       mappings.push(top);usedPs.add(psId);usedFinance.add(top.financeId);
     }
 
@@ -85,21 +88,24 @@
   function categoryFor(t){
     const type=norm(t?.type),cat=norm(t?.category?.title),payee=norm(t?.payee),all=[type,cat,payee].join(' ');
     if(t?.isTransfer===true||/transfer|internal transfer/.test(all))return'transfer';
-    if(Number(t?.amount)>0&&/salary|wage|payroll|income|deposit/.test(all))return'income';
+    if(/redraw|loan proceeds|borrow/.test(all))return'transfer';
+    if(/refund|reversal|reimbursement/.test(all))return'refund';
+    if(Number(t?.amount)>0&&/salary|wage|payroll|income|interest earned/.test(all))return'income';
+    for(const [id,pattern] of Object.entries({medical:/medical|doctor|dentist|pharmacy/,rates:/council|rates/,rego:/registration|rego/,kids:/childcare|school|swim/,pets:/pet|vet/,fitness:/pilates|fitness|gym/,clothing:/clothing|apparel/,home:/maintenance|hardware/,union:/union/,loan:/loan repayment/}))if(pattern.test(all))return id;
     if(/grocery|supermarket|woolworth|coles|aldi|iga/.test(all))return'groceries';
     if(/restaurant|cafe|coffee|takeaway|fast food|dining/.test(all))return'eating';
     if(/fuel|petrol|service station|ampol|shell|bp /.test(all+' '))return'fuel';
     if(/subscription|streaming|netflix|spotify|prime|disney/.test(all))return'subs';
     if(/insurance/.test(all))return'insurance';
     if(/shopping|retail|department store/.test(all))return'shopping';
-    return Number(t?.amount)>0?'income':'other';
+    return'other';
   }
 
   function existingMatch(existing=[],row){
     const same=existing.filter(t=>String(t.acct)===String(row.acct)&&String(t.date)===String(row.date)&&cents(t.amount)===cents(row.amount));
-    if(same.length===1)return same[0];
     const p=norm(row.note);
-    return same.find(t=>{const n=norm(t.note);return p&&n&&(p.includes(n)||n.includes(p));})||null;
+    const matches=same.filter(t=>{const n=norm(t.note);return p&&n&&(p===n||Math.min(p.length,n.length)>=6&&(p.startsWith(n+' ')||n.startsWith(p+' ')));});
+    return matches.length===1?matches[0]:null;
   }
 
   function planTransactions(existing=[],snapshotTransactions=[],accountMap={}){
@@ -108,19 +114,21 @@
       if(t?.pocketsmithId!=null)byExternal.set(String(t.pocketsmithId),t);
       if(String(t?.importKey||'').startsWith('pocketsmith:'))byExternal.set(String(t.importKey).slice(12),t);
     }
-    const additions=[],updates=[],links=[],skipped=[];
+    const additions=[],updates=[],links=[],skipped=[],used=new Set(),seenExternal=new Set();
     for(const src of snapshotTransactions){
       const psId=String(src?.id??'');
       const acct=accountMap[String(src?.transactionAccountId??'')];
-      if(!psId||!acct||!/^\d{4}-\d{2}-\d{2}/.test(String(src?.date||''))||!Number.isFinite(Number(src?.amount))){skipped.push(psId||'unknown');continue;}
-      const row={id:'ps_'+psId,acct,date:String(src.date).slice(0,10),amount:round2(src.amount),cat:categoryFor(src),note:String(src.payee||src.category?.title||'PocketSmith transaction'),src:'pocketsmith',pocketsmithId:psId,importKey:'pocketsmith:'+psId};
+      if(!psId||!acct||!validDate(src?.date)||src?.currencyCode&&src.currencyCode!=='AUD'||src?.amount==null||src?.amount===''||!Number.isFinite(Number(src?.amount))){skipped.push(psId||'unknown');continue;}
+      if(seenExternal.has(psId)){skipped.push(psId);continue;}seenExternal.add(psId);
+      const row={id:'ps_'+psId,acct,date:String(src.date).slice(0,10),amount:round2(src.amount),cat:categoryFor(src),note:String(src.payee||src.category?.title||'PocketSmith transaction'),src:'pocketsmith',pocketsmithId:psId,importKey:'pocketsmith:'+psId,sourceCategory:src.category||null,sourceStatus:src.status||null,needsReview:src.needsReview===true||categoryFor(src)==='other'||/pending/i.test(src.status||''),currencyCode:src.currencyCode||'AUD',sourceUpdatedAt:src.updatedAt||null,sourceCat:categoryFor(src)};
       const linked=byExternal.get(psId);
       if(linked){
-        updates.push({existingId:linked.id,...row,id:linked.id});
+        const overridden=linked.categoryOverride===true||(linked.sourceCat&&linked.cat!==linked.sourceCat);
+        updates.push({existingId:linked.id,...row,id:linked.id,cat:overridden?linked.cat:row.cat,categoryOverride:overridden,note:linked.noteOverride?linked.note:row.note,noteOverride:!!linked.noteOverride});
         continue;
       }
-      const match=existingMatch(existing,row);
-      if(match&&match.id!=null)links.push({existingId:match.id,pocketsmithId:psId,importKey:row.importKey});
+      const match=existingMatch(existing.filter(t=>!used.has(String(t.id))&&!t.pocketsmithId),row);
+      if(match&&match.id!=null){used.add(String(match.id));links.push({existingId:match.id,pocketsmithId:psId,importKey:row.importKey,sourceCategory:row.sourceCategory,sourceCat:row.sourceCat});}
       else additions.push(row);
     }
     return {additions,updates,links,skipped};
@@ -155,15 +163,16 @@
   }
 
   function financeModel(){
-    return evalFinance(`(()=>({accounts:ACCTS.map(a=>({id:a.id,name:a.name,type:a.type||null})),transactions:TXNS.map(t=>({id:t.id,acct:t.acct,date:t.date,amount:t.amount,note:t.note||"",importKey:t.importKey||"",pocketsmithId:t.pocketsmithId||null}))}))()`);
+    return evalFinance(`(()=>({accounts:ACCTS.map(a=>({...a})),transactions:TXNS.map(t=>({...t}))}))()`);
   }
 
   function applyOps(snapshot,mapping,plan){
     const frame=financeFrame(),w=frame.contentWindow;
     w.__PS_IMPORT_PAYLOAD__={
       generatedAt:snapshot.generatedAt||new Date().toISOString(),
+      full:snapshot.full===true&&snapshot.complete===true,sourceIds:(snapshot.transactions||[]).map(t=>String(t.id)),
       mappings:mapping.mappings,
-      balances:(snapshot.accounts||[]).filter(a=>mapping.map[String(a.id)]&&Number.isFinite(Number(a.currentBalance))).map(a=>({financeId:mapping.map[String(a.id)],pocketsmithId:String(a.id),balance:round2(a.currentBalance),asAt:a.currentBalanceDate||null})),
+      balances:(snapshot.accounts||[]).filter(a=>mapping.map[String(a.id)]&&a.currentBalance!=null&&a.currentBalance!==''&&Number.isFinite(Number(a.currentBalance))).map(a=>({financeId:mapping.map[String(a.id)],pocketsmithId:String(a.id),balance:round2(a.currentBalance),asAt:a.currentBalanceDate||null})),
       additions:plan.additions,
       updates:plan.updates,
       links:plan.links
@@ -173,44 +182,48 @@
         const payload=window.__PS_IMPORT_PAYLOAD__;
         if(!payload||typeof ACCTS==="undefined"||typeof TXNS==="undefined")return {ok:false,reason:"runtime_missing"};
 
+        const oldAccounts=JSON.parse(JSON.stringify(ACCTS)),oldTransactions=JSON.parse(JSON.stringify(TXNS));
+        let updated=0,added=0;const balanceResults=[];
+        try{
         for(const link of payload.links){
           const row=TXNS.find(t=>String(t.id)===String(link.existingId));
           if(row){row.pocketsmithId=link.pocketsmithId;row.importKey=link.importKey;row.pocketsmithLinked=true;}
         }
-        let updated=0;
         for(const next of payload.updates||[]){
           const row=TXNS.find(t=>String(t.id)===String(next.existingId));
           if(!row)continue;
-          Object.assign(row,{acct:next.acct,date:next.date,amount:next.amount,cat:next.cat,note:next.note,src:'pocketsmith',pocketsmithId:next.pocketsmithId,importKey:next.importKey});
+          const {existingId,...record}=next;Object.assign(row,record);
           updated++;
         }
         const known=new Set(TXNS.map(t=>t.importKey).filter(Boolean));
-        let added=0;
         for(const row of payload.additions){
           if(known.has(row.importKey))continue;
           TXNS.push({...row});known.add(row.importKey);added++;
         }
 
-        const balanceResults=[];
+        if(payload.full){const ids=new Set(payload.sourceIds);for(const t of TXNS)if(t.pocketsmithId)t.sourceMissing=!ids.has(String(t.pocketsmithId));}
         for(const b of payload.balances){
           const acct=ACCTS.find(a=>String(a.id)===String(b.financeId));
           if(!acct)continue;
           const total=TXNS.filter(t=>String(t.acct)===String(acct.id)).reduce((s,t)=>s+(Number(t.amount)||0),0);
-          acct.openBal=Math.round((Number(b.balance)-total)*100)/100;
+          const ledger=Math.round((Number(acct.openBal)+TXNS.filter(t=>String(t.acct)===String(acct.id)&&t.date<=b.asAt).reduce((s,t)=>s+(Number(t.amount)||0),0))*100)/100;
+          acct.sourceBalance={amount:Number(b.balance),date:b.asAt,source:"pocketsmith",ledgerTotal:ledger-Number(acct.openBal),dayTotal:TXNS.filter(t=>String(t.acct)===String(acct.id)&&t.date===b.asAt).reduce((s,t)=>s+(Number(t.amount)||0),0)};
+          acct.reconciliation={difference:Math.round((Number(b.balance)-ledger)*100)/100,at:payload.generatedAt,historyVerified:false};
           acct.pocketSmithAccountId=b.pocketsmithId;
           acct.pocketSmithBalanceAsAt=b.asAt;
           acct.pocketSmithSyncedAt=payload.generatedAt;
-          balanceResults.push({financeId:acct.id,target:Number(b.balance),calculated:Math.round((Number(acct.openBal)+total)*100)/100});
+          balanceResults.push({financeId:acct.id,target:Number(b.balance),calculated:Number(b.balance),ledger,difference:acct.reconciliation.difference});
         }
 
         const accountsKey=typeof K_ACCTS!=="undefined"?K_ACCTS:"fin_accounts_v3";
         const txnsKey=typeof K_TXNS!=="undefined"?K_TXNS:"fin_txns_v3";
-        if(typeof save==="function"){save(accountsKey,ACCTS);save(txnsKey,TXNS);}
-        else{localStorage.setItem(accountsKey,JSON.stringify(ACCTS));localStorage.setItem(txnsKey,JSON.stringify(TXNS));}
+        if(typeof saveAtomic!=="function")throw new Error("Refresh Finance before importing: safe storage is not ready.");
+        saveAtomic({[accountsKey]:ACCTS,[txnsKey]:TXNS});
+        }catch(error){ACCTS=oldAccounts;TXNS=oldTransactions;throw error;}
 
         window.financeDataAsAt=payload.generatedAt;
         if(typeof buildWeeklyEverydayPlan==="function"){
-          try{const p=buildWeeklyEverydayPlan();window.safeSavingsSuggestion=p&&p.safeSavingsSuggestion!=null?p.safeSavingsSuggestion:null;}catch(_){}
+          try{const p=buildWeeklyEverydayPlan();window.safeSavingsSuggestion=typeof financeEvidence==="function"&&financeEvidence().trusted&&p&&p.safeSavingsSuggestion!=null?p.safeSavingsSuggestion:null;}catch(_){}
         }
         if(typeof publishPartnerSnapshot==="function"){try{publishPartnerSnapshot();}catch(_){}}
         if(typeof render==="function"){try{render();}catch(_){}}
@@ -231,7 +244,9 @@
       try{overrides=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
       const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
+      if(snapshot.accounts.some(a=>mapping.map[String(a.id)]&&(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance))||!validDate(a.currentBalanceDate)||a.currencyCode&&a.currencyCode!=='AUD')))throw new Error('A mapped account has an unknown balance, date or unsupported currency. Nothing was imported.');
       const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map);
+      if(mapping.unmatched.length||plan.skipped.length)return setState('attention','Review unmatched accounts or invalid transactions before importing. Nothing was changed.',{mapping});
       const applied=applyOps(snapshot,mapping,plan);
       if(!applied||!applied.ok)throw new Error('Finance runtime did not accept the PocketSmith update.');
       const badBalances=(applied.balances||[]).filter(x=>cents(x.target)!==cents(x.calculated));

@@ -71,7 +71,7 @@
     const lifestyleSpend=expenseTxns.filter(t=>LIFESTYLE.has(String(t.cat||'other').toLowerCase())).reduce((s,t)=>s+Math.abs(number(t.amount)),0)*scale;
     const annualBudgetLeak=Math.max(0,lifestyleSpend-lifestyleBudget)*12;
     const plannedIncome=(Array.isArray(input.incomeBudget)?input.incomeBudget:[]).filter(x=>!['overtime','redraw','transfer'].includes(String(x.type||'').toLowerCase())).reduce((s,x)=>s+Math.max(0,number(x.mo)),0);
-    const accounts=Array.isArray(input.accounts)?input.accounts:[],cashAssets=accounts.filter(a=>a.type!=='loan').reduce((s,a)=>s+Math.max(0,number(a.balance)),0);
+    const accounts=Array.isArray(input.accounts)?input.accounts:[],cashAssets=accounts.filter(a=>a.type!=='loan').reduce((s,a)=>s+number(a.balance),0);
     const loans=accounts.filter(a=>a.type==='loan'&&number(a.balance)<0),loanDebt=loans.reduce((s,a)=>s+Math.abs(number(a.balance)),0);
     const investmentValue=(Array.isArray(input.investments)?input.investments:[]).reduce((s,x)=>s+Math.max(0,number(x.value)),0);
     const propertyValue=Math.max(0,number(settings.propertyValue)),superBalance=Math.max(0,number(settings.superBalance)),otherAssets=Math.max(0,number(settings.otherAssets)),otherDebts=Math.max(0,number(settings.otherDebts));

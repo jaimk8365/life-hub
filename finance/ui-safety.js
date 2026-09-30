@@ -2,7 +2,7 @@
 (function(){
  let previous=null;
  window.FinanceUI={
-  open(scrim,sheet){previous=document.activeElement;scrim.classList.add('on');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','true');sheet.setAttribute('aria-label',sheet.querySelector('h2')?.textContent||'Money details');sheet.setAttribute('tabindex','-1');document.body.style.overflow='hidden';(sheet.querySelector('button,input,select,textarea')||sheet).focus();},
+  open(scrim,sheet){sheet.querySelectorAll('.field').forEach((field,i)=>{const label=field.querySelector('label'),input=field.querySelector('input,select,textarea');if(label&&input){if(!input.id)input.id='dialog-field-'+i;label.htmlFor=input.id;}});previous=document.activeElement;scrim.classList.add('on');sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','true');sheet.setAttribute('aria-label',sheet.querySelector('h2')?.textContent||'Money details');sheet.setAttribute('tabindex','-1');document.body.style.overflow='hidden';(sheet.querySelector('button,input,select,textarea')||sheet).focus();},
   close(scrim){scrim.classList.remove('on');document.body.style.overflow='';if(previous?.isConnected)previous.focus();},
  };
  document.addEventListener('keydown',e=>{const scrim=document.getElementById('scrim'),sheet=document.getElementById('sheet');if(!scrim?.classList.contains('on')||!sheet)return;

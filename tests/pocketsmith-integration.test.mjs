@@ -20,25 +20,25 @@ test('PocketSmith API sync is not marked complete until Finance importer runs',(
 
 test('first importer deployment forces a full transaction snapshot instead of trusting an older fetch timestamp',()=>{
   assert.match(client,/IMPORT_VERSION_KEY/);
-  assert.match(client,/importerCurrent && last \? '\?updated_since='/);
+  assert.match(client,/full=!importerCurrent/);assert.match(client,/!full && last/);
   assert.match(client,/localStorage\.setItem\(IMPORT_VERSION_KEY, IMPORT_VERSION\)/);
 });
 
-test('importer reconciles displayed Finance balance back to PocketSmith current balance',()=>{
-  assert.match(importer,/acct\.openBal=Math\.round\(\(Number\(b\.balance\)-total\)\*100\)\/100/);
+test('importer preserves bank snapshots separately from ledger history',()=>{
+  assert.doesNotMatch(importer,/acct\.openBal=/);assert.match(importer,/acct\.sourceBalance=/);assert.match(importer,/acct\.reconciliation=/);
   assert.match(importer,/target:Number\(b\.balance\)/);
-  assert.match(importer,/calculated:Math\.round/);
+  assert.match(importer,/difference:acct\.reconciliation\.difference/);
 });
 
 test('importer persists accounts and transactions through Finance storage contracts',()=>{
   assert.match(importer,/typeof K_ACCTS/);
   assert.match(importer,/typeof K_TXNS/);
-  assert.match(importer,/save\(accountsKey,ACCTS\)/);
-  assert.match(importer,/save\(txnsKey,TXNS\)/);
+  assert.match(importer,/saveAtomic\(\{\[accountsKey\]:ACCTS,\[txnsKey\]:TXNS\}\)/);
+  assert.match(importer,/ACCTS=oldAccounts;TXNS=oldTransactions/);
 });
 
 test('PocketSmith transactions are deduplicated using external IDs and same-date amount matching',()=>{
   assert.match(importer,/pocketsmithId/);
   assert.match(importer,/importKey:'pocketsmith:'/);
-  assert.match(importer,/existingMatch\(existing,row\)/);
+  assert.match(importer,/!used\.has/);assert.match(importer,/matches\.length===1/);
 });

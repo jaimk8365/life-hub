@@ -56,7 +56,7 @@
     "security answers"
   ],
   "rules": [
-    "Finance app remains the detailed source; Notion is the action/summary layer.",
+    "Money Hub remains the source of truth for household plans; Finance records bank detail. This contract is not an active Notion connection.",
     "Only sync changed summary values.",
     "Do not create duplicate Money Hub pages or finance databases.",
     "Secrets must never be committed to this repository or embedded in browser JavaScript."

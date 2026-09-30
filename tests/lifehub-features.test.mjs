@@ -474,10 +474,11 @@ test('Overview affordability check requires fresh account data and produces mult
   assert.match(finance,/Optional current balance/);
 });
 
-test('screenshot review requires approval and balance-only updates create a visible missing-data adjustment', async () => {
+test('screenshot review requires approval and balance-only updates preserve a dated discrepancy', async () => {
   const finance=await text('src/finance.html');
-  for(const marker of ['fin_screenshot_review_v1','openScreenshotReview','saveScreenshotDraftRow','addScreenshotDraftRow','approveScreenshotReview','Approve and import','Extracted transactions — review before importing','Balance adjustment only — transaction details missing','needsDetails']) assert.match(finance,new RegExp(marker.replace(/[—]/g,'—')));
-  assert.match(finance,/cat:'transfer'.*src:'balance-adjustment'/s);
+  for(const marker of ['fin_screenshot_review_v1','openScreenshotReview','saveScreenshotDraftRow','addScreenshotDraftRow','approveScreenshotReview','Approve and import','Extracted transactions — review before importing','reviewed screenshot','historyVerified:false']) assert.match(finance,new RegExp(marker.replace(/[—]/g,'—')));
+  assert.match(finance,/function setActualBalanceOnly[\s\S]*?a\.sourceBalance=\{amount:target,date,[\s\S]*?a\.reconciliation=/);
+  assert.doesNotMatch(finance.match(/function setActualBalanceOnly[^\n]+/)[0],/TXNS\.push|openBal\s*=/);
   assert.doesNotMatch(finance,/merge Claude's screenshot-extracted transactions into the local log/);
 });
 

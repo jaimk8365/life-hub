@@ -1,3 +1,4 @@
+const RELEASE = "finance-integrity-2026-09-30";
 const API = "https://api.pocketsmith.com/v2";
 
 function json(body, status = 200, origin = "") {
@@ -35,11 +36,12 @@ function allowedOrigin(request, env) {
 
 function authorised(request, env) {
   const supplied = request.headers.get("Authorization") || "";
-  return supplied === `Bearer ${env.APP_SYNC_TOKEN}`;
+  return Boolean(env.APP_SYNC_TOKEN) && supplied === `Bearer ${env.APP_SYNC_TOKEN}`;
 }
 
 async function pocketSmith(path, env) {
   const response = await fetch(API + path, {
+    signal: AbortSignal.timeout(20000),
     headers: {
       "X-Developer-Key": env.POCKETSMITH_DEVELOPER_KEY,
       accept: "application/json"
@@ -84,14 +86,15 @@ async function getTransactions(userId, env, updatedSince) {
       env
     );
 
-    if (!Array.isArray(batch) || batch.length === 0) break;
+    if (!Array.isArray(batch)) {const error=new Error("Invalid transactions response");error.path="transactions_shape";throw error;}
+    if (batch.length === 0) return transactions;
 
     transactions.push(...batch);
 
-    if (batch.length < 1000) break;
+    if (batch.length < 1000) return transactions;
   }
 
-  return transactions;
+  const error=new Error("History limit reached: snapshot is incomplete");error.path="transactions_truncated";throw error;
 }
 
 function safeAccount(account) {
@@ -126,6 +129,7 @@ function safeTransaction(transaction) {
       : null,
     transactionAccountId:
       transaction.transaction_account?.id || transaction.transaction_account_id || null,
+    currencyCode: transaction.currency_code || transaction.transaction_account?.currency_code || null,
     updatedAt: transaction.updated_at || null
   };
 }
@@ -135,6 +139,8 @@ export default {
     const url = new URL(request.url);
     const rawOrigin = request.headers.get("Origin") || "";
     const origin = allowedOrigin(request, env);
+
+    if(url.pathname==="/version"&&request.method==="GET")return json({release:RELEASE});
 
     // Browser requests with Authorization trigger a CORS preflight first.
     if (request.method === "OPTIONS") {
@@ -197,7 +203,9 @@ export default {
 
     try {
       if (url.pathname === "/snapshot") {
+        const watermark=new Date().toISOString();
         const me = await pocketSmith("/me", env);
+        if(!me?.id)throw new Error("Account identity unavailable");
         const updatedSince =
           url.searchParams.get("updated_since") || "";
 
@@ -232,6 +240,7 @@ export default {
         return json(
           {
             generatedAt: new Date().toISOString(),
+            watermark,complete:true,full:!updatedSince,transactionCount:transactions.length,
             updatedSince: updatedSince || null,
             accounts: accounts.map(safeAccount).filter(Boolean),
             transactions: transactions.map(safeTransaction).filter(Boolean)
