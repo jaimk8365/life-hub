@@ -201,17 +201,18 @@ async function runSync(){
     // Commit the entire pull together. Preserve old values until every write succeeds.
     const recovery={};for(const [k]of pending)recovery[k]=localStorage.getItem(k);
     for(const k of [M_KEY,RECORD_KEY,'lifehub_finance_sync_conflicts'])recovery[k]=localStorage.getItem(k);
-    if(pending.length)localStorage.setItem('lifehub_finance_pending_commit',JSON.stringify(recovery));
+    const journal=typeof sessionStorage==='object'?sessionStorage:localStorage,journalKey='lifehub_finance_pending_commit';
+    if(pending.length){journal.setItem(journalKey,JSON.stringify(recovery));if(journal!==localStorage)localStorage.setItem(journalKey,JSON.stringify({version:2,storage:'session'}));}
     try{
       for(const [k,entry]of pending)applyRemote(k,entry);
       const resolved=new Set(read('fin_sync_resolutions_v1',[]).map(x=>x.id));
       write('lifehub_finance_sync_conflicts',allConflicts.filter(c=>!resolved.has(c.conflictId)));
-      if(pending.length)localStorage.removeItem('lifehub_finance_pending_commit');
+      if(pending.length){localStorage.removeItem(journalKey);if(journal!==localStorage)journal.removeItem(journalKey);}
     }catch(error){
       for(const [k,v]of Object.entries(recovery)){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}
       meta=read(M_KEY,{});recordVersions=read(RECORD_KEY,{});
       for(const [k]of pending)observed.set(k,localStorage.getItem(k));
-      localStorage.removeItem('lifehub_finance_pending_commit');throw error;
+      localStorage.removeItem(journalKey);if(journal!==localStorage)journal.removeItem(journalKey);throw error;
     }
     if (needPush){
       await gh('/gists/' + id, { method: 'PATCH', body: JSON.stringify({
