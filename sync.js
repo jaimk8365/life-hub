@@ -276,7 +276,7 @@ window.LifeHubSync = {
   /* ---- full local backup/restore — every tracked key, plaintext JSON,
      downloaded to the device (not uploaded anywhere). Separate from the
      encrypted gist sync above; this is a manual "just in case" copy. ---- */
-  async exportEncrypted(){return encrypt({keys:localMap(),exportedAt:new Date().toISOString()});},
+  async exportEncrypted(){return encrypt({keys:localMap(),conflicts:read('lifehub_finance_sync_conflicts',[]),exportedAt:new Date().toISOString()});},
   exportAll(){
     const out = { exportedAt: new Date().toISOString(), keys: {} };
     for (let i = 0; i < localStorage.length; i++){
