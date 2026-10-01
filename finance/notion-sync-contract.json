@@ -1,64 +1,53 @@
 {
-  "version": 1,
-  "purpose": "Safe summary contract for Jaimi's HQ > Money Hub. Never include raw transactions, credentials, account numbers, PINs or security data.",
+  "version": 2,
+  "purpose": "Discreet status-only contract for Money Hub. No balances or financial amounts leave Life Hub.",
   "destination": {
     "notionPage": "Money Hub",
     "pageId": "3e4fcd35-0e18-8129-8a43-ce6694628616"
   },
+  "connectionStatus": "not_connected",
   "sync": {
     "accounts": [
       "displayName",
-      "purpose",
-      "balance",
-      "bufferTarget",
-      "bufferProgressPct"
-    ],
-    "loans": [
-      "displayName",
-      "balance",
-      "interestRate",
-      "repaymentAmount",
-      "repaymentFrequency"
+      "reviewStatus",
+      "sourceUpdatedAt"
     ],
     "goals": [
-      "name",
-      "saved",
-      "target",
-      "progressPct",
-      "dueDate",
-      "requiredWeekly",
-      "status"
-    ],
-    "cashFlow": [
-      "plannedWeeklyCommitments",
-      "estimatedWeeklySurplus",
-      "estimatedFortnightlySurplus"
-    ],
-    "attention": [
-      "label",
-      "reason",
-      "priority"
+      "displayName",
+      "reviewStatus",
+      "sourceUpdatedAt"
     ],
     "meta": [
       "generatedAt",
-      "financeDataAsAt"
+      "lastSuccessfulSyncAt"
     ]
   },
+  "allowedReviewStatuses": [
+    "up_to_date",
+    "review_needed",
+    "unknown"
+  ],
   "exclusions": [
-    "rawTransactions",
-    "bankAccountNumbers",
+    "balances",
+    "amounts",
+    "percentages",
+    "interestRates",
+    "repayments",
+    "transactions",
+    "accountNumbers",
     "BSB",
-    "passwords",
-    "PINs",
-    "API tokens",
-    "GitHub tokens",
-    "Notion tokens",
-    "security answers"
+    "credentials",
+    "tokens",
+    "freeTextFinancialDetails"
   ],
   "rules": [
-    "Money Hub remains the source of truth for household plans; Finance records bank detail. This contract is not an active Notion connection.",
-    "Only sync changed summary values.",
-    "Do not create duplicate Money Hub pages or finance databases.",
-    "Secrets must never be committed to this repository or embedded in browser JavaScript."
+    "This is a contract, not an active Notion connection or runtime privacy filter.",
+    "Life Hub is the source of truth for financial detail. Notion holds actions and discreet review statuses only.",
+    "Export only allowlisted fields. Use user-approved neutral display names and enum statuses; never interpolate private values into text.",
+    "sourceUpdatedAt must represent a genuine source-account refresh, never a page edit or export time. Missing timestamps mean unknown.",
+    "lastSuccessfulSyncAt is set only after delivery to Notion is verified. A failed delivery must not mark data current.",
+    "Derive stale status from sourceUpdatedAt using a user-configured review interval; do not invent a freshness threshold.",
+    "Never store export payloads, credentials or private data in this public repository or browser JavaScript.",
+    "Do not create duplicate Money Hub pages or finance databases."
   ]
 }
