@@ -6,7 +6,7 @@ import {webcrypto} from 'node:crypto';
 
 // Run the actual browser scripts; stub only storage, events and HTTP boundaries.
 // Every key, token and record here is a synthetic test fixture.
-async function harness(kind, initial = {}, remoteKeys = {}) {
+async function harness(kind, initial = {}, remoteKeys = {}, options = {}) {
   const partner = kind === 'partner';
   const filename = partner ? 'lifehub-partner-sync.enc.json' : 'lifehub-sync.enc.json';
   const metaKey = partner ? 'finp_sync_meta' : 'lifehub_sync_meta';
@@ -27,23 +27,24 @@ async function harness(kind, initial = {}, remoteKeys = {}) {
   async function decrypt(content) {
     const value = JSON.parse(content);
     const plain = await webcrypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(value.iv,'base64')},cryptoKey,Buffer.from(value.ct,'base64'));
-    return JSON.parse(new TextDecoder().decode(plain)).keys;
+    return JSON.parse(new TextDecoder().decode(plain));
   }
   const map = new Map(Object.entries({
     [partner?'finp_gh_token':'lifehub_gh_token']:'dummy-token',
     [partner?'finp_gist_id':'lifehub_gist_id']:'dummy-id',
     hub_key:'dummy-passphrase', ...initial,
   }));
+  let failWrites=false,writeCount=0;
   const localStorage = {
     get length(){return map.size;}, key:i=>[...map.keys()][i]??null,
-    getItem:k=>map.get(k)??null, setItem:(k,v)=>map.set(k,String(v)), removeItem:k=>map.delete(k),
+    getItem:k=>map.get(k)??null, setItem:(k,v)=>{writeCount++;if(failWrites)throw new DOMException("Quota exceeded","QuotaExceededError");return map.set(k,String(v));}, removeItem:k=>map.delete(k),
   };
   let content = await encrypt(remoteKeys), patches = 0;
   const listeners = {}, ready = Promise.withResolvers();
   const window = {addEventListener:(type,fn)=>{listeners[type]=fn;},dispatchEvent:event=>{if(event.type==='lifehub-sync-ready')ready.resolve();}};
   const context = {window,localStorage,document:{dispatchEvent(){},addEventListener(){},getElementById(){return null;}},
     CustomEvent:class{constructor(type){this.type=type;}},Event:class{constructor(type){this.type=type;}},
-    crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,atob,btoa,
+    indexedDB:options.indexedDB,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,atob,btoa,
     setTimeout:()=>1,clearTimeout(){},setInterval(){},
     fetch:async (_url,options={})=>{
       if(options.method==='PATCH'){patches++;content=JSON.parse(options.body).files[filename].content;}
@@ -54,7 +55,7 @@ async function harness(kind, initial = {}, remoteKeys = {}) {
   let engine;
   if(partner) engine=window.PartnerSync.init(encode(fixedBytes),{keys:['fin_budget_v3','fin_shared_goals_v1','finp_shared']});
   else {await ready.promise;engine=window.LifeHubSync;}
-  return {map,engine,meta:()=>JSON.parse(map.get(metaKey)||'{}'),remote:()=>decrypt(content),patches:()=>patches,
+  return {map,engine,meta:()=>JSON.parse(map.get(metaKey)||'{}'),remote:async()=>(await decrypt(content)).keys,decode:decrypt,failWrites:()=>{failWrites=true;},writes:()=>writeCount,patches:()=>patches,
     setRemote:async keys=>{content=await encrypt(keys);},listeners};
 }
 
@@ -110,4 +111,54 @@ test('hub propagates a transaction deletion without deleting independent additio
  const h=await harness('hub',{fin_txns:JSON.stringify([{id:'a'},{id:'b'}])},{});await h.engine.syncNow();
  h.map.set('fin_txns',JSON.stringify([{id:'b'}]));await h.engine.syncNow();
  const r=(await h.remote()).fin_txns;assert.deepEqual(JSON.parse(r.v).map(x=>x.id),['b']);assert.equal(r.records.a.deleted,true);
+});
+
+// Minimal asynchronous IDB boundary: requests complete before the transaction.
+// Synthetic data only; failed transactions never commit their writes.
+function memoryDB({fail=false,corruptRead=false}={}){
+ const data=new Map();let reads=0;
+ const db={createObjectStore(){},transaction(){
+  const tx={};tx.objectStore=()=>({get(k){const req={};queueMicrotask(()=>{req.result=corruptRead&&++reads>1?'{}':data.get(k);req.onsuccess?.();queueMicrotask(()=>tx.oncomplete?.());});return req;},put(value,k){const req={};queueMicrotask(()=>{if(fail){tx.onabort?.();return;}data.set(k,value);req.result=k;req.onsuccess?.();queueMicrotask(()=>tx.oncomplete?.());});return req;}});return tx;
+ }};
+ return {data,open(){const req={};queueMicrotask(()=>{req.result=db;req.onupgradeneeded?.();req.onsuccess?.();});return req;}};
+}
+test('private recovery exports at full quota with no writes and retains unsaved ledger separately',async()=>{
+ const h=await harness('hub',{fin_txns:'[{"id":"saved","amount":7}]',fin_private_debt_lock_v1:'private-lock'},{});
+ h.failWrites();const before=h.writes();
+ const result=await h.decode(await h.engine.exportEncrypted({fin_txns:[{id:'unsaved',amount:9}],lifehub_gh_token:'must-not-export',fin_private_debt_lock_v1:'must-not-export'}));
+ assert.equal(h.writes(),before);assert.equal(result.keys.fin_txns.v,'[{"id":"saved","amount":7}]');
+ assert.equal(result.inMemory.fin_txns,'[{"id":"unsaved","amount":9}]');
+ assert.equal(result.keys.lifehub_gh_token,undefined);assert.equal(result.keys.fin_private_debt_lock_v1,undefined);
+ assert.equal(result.inMemory.lifehub_gh_token,undefined);assert.equal(result.inMemory.fin_private_debt_lock_v1,undefined);
+});
+test('verified IDB migration retains tombstones and removes only duplicate metadata',async()=>{
+ const idb=memoryDB(),legacy=JSON.stringify({fin_txns:{gone:{t:20,deleted:true}}});
+ const h=await harness('hub',{lifehub_record_versions_v1:legacy,fin_txns:'[]'}, {},{indexedDB:idb});
+ assert.equal(h.map.has('lifehub_record_versions_v1'),false);
+ assert.equal(JSON.parse(idb.data.get('lifehub_record_versions_v1')).fin_txns.gone.deleted,true);
+ assert.equal(h.map.get('fin_txns'),'[]');assert.equal(h.map.get('lifehub_gh_token'),'dummy-token');
+ const restarted=await harness('hub',{fin_txns:'[]'},{},{indexedDB:idb});
+ assert.equal((await restarted.remote()).fin_txns.records.gone.deleted,true);
+});
+test('failed IDB migration keeps the legacy metadata and ledger',async()=>{
+ const legacy=JSON.stringify({fin_txns:{gone:{t:20,deleted:true}}});
+ const h=await harness('hub',{lifehub_record_versions_v1:legacy,fin_txns:'[]'},{},{indexedDB:memoryDB({fail:true})});
+ assert.equal(JSON.parse(h.map.get('lifehub_record_versions_v1')).fin_txns.gone.deleted,true);
+ assert.equal(h.map.get('fin_txns'),'[]');
+});
+test('migration readback mismatch preserves legacy tombstones',async()=>{
+ const legacy=JSON.stringify({fin_txns:{gone:{t:20,deleted:true}}});
+ const h=await harness('hub',{lifehub_record_versions_v1:legacy,fin_txns:'[]'},{},{indexedDB:memoryDB({corruptRead:true})});
+ assert.equal(JSON.parse(h.map.get('lifehub_record_versions_v1')).fin_txns.gone.deleted,true);
+});
+test('a validated GitHub token survives a later sync failure',async()=>{
+ const h=await harness('hub');h.map.set('lifehub_finance_pending_commit','{}');
+ await assert.rejects(h.engine.connect('replacement-dummy-token'),/interrupted Finance save/);
+ assert.equal(h.map.get('lifehub_gh_token'),'replacement-dummy-token');assert.equal(h.engine.state().status,'err');
+});
+
+test('a legacy tab cannot replace newer archived deletion history on migration',async()=>{
+ const idb=memoryDB();idb.data.set('lifehub_record_versions_v1',JSON.stringify({fin_txns:{gone:{t:200,deleted:true}}}));
+ const h=await harness('hub',{fin_txns:'[]',lifehub_record_versions_v1:JSON.stringify({fin_txns:{gone:{t:10,hash:'old',deleted:false}}})},{},{indexedDB:idb});
+ assert.equal((await h.remote()).fin_txns.records.gone.deleted,true);assert.equal(h.map.has('lifehub_record_versions_v1'),false);
 });

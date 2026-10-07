@@ -32,3 +32,8 @@ test('service worker cleans only old Life Hub cache versions',async()=>{
 test('service worker precaches encrypted finance profiles and their shared assets',async()=>{
  const w=worker();await w.event('install');for(const path of ['finance/index.html','partner/index.html','plan/index.html','finance/pocketsmith-client.js','finance/pocketsmith-import.js','finance/money-map.js','finance/money-map.css','finance/csv-batch.js','finance/account-migrations.js','finance/shared-budget.js','finance/ui-safety.js','finance/wealth-coach.js','partner-sync.js'])assert.ok(w.precache.includes('./'+path),path);
 });
+
+test('query variants and other same-origin apps do not grow the Life Hub cache',async()=>{
+ const w=worker();for(const query of ['?v=1','?v=2','?cachebust=3'])assert.equal((await w.event('fetch',{method:'GET',url:'https://example.test/life-hub/finance/index.html'+query})).handled,true);
+ assert.equal(w.puts.length,0);assert.equal((await w.event('fetch',{method:'GET',url:'https://example.test/other-app/'})).handled,false);
+});
