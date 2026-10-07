@@ -6,6 +6,7 @@
   if(typeof module==='object'&&module.exports) module.exports=api;
   else root.PocketSmithImporter=api;
 })(typeof window==='object'?window:globalThis,function(root){
+  const HISTORY_DAYS=730,MAX_BANK_ROWS=5000,MAX_LEDGER_CHARS=2000000;
   const MAP_KEY='fin_pocketsmith_account_map_v1';
   const aliases={
     everyday:['everyday','everyday expenses','main offset','everyday offset'],
@@ -108,13 +109,17 @@
     return matches.length===1?matches[0]:null;
   }
 
-  function planTransactions(existing=[],snapshotTransactions=[],accountMap={}){
+  function planTransactions(existing=[],snapshotTransactions=[],accountMap={},asAt=null){
+    // Keep every existing row, including manual edits and older linked records.
+    // Only previously unseen source history is subject to the import window.
+    const anchor=validDate(asAt)?new Date(String(asAt).slice(0,10)+'T00:00:00Z'):null;
+    const cutoff=anchor?new Date(anchor.getTime()-HISTORY_DAYS*86400000).toISOString().slice(0,10):null;
     const byExternal=new Map();
     for(const t of existing){
       if(t?.pocketsmithId!=null)byExternal.set(String(t.pocketsmithId),t);
       if(String(t?.importKey||'').startsWith('pocketsmith:'))byExternal.set(String(t.importKey).slice(12),t);
     }
-    const additions=[],updates=[],links=[],skipped=[],used=new Set(),seenExternal=new Set();
+    const additions=[],updates=[],links=[],skipped=[],outsideWindow=[],used=new Set(),seenExternal=new Set();
     for(const src of snapshotTransactions){
       const psId=String(src?.id??'');
       const acct=accountMap[String(src?.transactionAccountId??'')];
@@ -129,9 +134,12 @@
       }
       const match=existingMatch(existing.filter(t=>!used.has(String(t.id))&&!t.pocketsmithId),row);
       if(match&&match.id!=null){used.add(String(match.id));links.push({existingId:match.id,pocketsmithId:psId,importKey:row.importKey,sourceCategory:row.sourceCategory,sourceCat:row.sourceCat});}
+      else if(cutoff&&row.date<cutoff)outsideWindow.push(psId);
       else additions.push(row);
     }
-    return {additions,updates,links,skipped};
+    const bankRows=existing.filter(t=>t.pocketsmithId!=null||String(t.importKey||'').startsWith('pocketsmith:')).length;
+    if(additions.length&&bankRows+additions.length>MAX_BANK_ROWS)throw new Error('Bank history has reached its safe storage limit. Existing records were kept; no new import was saved. Download a recovery backup before expanding history.');
+    return {additions,updates,links,skipped,outsideWindow};
   }
 
   let state={status:'idle',detail:'',result:null};
@@ -170,7 +178,7 @@
     const frame=financeFrame(),w=frame.contentWindow;
     w.__PS_IMPORT_PAYLOAD__={
       generatedAt:snapshot.generatedAt||new Date().toISOString(),
-      full:snapshot.full===true&&snapshot.complete===true,sourceIds:(snapshot.transactions||[]).map(t=>String(t.id)),
+      full:snapshot.full===true&&snapshot.complete===true&&!snapshot.historyStart,sourceIds:(snapshot.transactions||[]).map(t=>String(t.id)),
       mappings:mapping.mappings,
       balances:(snapshot.accounts||[]).filter(a=>mapping.map[String(a.id)]&&a.currentBalance!=null&&a.currentBalance!==''&&Number.isFinite(Number(a.currentBalance))).map(a=>({financeId:mapping.map[String(a.id)],pocketsmithId:String(a.id),balance:round2(a.currentBalance),asAt:a.currentBalanceDate||null})),
       additions:plan.additions,
@@ -218,6 +226,9 @@
         const accountsKey=typeof K_ACCTS!=="undefined"?K_ACCTS:"fin_accounts_v3";
         const txnsKey=typeof K_TXNS!=="undefined"?K_TXNS:"fin_txns_v3";
         if(typeof saveAtomic!=="function")throw new Error("Refresh Finance before importing: safe storage is not ready.");
+        // Legacy large ledgers may still be updated if they do not grow.
+        const previousSize=JSON.stringify(oldTransactions).length,nextSize=JSON.stringify(TXNS).length;
+        if(nextSize>Math.max(${MAX_LEDGER_CHARS},previousSize))throw new Error("Bank history is too large for a safe import. Existing balances and records were kept; download a recovery backup.");
         saveAtomic({[accountsKey]:ACCTS,[txnsKey]:TXNS});
         }catch(error){ACCTS=oldAccounts;TXNS=oldTransactions;throw error;}
 
@@ -245,16 +256,17 @@
       const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
       if(snapshot.accounts.some(a=>mapping.map[String(a.id)]&&(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance))||!validDate(a.currentBalanceDate)||a.currencyCode&&a.currencyCode!=='AUD')))throw new Error('A mapped account has an unknown balance, date or unsupported currency. Nothing was imported.');
-      const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map);
+      const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt);
       if(mapping.unmatched.length||plan.skipped.length)return setState('attention','Review unmatched accounts or invalid transactions before importing. Nothing was changed.',{mapping});
       const applied=applyOps(snapshot,mapping,plan);
       if(!applied||!applied.ok)throw new Error('Finance runtime did not accept the PocketSmith update.');
       const badBalances=(applied.balances||[]).filter(x=>cents(x.target)!==cents(x.calculated));
       if(badBalances.length)throw new Error('A synced account did not reconcile to the PocketSmith balance.');
+      const historyNote=plan.outsideWindow.length?` Older bank history (${plan.outsideWindow.length} rows) remains in PocketSmith; your existing Finance history was kept.`:'';
       const detail=mapping.unmatched.length
         ? `Updated ${applied.balances.length} account(s); ${mapping.unmatched.length} PocketSmith account(s) still need matching.`
         : `Updated ${applied.balances.length} account(s), imported ${applied.added} new transaction(s) and refreshed ${applied.updated||0} changed transaction(s).`;
-      return setState(mapping.unmatched.length?'attention':'ok',detail,{mapping,plan:{added:applied.added,updated:applied.updated||0,linked:applied.linked,skipped:plan.skipped.length},balances:applied.balances});
+      return setState(mapping.unmatched.length?'attention':'ok',detail+historyNote,{mapping,plan:{added:applied.added,updated:applied.updated||0,linked:applied.linked,skipped:plan.skipped.length},balances:applied.balances});
     }catch(e){
       return setState('error',e.message||'PocketSmith data could not be applied to Finance.');
     }
@@ -272,6 +284,6 @@
     return map;
   }
   function getState(){return {...state};}
-  const api={norm,buildAccountMapping,categoryFor,planTransactions,apply,setMapping,state:getState,MAP_KEY};
+  const api={norm,buildAccountMapping,categoryFor,planTransactions,apply,setMapping,state:getState,MAP_KEY,HISTORY_DAYS,MAX_BANK_ROWS,MAX_LEDGER_CHARS};
   return api;
 });

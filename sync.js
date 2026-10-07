@@ -40,6 +40,54 @@ const pass  = () => localStorage.getItem('hub_key');
 const isTracked = k => k!=='fin_private_debt_lock_v1' && TRACKED.some(t => k.startsWith(t.prefix));
 const RECORD_KEY='lifehub_record_versions_v1';
 let recordVersions=read(RECORD_KEY,{});
+// Record versions are durable sync state (including deletion tombstones), not a
+// disposable cache. Move them losslessly out of the small Web Storage quota.
+let versionsDB=null,storageError=null;
+function mergeVersionState(left,right){
+ const result={...left};
+ for(const [key,records]of Object.entries(right||{})){
+  const merged={...(result[key]||{})};
+  for(const [id,value]of Object.entries(records||{})){
+   const old=merged[id];
+   if(!old||value.t>old.t||value.t===old.t&&String(value.hash||'')>String(old.hash||''))merged[id]=value;
+  }
+  result[key]=merged;
+ }
+ return result;
+}
+function dbRequest(mode, operation){
+ return new Promise((resolve,reject)=>{
+  const tx=versionsDB.transaction('state',mode);let result;
+  const request=operation(tx.objectStore('state'));
+  request.onsuccess=()=>{result=request.result;};
+  tx.oncomplete=()=>resolve(result);
+  tx.onerror=tx.onabort=()=>reject(new Error('Sync recovery storage could not be saved. Existing data was kept.'));
+ });
+}
+const storageReady=(async()=>{
+ if(typeof indexedDB==='undefined')return;
+ try{
+  versionsDB=await new Promise((resolve,reject)=>{const request=indexedDB.open('lifehub-sync-storage-v1',1);request.onupgradeneeded=()=>request.result.createObjectStore('state');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('Recovery storage is busy.'));});
+  const legacy=localStorage.getItem(RECORD_KEY),saved=await dbRequest('readonly',store=>store.get(RECORD_KEY));
+  if(legacy!==null){
+   let parsed=JSON.parse(legacy);
+   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error('Invalid sync metadata');
+   // Retain tombstones from a previous migration if an older tab rewrites
+   // legacy metadata. Never replace a newer archive with that older copy.
+   parsed=mergeVersionState(saved?JSON.parse(saved):{},parsed);
+   const migrated=JSON.stringify(parsed);
+   await dbRequest('readwrite',store=>store.put(migrated,RECORD_KEY));
+   if(await dbRequest('readonly',store=>store.get(RECORD_KEY))!==migrated)throw new Error('Migration verification failed');
+   if(localStorage.getItem(RECORD_KEY)!==legacy)throw new Error('Sync metadata changed during migration');
+   recordVersions=parsed;localStorage.removeItem(RECORD_KEY);
+  }else if(saved!=null){recordVersions=JSON.parse(saved);}
+ }catch(_){versionsDB=null;if(localStorage.getItem(RECORD_KEY)===null)storageError=new Error('Sync recovery metadata could not be read. Local records were kept; try again before syncing.');}
+})();
+async function persistVersions(){
+ const value=JSON.stringify(recordVersions);
+ if(versionsDB)await dbRequest('readwrite',store=>store.put(value,RECORD_KEY));
+ else localStorage.setItem(RECORD_KEY,value);
+}
 const observed = new Map();
 function fingerprint(value){const text=JSON.stringify(value);let a=2166136261,b=5381;for(let i=0;i<text.length;i++){a=Math.imul(a^text.charCodeAt(i),16777619);b=Math.imul(b,33)^text.charCodeAt(i);}return text.length+':'+(a>>>0)+':'+(b>>>0);}
 function recordArray(key,value){if(!key.startsWith('fin_'))return null;try{const rows=JSON.parse(value);return Array.isArray(rows)&&rows.every(x=>x&&typeof x==='object'&&x.id!=null)&&new Set(rows.map(x=>String(x.id))).size===rows.length?rows:null;}catch(_){return null;}}
@@ -142,13 +190,12 @@ function localMap(){
     }
     out[k] = versionRecords(k,{ v, t: meta[k] });
   }
-  write(RECORD_KEY,recordVersions);
   if (stamped) write(M_KEY, meta);
   return out;
 }
 function applyRemote(k, entry){
   localStorage.setItem(k, entry.v);
-  if(entry.records){recordVersions[k]=entry.records;write(RECORD_KEY,recordVersions);}
+  if(entry.records)recordVersions[k]=entry.records;
   observed.set(k, entry.v);
   meta[k] = entry.t; write(M_KEY, meta);
   const spec = TRACKED.find(t => k.startsWith(t.prefix));
@@ -168,6 +215,8 @@ async function runSync(){
   busy = true;
   setState('busy', '');
   try {
+    await storageReady;
+    if(storageError)throw storageError;
     const id = await findOrCreateGist();
     const g = await gh('/gists/' + id);
     const file = g.files && g.files[FILE];
@@ -180,6 +229,7 @@ async function runSync(){
     }
     if(localStorage.getItem('lifehub_finance_pending_commit'))throw new Error('Finish recovering the interrupted Finance save before syncing.');
     const local = localMap();
+    await persistVersions();
     const merged = Object.create(null);
     let needPush = false;const pending=[],allConflicts=[];
     for (const k of new Set([...Object.keys(remote), ...Object.keys(local)])){
@@ -200,17 +250,23 @@ async function runSync(){
     }
     // Commit the entire pull together. Preserve old values until every write succeeds.
     const recovery={};for(const [k]of pending)recovery[k]=localStorage.getItem(k);
-    for(const k of [M_KEY,RECORD_KEY,'lifehub_finance_sync_conflicts'])recovery[k]=localStorage.getItem(k);
+    const oldVersions=JSON.stringify(recordVersions);
+    // Recovery must include IDB-backed metadata too; startup can restore this
+    // legacy key before migrating it back into IDB.
+    recovery[RECORD_KEY]=oldVersions;
+    for(const k of [M_KEY,'lifehub_finance_sync_conflicts'])recovery[k]=localStorage.getItem(k);
     const journal=typeof sessionStorage==='object'?sessionStorage:localStorage,journalKey='lifehub_finance_pending_commit';
     if(pending.length){journal.setItem(journalKey,JSON.stringify(recovery));if(journal!==localStorage)localStorage.setItem(journalKey,JSON.stringify({version:2,storage:'session'}));}
     try{
       for(const [k,entry]of pending)applyRemote(k,entry);
+      await persistVersions();
       const resolved=new Set(read('fin_sync_resolutions_v1',[]).map(x=>x.id));
       write('lifehub_finance_sync_conflicts',allConflicts.filter(c=>!resolved.has(c.conflictId)));
       if(pending.length){localStorage.removeItem(journalKey);if(journal!==localStorage)journal.removeItem(journalKey);}
     }catch(error){
-      for(const [k,v]of Object.entries(recovery)){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}
-      meta=read(M_KEY,{});recordVersions=read(RECORD_KEY,{});
+      const restore=Object.entries(recovery).filter(([k])=>k!==RECORD_KEY).sort(([a,av],[b,bv])=>((av||'').length-(localStorage.getItem(a)||'').length)-((bv||'').length-(localStorage.getItem(b)||'').length));
+      for(const [k,v]of restore){if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}
+      meta=read(M_KEY,{});recordVersions=JSON.parse(oldVersions);await persistVersions();
       for(const [k]of pending)observed.set(k,localStorage.getItem(k));
       localStorage.removeItem(journalKey);if(journal!==localStorage)journal.removeItem(journalKey);throw error;
     }
@@ -235,6 +291,7 @@ function schedulePush(ms){
 
 /* ---------- change detection: iframe writes fire storage events here ---------- */
 window.addEventListener('storage', (e) => {
+  if(e.key===RECORD_KEY&&e.newValue){recordVersions=read(RECORD_KEY,recordVersions);return;}
   if (e.key === 'hub_key' && e.newValue && token()) { runSync(); return; }  // unlocked → sync can start
   if (!e.key || !isTracked(e.key) || e.newValue === null || e.newValue === e.oldValue) return;
   if (observed.get(e.key) === e.newValue) return;
@@ -256,16 +313,18 @@ window.LifeHubSync = {
     tok = (tok || '').trim();
     if (!tok) throw new Error('Paste the token in first.');
     if (!pass()) throw new Error('First unlock the Life Hub tab on this device — sync uses your passcode to encrypt everything.');
+    await storageReady;
+    const previousToken=token();
     localStorage.setItem(T_KEY, tok);
     // Validate the permission this app actually needs. A Gist-only token does not
     // need to pass an unrelated /user profile check.
     try { await gh('/gists?per_page=1'); }
-    catch(e){ localStorage.removeItem(T_KEY); throw e; }
+    catch(e){ if(previousToken===null)localStorage.removeItem(T_KEY);else localStorage.setItem(T_KEY,previousToken); throw e; }
     await runSync();
     if (state.status === 'err'){
       const msg = state.detail;
-      localStorage.removeItem(T_KEY);
-      setState('off', '');
+      // A validated credential must survive storage/network failures in sync.
+      setState('err', msg);
       throw new Error(msg);
     }
   },
@@ -277,7 +336,20 @@ window.LifeHubSync = {
   /* ---- full local backup/restore — every tracked key, plaintext JSON,
      downloaded to the device (not uploaded anywhere). Separate from the
      encrypted gist sync above; this is a manual "just in case" copy. ---- */
-  async exportEncrypted(){return encrypt({keys:localMap(),conflicts:read('lifehub_finance_sync_conflicts',[]),exportedAt:new Date().toISOString()});},
+  async exportEncrypted(inMemory={}){
+    // Recovery is strictly read-only: never stamp versions or save metadata.
+    // A failed migration still leaves the legacy data available for export.
+    if(!pass())throw new Error('Unlock Life Hub before encrypting a recovery backup.');
+    await storageReady;
+    const keys={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);if(!isTracked(k))continue;
+      keys[k]={v:localStorage.getItem(k),t:meta[k]||0,...(recordVersions[k]?{records:recordVersions[k]}:{})};
+    }
+    const unsaved={};for(const [k,v]of Object.entries(inMemory))if(isTracked(k))unsaved[k]=JSON.stringify(v);
+    let journal=null;try{journal={marker:localStorage.getItem('lifehub_finance_pending_commit'),tab:typeof sessionStorage==='object'?sessionStorage.getItem('lifehub_finance_pending_commit'):null};}catch(_){}
+    return encrypt({keys,inMemory:unsaved,recoveryJournal:journal,conflicts:read('lifehub_finance_sync_conflicts',[]),exportedAt:new Date().toISOString()});
+  },
   exportAll(){
     const out = { exportedAt: new Date().toISOString(), keys: {} };
     for (let i = 0; i < localStorage.length; i++){

@@ -1,7 +1,7 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v43';
+const CACHE = 'lifehub-v44';
 const PRECACHE = [
-  './finance/app.html', './finance/standalone.js', './finance/pocketsmith-client.js', './finance/pocketsmith-import.js', './finance/manifest.webmanifest',
+  './finance/recovery.html', './finance/recovery.js', './finance/app.html', './finance/standalone.js', './finance/pocketsmith-client.js', './finance/pocketsmith-import.js', './finance/manifest.webmanifest',
   './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './hub/index.html', './finance/index.html', './partner/index.html', './plan/index.html',
@@ -25,10 +25,13 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   // Never intercept authenticated Gist/API requests or other apps' resources.
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
+  const url=new URL(e.request.url),scope=new URL('./',self.location.href||self.location.origin+'/life-hub/');
+  if(!url.pathname.startsWith(scope.pathname))return;
+  const cacheable=!url.search;
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        if (res.ok) {
+        if (res.ok && cacheable) {
           const copy = res.clone();
           e.waitUntil(caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {}));
         }

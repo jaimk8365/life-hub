@@ -73,3 +73,20 @@ test('manual account mapping overrides safely resolve ambiguous PocketSmith name
 test('PocketSmith transfer flag wins over merchant/category guesses',()=>{
  assert.equal(categoryFor({amount:-100,isTransfer:true,payee:'Woolworths',category:{title:'Groceries'}}),'transfer');
 });
+
+test('history window excludes only new old rows and still updates existing old records',()=>{
+ const old={id:'existing',pocketsmithId:'1',acct:'everyday',date:'2020-01-01',amount:-1,note:'Old'};
+ const make=id=>({id,transactionAccountId:1,date:'2020-01-01',amount:-2,payee:'Old'});
+ const result=planTransactions([old],[make(1),make(2)],{'1':'everyday'},'2026-10-07');
+ assert.equal(result.additions.length,0);assert.equal(result.updates.length,1);assert.deepEqual(result.outsideWindow,['2']);assert.equal(old.amount,-1);
+});
+test('bounded history rejects growth beyond the cap without altering existing records',()=>{
+ const existing=Array.from({length:5000},(_,i)=>({id:'ps_'+i,pocketsmithId:String(i)}));
+ assert.throws(()=>planTransactions(existing,[{id:9999,transactionAccountId:1,date:'2026-10-07',amount:-2,payee:'New'}],{'1':'everyday'},'2026-10-07'),/safe storage limit/);
+ assert.equal(existing.length,5000);
+});
+test('a repeated snapshot neither duplicates transactions nor adds outside-window history',()=>{
+ const input=[{id:1,transactionAccountId:1,date:'2026-10-07',amount:-2,payee:'New'}];
+ const first=planTransactions([],input,{'1':'everyday'},'2026-10-07');
+ const second=planTransactions(first.additions,input,{'1':'everyday'},'2026-10-07');assert.equal(second.additions.length,0);assert.equal(second.updates.length,1);
+});
