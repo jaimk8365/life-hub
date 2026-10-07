@@ -252,8 +252,8 @@
       </div>`;
     document.getElementById('syncMsg').textContent = '';
   }
-  function exportBackup(){
-    const data = LifeHubSync.exportAll();
+  async function exportBackup(){
+    let data;try{data=await LifeHubSync.exportAll();}catch(error){document.getElementById('syncMsg').textContent='Backup could not be read: '+error.message;return;}
     const blob = new Blob([JSON.stringify(data, null, 1)], {type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -270,10 +270,10 @@
       document.getElementById('importFile').value = ''; return;
     }
     const r = new FileReader();
-    r.onload = () => {
+    r.onload = async () => {
       try {
         const data = JSON.parse(r.result);
-        const n = LifeHubSync.importAll(data, 'merge');
+        const n = await LifeHubSync.importAll(data, 'merge');
         msg.className = 'msg good'; msg.textContent = `Restored ${n} keys ✓ — switch tabs to see the refreshed data.`;
         document.querySelectorAll('.stage iframe').forEach(f => { if (f.src) try { f.contentWindow.location.reload(); } catch(e){} });
       } catch(e){ msg.className = 'msg bad'; msg.textContent = 'Couldn’t read that file — is it a Life Hub backup?'; }
@@ -301,6 +301,7 @@
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
+<script src="./finance/bulk-storage.js"></script>
 <script src="./sync.js"></script>
 </body>
 </html>

@@ -8,3 +8,5 @@ src/
 .refresh-*-source.html
 .reminder-lists.json
 .lifehub-reminders*.log
+
+node_modules/

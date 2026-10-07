@@ -109,7 +109,7 @@
     return matches.length===1?matches[0]:null;
   }
 
-  function planTransactions(existing=[],snapshotTransactions=[],accountMap={},asAt=null){
+  function planTransactions(existing=[],snapshotTransactions=[],accountMap={},asAt=null,largeStore=false){
     // Keep every existing row, including manual edits and older linked records.
     // Only previously unseen source history is subject to the import window.
     const anchor=validDate(asAt)?new Date(String(asAt).slice(0,10)+'T00:00:00Z'):null;
@@ -138,7 +138,7 @@
       else additions.push(row);
     }
     const bankRows=existing.filter(t=>t.pocketsmithId!=null||String(t.importKey||'').startsWith('pocketsmith:')).length;
-    if(additions.length&&bankRows+additions.length>MAX_BANK_ROWS)throw new Error('Bank history has reached its safe storage limit. Existing records were kept; no new import was saved. Download a recovery backup before expanding history.');
+    if(!largeStore&&additions.length&&bankRows+additions.length>MAX_BANK_ROWS)throw new Error('Bank history has reached its safe storage limit. Existing records were kept; no new import was saved. Download a recovery backup before expanding history.');
     return {additions,updates,links,skipped,outsideWindow};
   }
 
@@ -174,7 +174,7 @@
     return evalFinance(`(()=>({accounts:ACCTS.map(a=>({...a})),transactions:TXNS.map(t=>({...t}))}))()`);
   }
 
-  function applyOps(snapshot,mapping,plan){
+  async function applyOps(snapshot,mapping,plan){
     const frame=financeFrame(),w=frame.contentWindow;
     w.__PS_IMPORT_PAYLOAD__={
       generatedAt:snapshot.generatedAt||new Date().toISOString(),
@@ -186,7 +186,7 @@
       links:plan.links
     };
     try{
-      return w.eval(`(()=>{
+      return await w.eval(`(async()=>{
         const payload=window.__PS_IMPORT_PAYLOAD__;
         if(!payload||typeof ACCTS==="undefined"||typeof TXNS==="undefined")return {ok:false,reason:"runtime_missing"};
 
@@ -228,8 +228,8 @@
         if(typeof saveAtomic!=="function")throw new Error("Refresh Finance before importing: safe storage is not ready.");
         // Legacy large ledgers may still be updated if they do not grow.
         const previousSize=JSON.stringify(oldTransactions).length,nextSize=JSON.stringify(TXNS).length;
-        if(nextSize>Math.max(${MAX_LEDGER_CHARS},previousSize))throw new Error("Bank history is too large for a safe import. Existing balances and records were kept; download a recovery backup.");
-        saveAtomic({[accountsKey]:ACCTS,[txnsKey]:TXNS});
+        if(!window.FinanceStore&&nextSize>Math.max(${MAX_LEDGER_CHARS},previousSize))throw new Error("Bank history is too large for a safe import. Existing balances and records were kept; download a recovery backup.");
+        await saveAtomic({[accountsKey]:ACCTS,[txnsKey]:TXNS});
         }catch(error){ACCTS=oldAccounts;TXNS=oldTransactions;throw error;}
 
         window.financeDataAsAt=payload.generatedAt;
@@ -256,9 +256,9 @@
       const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
       if(snapshot.accounts.some(a=>mapping.map[String(a.id)]&&(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance))||!validDate(a.currentBalanceDate)||a.currencyCode&&a.currencyCode!=='AUD')))throw new Error('A mapped account has an unknown balance, date or unsupported currency. Nothing was imported.');
-      const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt);
+      const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt,!!financeFrame()?.contentWindow?.FinanceStore);
       if(mapping.unmatched.length||plan.skipped.length)return setState('attention','Review unmatched accounts or invalid transactions before importing. Nothing was changed.',{mapping});
-      const applied=applyOps(snapshot,mapping,plan);
+      const applied=await applyOps(snapshot,mapping,plan);
       if(!applied||!applied.ok)throw new Error('Finance runtime did not accept the PocketSmith update.');
       const badBalances=(applied.balances||[]).filter(x=>cents(x.target)!==cents(x.calculated));
       if(badBalances.length)throw new Error('A synced account did not reconcile to the PocketSmith balance.');
