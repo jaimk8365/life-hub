@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url);
 const importer=require('../finance/pocketsmith-import.js');
 const wealth=require('../finance/wealth-coach.js');
 const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
-function fn(name){const lines=source.split('\n'),i=lines.findIndex(x=>x.startsWith(`function ${name}(`));assert.ok(i>=0);if(lines[i].endsWith('}'))return lines[i];const end=lines.findIndex((x,j)=>j>i&&x==='}');return lines.slice(i,end+1).join('\n');}
+function fn(name){const lines=source.split('\n'),i=lines.findIndex(x=>(x.startsWith(`function ${name}(`)||x.startsWith(`async function ${name}(`)));assert.ok(i>=0);if(lines[i].endsWith('}'))return lines[i];const end=lines.findIndex((x,j)=>j>i&&x==='}');return lines.slice(i,end+1).join('\n');}
 const row=(id,payee='Shop')=>({id,transactionAccountId:1,date:'2026-09-28',amount:-10,payee});
 test('equal amount cannot link an unrelated merchant',()=>{
  const p=importer.planTransactions([{id:'legacy',acct:'e',date:'2026-09-28',amount:-10,note:'Doctor'}],[row(1)],{'1':'e'});
@@ -47,6 +47,6 @@ test('CSV preserves identical repeated purchases and ties balance to its own dat
  const csv='28/09/2026,-10,123,,,Shop,100,groceries,Shop\n28/09/2026,-10,123,,,Shop,90,groceries,Shop\n29/09/2026,-5,123,,,Other,,groceries,Other';
  c.csv=csv;const p=vm.runInContext('parseImportData(csv)',c);assert.equal(p.rows.length,3);assert.notEqual(p.rows[0].importKey,p.rows[1].importKey);assert.equal(p.balanceDate,'2026-09-28');assert.equal(p.latestBal,90);
 });
-test('manual balance changes preserve opening balance and record a discrepancy',()=>{
- const account={id:'e',openBal:100};const c=vm.createContext({acctById:()=>account,TXNS:[{id:'t',acct:'e',date:'2026-09-29',amount:-10}],todayISO:()=> '2026-09-30',ACCTS:[account],K_ACCTS:'a',K_TXNS:'t',saveAtomic(){}});vm.runInContext(fn('setActualBalanceOnly'),c);vm.runInContext("setActualBalanceOnly('e',120)",c);assert.equal(account.openBal,100);assert.equal(account.sourceBalance.amount,120);assert.equal(account.reconciliation.difference,30);assert.equal(c.TXNS.length,1);
+test('manual balance changes preserve opening balance and record a discrepancy',async()=>{
+ const account={id:'e',openBal:100};const c=vm.createContext({acctById:()=>account,TXNS:[{id:'t',acct:'e',date:'2026-09-29',amount:-10}],todayISO:()=> '2026-09-30',ACCTS:[account],K_ACCTS:'a',K_TXNS:'t',saveAtomic(){}});vm.runInContext(fn('setActualBalanceOnly'),c);await vm.runInContext("setActualBalanceOnly('e',120)",c);assert.equal(account.openBal,100);assert.equal(account.sourceBalance.amount,120);assert.equal(account.reconciliation.difference,30);assert.equal(c.TXNS.length,1);
 });

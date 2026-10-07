@@ -33,7 +33,9 @@ let cryptoKey = null, saltB64 = null;
 let dirty = false, pushTimer = null, busy = false, queued = false;
 let state = { status: 'off', detail: '' };
 
-function read(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } }
+function dataGet(k){return window.FinanceStore?.getItem(k)??localStorage.getItem(k);}
+const dataKeys=()=>window.FinanceStore?window.FinanceStore.keys():Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));
+function read(k, d){ try { return JSON.parse(dataGet(k)) ?? d; } catch(e){ return d; } }
 function write(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 const token = () => localStorage.getItem(T_KEY);
 const pass  = () => localStorage.getItem('hub_key');
@@ -65,6 +67,8 @@ function dbRequest(mode, operation){
  });
 }
 const storageReady=(async()=>{
+ if(window.FinanceStore){await window.FinanceStore.ready;recordVersions=read(RECORD_KEY,{});return;}
+ if(localStorage.getItem('lifehub_finance_storage_v2'))throw new Error('Refresh Finance to load its larger storage before syncing.');
  if(typeof indexedDB==='undefined')return;
  try{
   versionsDB=await new Promise((resolve,reject)=>{const request=indexedDB.open('lifehub-sync-storage-v1',1);request.onupgradeneeded=()=>request.result.createObjectStore('state');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('Recovery storage is busy.'));});
@@ -84,6 +88,7 @@ const storageReady=(async()=>{
  }catch(_){versionsDB=null;if(localStorage.getItem(RECORD_KEY)===null)storageError=new Error('Sync recovery metadata could not be read. Local records were kept; try again before syncing.');}
 })();
 async function persistVersions(){
+ if(window.FinanceStore)return; // Committed with the data, below.
  const value=JSON.stringify(recordVersions);
  if(versionsDB)await dbRequest('readwrite',store=>store.put(value,RECORD_KEY));
  else localStorage.setItem(RECORD_KEY,value);
@@ -112,9 +117,8 @@ function mergeRecords(key,left,right){
  const unique=new Map(conflicts.map(x=>[x.id+':'+x.at+':'+fingerprint(x.alternative),x]));
  return {v:JSON.stringify(rows),t:Math.max(left.t,right.t),records,conflicts:[...unique.values()].map(c=>({...c,key,conflictId:key+':'+c.id+':'+c.at+':'+fingerprint(c.alternative)})).slice(-100)};
 }
-for (let i = 0; i < localStorage.length; i++) {
-  const k = localStorage.key(i);
-  if (isTracked(k)) observed.set(k, localStorage.getItem(k));
+for (const k of dataKeys()) {
+  if (isTracked(k)) observed.set(k, dataGet(k));
 }
 
 /* ---------- crypto ---------- */
@@ -180,17 +184,16 @@ async function findOrCreateGist(){
 function localMap(){
   const out = {};
   let stamped = false;
-  for (let i = 0; i < localStorage.length; i++){
-    const k = localStorage.key(i);
+  for (const k of dataKeys()){
     if (!isTracked(k)) continue;
-    const v = localStorage.getItem(k);
+    const v = dataGet(k);
     if (!meta[k] || observed.get(k) !== v) {
       meta[k] = Math.max(Date.now(), (+meta[k] || 0) + 1); stamped = true;
       observed.set(k, v);
     }
     out[k] = versionRecords(k,{ v, t: meta[k] });
   }
-  if (stamped) write(M_KEY, meta);
+  if (stamped&&!window.FinanceStore) write(M_KEY, meta);
   return out;
 }
 function applyRemote(k, entry){
@@ -217,6 +220,7 @@ async function runSync(){
   try {
     await storageReady;
     if(storageError)throw storageError;
+    if(window.FinanceStore){await window.FinanceStore.flush();recordVersions=read(RECORD_KEY,{});meta=read(M_KEY,{});}
     const id = await findOrCreateGist();
     const g = await gh('/gists/' + id);
     const file = g.files && g.files[FILE];
@@ -248,6 +252,16 @@ async function runSync(){
       if (r && (!l || r.t > l.t)) { pending.push([k,r]); merged[k] = r; }
       else if (l) { merged[k] = l; if (!r || l.t > r.t) needPush = true; }
     }
+    if(window.FinanceStore){
+      const records={},expected=Object.fromEntries(Object.entries(local).map(([k,e])=>[k,e.v]));
+      for(const [k,entry]of pending){if(!Object.hasOwn(expected,k))expected[k]=null;records[k]=entry.v;if(entry.records)recordVersions[k]=entry.records;meta[k]=entry.t;}
+      const resolved=new Set(read('fin_sync_resolutions_v1',[]).map(x=>x.id));
+      records[M_KEY]=JSON.stringify(meta);records[RECORD_KEY]=JSON.stringify(recordVersions);
+      records.lifehub_finance_sync_conflicts=JSON.stringify(allConflicts.filter(c=>!resolved.has(c.conflictId)));
+      await window.FinanceStore.commitRaw(records,{expected,source:'sync'});
+      for(const [k,entry]of pending)observed.set(k,entry.v);
+      if(pending.length){const frame=document.getElementById('f-finance');try{frame?.contentWindow.dispatchEvent(new Event('finance-data-updated'));}catch(_){}}
+    }else{
     // Commit the entire pull together. Preserve old values until every write succeeds.
     const recovery={};for(const [k]of pending)recovery[k]=localStorage.getItem(k);
     const oldVersions=JSON.stringify(recordVersions);
@@ -270,6 +284,7 @@ async function runSync(){
       for(const [k]of pending)observed.set(k,localStorage.getItem(k));
       localStorage.removeItem(journalKey);if(journal!==localStorage)journal.removeItem(journalKey);throw error;
     }
+    }
     if (needPush){
       await gh('/gists/' + id, { method: 'PATCH', body: JSON.stringify({
         files: { [FILE]: { content: await encrypt({ keys: merged }) } } })});
@@ -290,7 +305,9 @@ function schedulePush(ms){
 }
 
 /* ---------- change detection: iframe writes fire storage events here ---------- */
+window.addEventListener('finance-storage-commit',event=>{if(event.detail.source==='sync'||!event.detail.keys.some(isTracked))return;dirty=true;schedulePush(2500);});
 window.addEventListener('storage', (e) => {
+  if(window.FinanceStore&&e.key?.startsWith('fin_'))return;
   if(e.key===RECORD_KEY&&e.newValue){recordVersions=read(RECORD_KEY,recordVersions);return;}
   if (e.key === 'hub_key' && e.newValue && token()) { runSync(); return; }  // unlocked → sync can start
   if (!e.key || !isTracked(e.key) || e.newValue === null || e.newValue === e.oldValue) return;
@@ -340,25 +357,30 @@ window.LifeHubSync = {
     // Recovery is strictly read-only: never stamp versions or save metadata.
     // A failed migration still leaves the legacy data available for export.
     if(!pass())throw new Error('Unlock Life Hub before encrypting a recovery backup.');
-    await storageReady;
+    await storageReady.catch(()=>{});
     const keys={};
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);if(!isTracked(k))continue;
-      keys[k]={v:localStorage.getItem(k),t:meta[k]||0,...(recordVersions[k]?{records:recordVersions[k]}:{})};
+    const durable=window.FinanceStore?await window.FinanceStore.inspect():null;
+    for(const k of dataKeys()){
+      if(!isTracked(k))continue;
+      const value=durable&&window.FinanceStore.isBulk(k)?durable.values[k]??localStorage.getItem(k):durable?.journal?.smallBefore&&Object.hasOwn(durable.journal.smallBefore,k)?durable.journal.smallBefore[k]:localStorage.getItem(k);
+      keys[k]={v:value,t:meta[k]||0,...(recordVersions[k]?{records:recordVersions[k]}:{})};
     }
+    const legacyBulk={};if(window.FinanceStore)for(const k of ['fin_txns','fin_inbox','lifehub_record_versions_v1','lifehub_finance_sync_conflicts']){const v=localStorage.getItem(k);if(v!==null)legacyBulk[k]=v;}
     const unsaved={};for(const [k,v]of Object.entries(inMemory))if(isTracked(k))unsaved[k]=JSON.stringify(v);
     let journal=null;try{journal={marker:localStorage.getItem('lifehub_finance_pending_commit'),tab:typeof sessionStorage==='object'?sessionStorage.getItem('lifehub_finance_pending_commit'):null};}catch(_){}
-    return encrypt({keys,inMemory:unsaved,recoveryJournal:journal,conflicts:read('lifehub_finance_sync_conflicts',[]),exportedAt:new Date().toISOString()});
+    return encrypt({keys,inMemory:unsaved,pendingWrites:window.FinanceStore?.pendingValues(),bulkRecovery:durable,legacyBulk,recoveryJournal:journal,conflicts:read('lifehub_finance_sync_conflicts',[]),exportedAt:new Date().toISOString()});
   },
-  exportAll(){
-    const out = { exportedAt: new Date().toISOString(), keys: {} };
-    for (let i = 0; i < localStorage.length; i++){
-      const k = localStorage.key(i);
-      if (isTracked(k)) out.keys[k] = localStorage.getItem(k);
+  async exportAll(){
+    await storageReady.catch(()=>{});
+    const bulk=window.FinanceStore?await window.FinanceStore.inspect():null;
+    const out = { exportedAt: new Date().toISOString(), keys: {},bulkRecovery:bulk,pendingWrites:window.FinanceStore?.pendingValues() };
+    for (const k of new Set([...dataKeys(),...Object.keys(bulk?.values||{})])){
+      if (isTracked(k)) out.keys[k] = bulk?.journal?.smallBefore&&Object.hasOwn(bulk.journal.smallBefore,k)?bulk.journal.smallBefore[k]:bulk?.values[k]??localStorage.getItem(k);
     }
     return out;
   },
-  importAll(payload, mode){ // mode: 'merge' (default, newer wins by writing all) or 'skip-existing'
+  async importAll(payload, mode){
+    if(window.FinanceStore){await window.FinanceStore.ready;const records={};for(const [k,value]of Object.entries(payload?.keys||{})){if(isTracked(k)&&!(mode==='skip-existing'&&dataGet(k)!=null))records[k]=value;}await window.FinanceStore.commitRaw(records);return Object.keys(records).length;} // mode: 'merge' (default, newer wins by writing all) or 'skip-existing'
     let n = 0;
     const keys = (payload && payload.keys) || {};
     for (const k of Object.keys(keys)){
@@ -373,6 +395,8 @@ window.LifeHubSync = {
 
 /* ---------- boot ---------- */
 (async () => {
+  try{await storageReady;}catch(error){setState('err',error.message);window.dispatchEvent(new Event('lifehub-sync-ready'));return;}
+  for(const k of dataKeys())if(isTracked(k))observed.set(k,dataGet(k));
   if (token() && pass()){
     // give the first pull up to 6s so sections open with fresh data; boot anyway if slow
     await Promise.race([ runSync(), new Promise(res => setTimeout(res, 6000)) ]);

@@ -90,3 +90,9 @@ test('a repeated snapshot neither duplicates transactions nor adds outside-windo
  const first=planTransactions([],input,{'1':'everyday'},'2026-10-07');
  const second=planTransactions(first.additions,input,{'1':'everyday'},'2026-10-07');assert.equal(second.additions.length,0);assert.equal(second.updates.length,1);
 });
+
+test('durable storage allows new bank imports above the legacy 5000-row limit',()=>{
+ const existing=Array.from({length:7025},(_,i)=>({id:'ps_'+i,pocketsmithId:String(i),acct:'everyday',date:'2026-10-01',amount:-1}));
+ const plan=planTransactions(existing,[{id:9000,transactionAccountId:1,date:'2026-10-07',amount:-9,payee:'Synthetic new purchase'}],{'1':'everyday'},'2026-10-08',true);
+ assert.equal(plan.additions.length,1);assert.equal(existing.length,7025);
+});

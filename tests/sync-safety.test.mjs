@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
+import {IDBFactory} from 'fake-indexeddb';
+const Bulk=createRequire(import.meta.url)('../finance/bulk-storage.js');
 import {webcrypto} from 'node:crypto';
 
 // Run the actual browser scripts; stub only storage, events and HTTP boundaries.
@@ -42,6 +45,7 @@ async function harness(kind, initial = {}, remoteKeys = {}, options = {}) {
   let content = await encrypt(remoteKeys), patches = 0;
   const listeners = {}, ready = Promise.withResolvers();
   const window = {addEventListener:(type,fn)=>{listeners[type]=fn;},dispatchEvent:event=>{if(event.type==='lifehub-sync-ready')ready.resolve();}};
+  if(options.bulk){let queue=Promise.resolve();window.FinanceStore=Bulk.create({storage:localStorage,indexedDB:new IDBFactory(),locks:{request(_name,fn){const p=queue.then(fn);queue=p.catch(()=>{});return p;}}});}
   const context = {window,localStorage,document:{dispatchEvent(){},addEventListener(){},getElementById(){return null;}},
     CustomEvent:class{constructor(type){this.type=type;}},Event:class{constructor(type){this.type=type;}},
     indexedDB:options.indexedDB,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,atob,btoa,
@@ -56,7 +60,7 @@ async function harness(kind, initial = {}, remoteKeys = {}, options = {}) {
   if(partner) engine=window.PartnerSync.init(encode(fixedBytes),{keys:['fin_budget_v3','fin_shared_goals_v1','finp_shared']});
   else {await ready.promise;engine=window.LifeHubSync;}
   return {map,engine,meta:()=>JSON.parse(map.get(metaKey)||'{}'),remote:async()=>(await decrypt(content)).keys,decode:decrypt,failWrites:()=>{failWrites=true;},writes:()=>writeCount,patches:()=>patches,
-    setRemote:async keys=>{content=await encrypt(keys);},listeners};
+    store:window.FinanceStore,setRemote:async keys=>{content=await encrypt(keys);},listeners};
 }
 
 for (const kind of ['partner','hub']) {
@@ -161,4 +165,24 @@ test('a legacy tab cannot replace newer archived deletion history on migration',
  const idb=memoryDB();idb.data.set('lifehub_record_versions_v1',JSON.stringify({fin_txns:{gone:{t:200,deleted:true}}}));
  const h=await harness('hub',{fin_txns:'[]',lifehub_record_versions_v1:JSON.stringify({fin_txns:{gone:{t:10,hash:'old',deleted:false}}})},{},{indexedDB:idb});
  assert.equal((await h.remote()).fin_txns.records.gone.deleted,true);assert.equal(h.map.has('lifehub_record_versions_v1'),false);
+});
+
+
+test('bulk storage sync preserves an 8047-row ledger, timestamps and complete exports',async()=>{
+ const rows=Array.from({length:8047},(_,i)=>({id:String(i),amount:i%7,date:'2026-01-01'})),ledger=JSON.stringify(rows);
+ const h=await harness('hub',{fin_txns:ledger,fin_inbox:'[{"id":"image","data":"synthetic"}]',lifehub_sync_meta:'{"fin_txns":10,"fin_inbox":11}'},{},{bulk:true});
+ assert.equal(h.engine.state().status,'ok');assert.equal(h.map.has('fin_txns'),false);assert.equal(h.meta().fin_txns,10);
+ assert.equal((await h.remote()).fin_txns.v,ledger);assert.equal((await h.engine.exportAll()).keys.fin_txns,ledger);
+ await h.engine.syncNow();const count=h.patches();await h.engine.syncNow();assert.equal(h.patches(),count);
+ await h.store.save({fin_txns:[...rows,{id:'next',amount:3}]});await h.engine.syncNow();assert.equal(JSON.parse((await h.remote()).fin_txns.v).length,8048);
+ h.failWrites();const writes=h.writes(),backup=await h.engine.exportEncrypted({fin_txns:[{id:'unsaved'}]});assert.equal(h.writes(),writes);
+ const envelope=JSON.parse(backup),raw=await webcrypto.subtle.importKey('raw',new TextEncoder().encode('dummy-passphrase'),'PBKDF2',false,['deriveKey']),key=await webcrypto.subtle.deriveKey({name:'PBKDF2',salt:Buffer.from(envelope.salt,'base64'),iterations:300000,hash:'SHA-256'},raw,{name:'AES-GCM',length:256},false,['decrypt']);
+ const payload=JSON.parse(new TextDecoder().decode(await webcrypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(envelope.iv,'base64')},key,Buffer.from(envelope.ct,'base64'))));
+ assert.equal(JSON.parse(payload.keys.fin_txns.v).length,8048);assert.equal(payload.inMemory.fin_txns,'[{"id":"unsaved"}]');assert.equal(payload.bulkRecovery.migration.values.fin_txns,ledger);
+});
+test('bulk remote merge and asynchronous restore both reach durable storage',async()=>{
+ const h=await harness('hub',{fin_txns:'[{"id":"local"}]',lifehub_sync_meta:'{"fin_txns":10}'},{fin_txns:{v:'[{"id":"remote"}]',t:20}},{bulk:true});
+ assert.equal(h.engine.state().status,'ok');assert.deepEqual(JSON.parse((await h.store.inspect()).values.fin_txns).map(x=>x.id),['local','remote']);
+ assert.equal(await h.engine.importAll({keys:{fin_txns:'[{"id":"restored"}]',lifehub_gh_token:'forbidden'}},'merge'),1);
+ assert.equal((await h.store.inspect()).values.fin_txns,'[{"id":"restored"}]');assert.equal(h.map.get('lifehub_gh_token'),'dummy-token');
 });
