@@ -56,6 +56,7 @@
   }
 
   async function deliver(data) {
+    if(window.FinanceStandalone?.isEditingBankMappings())throw new Error('Finish reviewing account matches before importing. Nothing was changed.');
     snapshot = data;
     document.dispatchEvent(new CustomEvent('pocketsmith:snapshot', { detail: data }));
     if (!window.PocketSmithImporter || typeof window.PocketSmithImporter.apply !== 'function') {
@@ -69,6 +70,7 @@
   }
 
   async function syncNow(force = false) {
+    if(window.FinanceStandalone?.isEditingBankMappings()){if(force)throw new Error('Save or cancel account matches before updating.');return snapshot;}
     if (!token()) {
       status = 'off'; detail = 'Connect PocketSmith on this device.'; emit(); return null;
     }

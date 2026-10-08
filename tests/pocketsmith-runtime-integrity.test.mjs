@@ -5,7 +5,7 @@ function runtime(fail=false){const stored=new Map([['fin_accounts',JSON.stringif
  const storage={getItem:k=>stored.get(k)??null,setItem(k,v){if(fail&&k==='fin_txns'&&!failed){failed=true;throw Error('quota');}stored.set(k,v);},removeItem:k=>stored.delete(k)};
  const model=vm.createContext({ACCTS:JSON.parse(stored.get('fin_accounts')),TXNS:JSON.parse(stored.get('fin_txns')),K_ACCTS:'fin_accounts',K_TXNS:'fin_txns',window:{},localStorage:storage,todayISO:()=> '2026-09-29'});
  vm.runInContext(fn('saveAtomic')+';'+fn('balance')+';function acctById(id){return ACCTS.find(x=>x.id===id)}',model);
- const w=model.window;w.eval=code=>vm.runInContext(code,model);const root={document:{getElementById:()=>({contentWindow:w}),dispatchEvent(){}},localStorage:{getItem:()=>null}};
+ const w=model.window;w.eval=code=>vm.runInContext(code,model);const root={document:{getElementById:()=>({contentWindow:w}),dispatchEvent(){}},localStorage:storage};
  vm.runInNewContext(readFileSync(new URL('../finance/pocketsmith-import.js',import.meta.url),'utf8'),{window:root,CustomEvent:class{},setTimeout,Date});return{api:root.PocketSmithImporter,model,stored};}
 const snapshot=balance=>({complete:true,full:true,generatedAt:'2026-09-29T00:00:00Z',accounts:[{id:1,title:'Everyday',currentBalance:balance,currentBalanceDate:'2026-09-29',currencyCode:'AUD'}],transactions:[]});
 test('import stores bank snapshot and unexplained difference without rewriting history',async()=>{const r=runtime();const result=await r.api.apply(snapshot(150));assert.equal(result.status,'ok');assert.equal(r.model.ACCTS[0].openBal,100);assert.equal(r.model.ACCTS[0].reconciliation.difference,60);assert.equal(vm.runInContext("balance('everyday')",r.model),150);assert.equal(r.stored.has('lifehub_finance_pending_commit'),false);});
@@ -30,4 +30,10 @@ test('invalid bank snapshots identify the affected account and field without rev
 });
 test('currency validation accepts lowercase AUD but still rejects foreign currencies',async()=>{
  const r=runtime(),data=snapshot(150);data.accounts[0].currencyCode='aud';assert.equal((await r.api.apply(data)).status,'ok');data.accounts[0].currencyCode='USD';assert.match((await r.api.apply(data)).detail,/unsupported currency/);
+});
+test('batch mapping rejects duplicate destinations and saves a complete swap without importing',async()=>{
+ const r=runtime();r.model.ACCTS.push({id:'bills',name:'Bills',openBal:200});const data=snapshot(150);data.accounts.push({...data.accounts[0],id:2,title:'Bills'});await r.api.apply(data);
+ await assert.rejects(r.api.setMappings({'1':'everyday','2':'everyday'}),/same Finance account/);assert.equal(r.stored.has(r.api.MAP_KEY),false);
+ await r.api.setMappings({'1':'bills','2':'everyday'});assert.deepEqual(JSON.parse(r.stored.get(r.api.MAP_KEY)),{'1':'bills','2':'everyday'});assert.equal(r.model.ACCTS[0].pocketSmithAccountId,'1','saving mapping must not reimport the ledger');
+ await assert.rejects(r.api.setMappings({'1':'bills','2':''}),/every bank account/);
 });

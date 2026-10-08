@@ -20,6 +20,7 @@
  #finance-sync-panel,#bank-feed-panel{position:fixed;top:calc(65px + env(safe-area-inset-top));right:12px;width:min(430px,calc(100vw - 24px));max-height:calc(100dvh - 95px);overflow:auto;z-index:3;background:white;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 12px 35px #30253f28}
  h2{font-size:19px;margin:0 0 14px}p{line-height:1.5;font-size:14px}input{font:inherit;display:block;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;margin:8px 0 12px}label{font-size:13px}.actions{display:flex;gap:8px;flex-wrap:wrap}.close{float:right}.primary{background:var(--ink);color:white}.hint{font-size:12px;color:#675973}#finance-sync-message{min-height:1em;font-size:13px}
  @media(max-width:420px){header{gap:3px;padding-left:10px;padding-right:10px}header b{font-size:14px}header a{padding:7px;font-size:11px}#finance-sync-status{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+ .bank-map-row{display:grid;gap:8px;margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fcf8ff}.bank-map-caption{font-size:11px;color:#675973}.bank-map-row strong{overflow-wrap:anywhere}.bank-map-row label{display:block;margin-top:6px}.bank-map-row select{display:block;width:100%;min-width:0;min-height:44px;font:inherit;padding:10px;color:var(--ink);background:white;border:1px solid var(--line);border-radius:8px}.bank-map-actions{margin-top:16px}button:disabled,select:disabled{opacity:.6}
 </style>
 </head>
 <body>
@@ -29,9 +30,9 @@
 <section id="bank-feed-panel" hidden aria-labelledby="bank-feed-heading"><button class="close" onclick="FinanceStandalone.toggleBankFeed()" aria-label="Close bank feed settings">✕</button><h2 id="bank-feed-heading">PocketSmith bank feed</h2><div id="bank-feed-content"></div><p id="bank-feed-message" role="status"></p></section>
 <section id="finance-sync-panel" hidden aria-labelledby="finance-sync-heading"><button class="close" onclick="FinanceStandalone.toggleSync()" aria-label="Close sync settings">✕</button><h2 id="finance-sync-heading">Your private device sync</h2><p><a href="./recovery.html" target="_blank" rel="noopener">Recovery backup and storage sizes ↗</a></p><div id="finance-sync-content"></div><p id="finance-sync-message" role="status"></p></section>
 <script src="./bulk-storage.js"></script>
-<script src="./pocketsmith-import.js?v=20260926-1"></script>
-<script src="./pocketsmith-client.js?v=20260926-1"></script>
-<script src="./standalone.js"></script>
+<script src="./pocketsmith-import.js?v=20261009-mapping"></script>
+<script src="./pocketsmith-client.js?v=20261009-mapping"></script>
+<script src="./standalone.js?v=20261009-mapping"></script>
 <script src="../sync.js"></script>
 </body>
 </html>
