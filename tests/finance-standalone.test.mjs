@@ -33,3 +33,15 @@ test('An invalid saved sync token can be replaced without disconnecting the encr
  assert.deepEqual(connected,['dummy-replacement-token']);
  assert.equal(disconnects,0,'Replacing a token must not disconnect or forget the existing Gist');
 });
+test('mapping rows stay stable during editing and only save as an explicit batch',async()=>{
+ const events={},message={textContent:''},selects=[{dataset:{psAccount:'1'},value:'a',addEventListener(_name,fn){this.change=fn;}},{dataset:{psAccount:'2'},value:'b',addEventListener(_name,fn){this.change=fn;}}];
+ let html='',renders=0,saves=0,imports=0;
+ const content={get innerHTML(){return html;},set innerHTML(v){html=v;renders++;},querySelectorAll:()=>selects};
+ const els={'bank-feed-content':content,'bank-feed-message':message,'bank-feed-panel':{hidden:true},'bank-feed-status':{setAttribute(){}},'bali-sweep-card':{hidden:true},'f-finance':{}};
+ const mapping={mappings:[{psId:'2',psTitle:'2. Bills',financeId:'b'},{psId:'1',psTitle:'1. Everyday',financeId:'a'}],unmatched:[],financeAccounts:[{id:'a',name:'Everyday'},{id:'b',name:'Bills'}]};
+ const win={addEventListener(){},PocketSmithFinance:{state:()=>({connected:true,status:'ok'}),syncNow:async()=>{imports++;}},PocketSmithImporter:{state:()=>({result:{mapping}}),setMappings:async values=>{assert.equal(values['1'],'b');assert.equal(values['2'],'a');saves++;}}};
+ vm.runInNewContext(readFileSync(path('standalone.js'),'utf8'),{window:win,document:{getElementById:id=>els[id],addEventListener:(key,fn)=>events[key]=fn},navigator:{},setTimeout(){},Date});
+ win.FinanceStandalone.toggleBankFeed();assert.ok(html.indexOf('1. Everyday')<html.indexOf('2. Bills'));assert.match(html,/label for="bank-match-0"/);
+ selects[0].value='b';selects[0].change();selects[1].value='a';selects[1].change();const count=renders;events['pocketsmith-finance-state']();assert.equal(renders,count);assert.equal(saves,0);assert.equal(imports,0);
+ await win.FinanceStandalone.refreshBankFeed();assert.equal(imports,0);await win.FinanceStandalone.saveBankAccountMappings();assert.equal(saves,1);assert.equal(imports,0);assert.match(message.textContent,/No transactions were imported/);
+});

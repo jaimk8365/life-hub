@@ -142,6 +142,7 @@
     return {additions,updates,links,skipped,outsideWindow};
   }
 
+  let lastMapping=null;
   let state={status:'idle',detail:'',result:null};
   const emit=()=>{
     if(root.document)root.document.dispatchEvent(new CustomEvent('pocketsmith-import-state',{detail:{...state}}));
@@ -253,7 +254,7 @@
       const model=financeModel();
       let overrides={};
       try{overrides=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
-      const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);
+      const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);lastMapping=mapping;
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
       const invalid=snapshot.accounts.filter(a=>mapping.map[String(a.id)]).map(a=>{const problems=[];if(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance)))problems.push('missing valid balance');if(!validDate(a.currentBalanceDate))problems.push('missing valid balance date');if(a.currencyCode&&String(a.currencyCode).trim().toUpperCase()!=='AUD')problems.push('unsupported currency');return problems.length?String(a.title||a.name||'Bank account')+': '+problems.join(', '):null;}).filter(Boolean);
       if(invalid.length)throw new Error('Bank feed needs attention — '+invalid.join('; ')+'. Nothing was imported.');
@@ -273,6 +274,21 @@
     }
   }
 
+  async function setMappings(choices){
+    const mapping=lastMapping;
+    if(!mapping)throw new Error('Open the current account matches before saving.');
+    const psIds=[...mapping.mappings.map(m=>String(m.psId)),...mapping.unmatched.map(a=>String(a.id))];
+    const financeIds=new Set(mapping.financeAccounts.map(a=>String(a.id))),used=new Set(),next={};
+    if(Object.keys(choices||{}).length!==psIds.length)throw new Error('The bank account list changed. Cancel changes and review it again.');
+    for(const id of psIds){const target=String(choices[id]||'');if(!target||!financeIds.has(target))throw new Error('Choose a Finance account for every bank account before saving.');if(used.has(target))throw new Error('Two bank accounts have the same Finance account selected. Choose a different Finance account for each row.');used.add(target);next[id]=target;}
+    const model=financeModel();
+    if(root.FinanceStore)await root.FinanceStore.save({[MAP_KEY]:next});else root.localStorage.setItem(MAP_KEY,JSON.stringify(next));
+    root.localStorage.removeItem('finance_pocketsmith_import_version');
+    // Keep the last-success timestamp and ledger intact until a separate import succeeds.
+    const accounts=psIds.map(id=>{const matched=mapping.mappings.find(m=>String(m.psId)===id),unmatched=mapping.unmatched.find(a=>String(a.id)===id);return {id,title:matched?.psTitle||unmatched?.title};});
+    lastMapping=buildAccountMapping(accounts,model.accounts,next);if(state.result)state.result.mapping=lastMapping;
+    return next;
+  }
   function setMapping(psId,financeId){
     let map={};
     try{map=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
@@ -285,6 +301,6 @@
     return map;
   }
   function getState(){return {...state};}
-  const api={norm,buildAccountMapping,categoryFor,planTransactions,apply,setMapping,state:getState,MAP_KEY,HISTORY_DAYS,MAX_BANK_ROWS,MAX_LEDGER_CHARS};
+  const api={norm,buildAccountMapping,categoryFor,planTransactions,apply,setMapping,setMappings,state:getState,MAP_KEY,HISTORY_DAYS,MAX_BANK_ROWS,MAX_LEDGER_CHARS};
   return api;
 });
