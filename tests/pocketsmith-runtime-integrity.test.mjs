@@ -24,3 +24,10 @@ test('bank importer waits for durable completion and rolls back on asynchronous 
  let done=false;const importing=r.api.apply(snapshot(150)).then(result=>{done=true;return result;});await new Promise(resolve=>setTimeout(resolve,0));assert.equal(done,false);
  rejectSave(new Error('Durable storage unavailable'));const result=await importing;assert.equal(result.status,'error');assert.equal(r.model.ACCTS[0].openBal,100);assert.equal(r.model.ACCTS[0].sourceBalance,undefined);assert.equal(r.model.TXNS.length,1);
 });
+test('invalid bank snapshots identify the affected account and field without revealing the balance',async()=>{
+ const r=runtime(),data=snapshot(150);data.accounts[0].currentBalanceDate=null;const result=await r.api.apply(data);
+ assert.equal(result.status,'error');assert.match(result.detail,/Everyday: missing valid balance date/);assert.doesNotMatch(result.detail,/150/);assert.equal(r.model.ACCTS[0].sourceBalance,undefined);
+});
+test('currency validation accepts lowercase AUD but still rejects foreign currencies',async()=>{
+ const r=runtime(),data=snapshot(150);data.accounts[0].currencyCode='aud';assert.equal((await r.api.apply(data)).status,'ok');data.accounts[0].currencyCode='USD';assert.match((await r.api.apply(data)).detail,/unsupported currency/);
+});

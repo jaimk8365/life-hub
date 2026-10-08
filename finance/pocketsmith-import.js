@@ -123,7 +123,7 @@
     for(const src of snapshotTransactions){
       const psId=String(src?.id??'');
       const acct=accountMap[String(src?.transactionAccountId??'')];
-      if(!psId||!acct||!validDate(src?.date)||src?.currencyCode&&src.currencyCode!=='AUD'||src?.amount==null||src?.amount===''||!Number.isFinite(Number(src?.amount))){skipped.push(psId||'unknown');continue;}
+      if(!psId||!acct||!validDate(src?.date)||src?.currencyCode&&String(src.currencyCode).trim().toUpperCase()!=='AUD'||src?.amount==null||src?.amount===''||!Number.isFinite(Number(src?.amount))){skipped.push(psId||'unknown');continue;}
       if(seenExternal.has(psId)){skipped.push(psId);continue;}seenExternal.add(psId);
       const row={id:'ps_'+psId,acct,date:String(src.date).slice(0,10),amount:round2(src.amount),cat:categoryFor(src),note:String(src.payee||src.category?.title||'PocketSmith transaction'),src:'pocketsmith',pocketsmithId:psId,importKey:'pocketsmith:'+psId,sourceCategory:src.category||null,sourceStatus:src.status||null,needsReview:src.needsReview===true||categoryFor(src)==='other'||/pending/i.test(src.status||''),currencyCode:src.currencyCode||'AUD',sourceUpdatedAt:src.updatedAt||null,sourceCat:categoryFor(src)};
       const linked=byExternal.get(psId);
@@ -255,7 +255,8 @@
       try{overrides=JSON.parse(root.localStorage?.getItem(MAP_KEY)||'{}')||{};}catch(_){}
       const mapping=buildAccountMapping(snapshot.accounts,model.accounts,overrides);
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
-      if(snapshot.accounts.some(a=>mapping.map[String(a.id)]&&(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance))||!validDate(a.currentBalanceDate)||a.currencyCode&&a.currencyCode!=='AUD')))throw new Error('A mapped account has an unknown balance, date or unsupported currency. Nothing was imported.');
+      const invalid=snapshot.accounts.filter(a=>mapping.map[String(a.id)]).map(a=>{const problems=[];if(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance)))problems.push('missing valid balance');if(!validDate(a.currentBalanceDate))problems.push('missing valid balance date');if(a.currencyCode&&String(a.currencyCode).trim().toUpperCase()!=='AUD')problems.push('unsupported currency');return problems.length?String(a.title||a.name||'Bank account')+': '+problems.join(', '):null;}).filter(Boolean);
+      if(invalid.length)throw new Error('Bank feed needs attention — '+invalid.join('; ')+'. Nothing was imported.');
       const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt,!!financeFrame()?.contentWindow?.FinanceStore);
       if(mapping.unmatched.length||plan.skipped.length)return setState('attention','Review unmatched accounts or invalid transactions before importing. Nothing was changed.',{mapping});
       const applied=await applyOps(snapshot,mapping,plan);
