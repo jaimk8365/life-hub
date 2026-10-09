@@ -29,6 +29,14 @@ test('household cash does not add future income or count internal transfers as s
  const s=H.householdSafe({forecasts,internalTransfers:400,minimumRepayments:200,loanTransfers:200});
  assert.equal(s.cash,3000);assert.equal(s.transfers,200);assert.equal(s.remaining,2200);assert.equal(s.trusted,true);
 });
+test('additional configured private spending commitments remain protected',()=>{
+ const forecasts=['everyday','bills','loanrepay'].map(id=>({id,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:0,reserved:0,buffer:0,trusted:true,haveData:true}));
+ assert.equal(H.householdSafe({forecasts,additionalTransfers:100}).remaining,2900);
+});
+test('incomplete income and cash-flow history cannot look like a verified zero or deficit',()=>{
+ const summary=H.summarise({today:'2026-10-10',transactions:[{date:'2026-10-10',amount:2000,cat:'income',needsReview:true},{date:'2026-10-10',amount:-10,cat:'fees'}]});
+ const html=H.renderOverview({summary});assert.match(html,/Awaiting review/);assert.match(html,/Partial history/);assert.doesNotMatch(html,/<strong>-\$10<\/strong>/);
+});
 test('safe figure is withheld for incomplete evidence, missing history or invalid components',()=>{
  for(const f of [{trusted:false,haveData:true},{trusted:true,haveData:false},{trusted:true,haveData:true,cur:NaN}])assert.equal(H.householdSafe({forecasts:[{id:'everyday',cur:100,...f}]}).trusted,false);
 });
@@ -42,6 +50,16 @@ test('publisher calculates full-period shared totals without private accounts, p
  const ctx=vm.createContext({HouseholdDashboard:H,TXNS:[{acct:'bills',date:'2026-01-01',amount:-50,cat:'rates'},{acct:'jspend',date:'2026-10-10',amount:-999,cat:'shopping',note:'private account'},{acct:'bills',date:'2026-10-10',amount:-999,cat:'shopping',note:'secret provider'}],SHARED_ACCT_IDS:['bills'],PARTNER_PRIVATE_RE:/secret/,GOALS:[{acct:'jspend',name:'private goal',saved:999}],todayISO:()=> '2026-10-10',acctById:id=>({id,type:'spend'}),balance:()=>100,householdSafePlan:()=>({trusted:false}),goalSaved:g=>g.saved,save:()=>{throw new Error('No writes permitted');}});
  vm.runInContext(selectedFunction(source,'sharedHouseholdReview'),ctx);
  const s=vm.runInContext('sharedHouseholdReview()',ctx);assert.equal(s.periods.year.spending,50);assert.equal(s.periods.fortnight.spending,0);assert.equal(s.goals.length,0);assert.doesNotMatch(JSON.stringify(s),/private|secret|999/);
+});
+test('production household adapter protects planned private routes once, including when a real route exists',()=>{
+ const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
+ const extra={id:'private-route',fromAcct:'everyday',toAcct:'mspend-plan',amount:50,frequency:'weekly'};
+ const ctx=vm.createContext({HouseholdDashboard:H,ACCTS:[{id:'house',type:'loan',minRepay:100}],TRANSFERS:[],BILLS:[],balance:()=>-1000,moneyMapTransfers:()=>[extra],plannedTransferAmount:t=>t.amount*2});
+ ctx.forecastAccount=id=>({trusted:true,haveData:true,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:ctx.TRANSFERS.filter(t=>t.fromAcct===id).reduce((s,t)=>s+t.amount*2,0),oneoffs:0,reserved:0,buffer:0});
+ vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);
+ assert.equal(vm.runInContext('householdSafePlan().remaining',ctx),2700);
+ ctx.TRANSFERS.push({...extra,id:'real-route'});
+ assert.equal(vm.runInContext('householdSafePlan().remaining',ctx),2700);
 });
 test('partner dashboard refuses yesterday’s Safe to Spend without recalculating limited shared history',()=>{
  const source=readFileSync(new URL('../src/partner-finance.html',import.meta.url),'utf8');
