@@ -42,15 +42,17 @@ async function harness(kind, initial = {}, remoteKeys = {}, options = {}) {
     get length(){return map.size;}, key:i=>[...map.keys()][i]??null,
     getItem:k=>map.get(k)??null, setItem:(k,v)=>{writeCount++;if(failWrites)throw new DOMException("Quota exceeded","QuotaExceededError");return map.set(k,String(v));}, removeItem:k=>map.delete(k),
   };
-  let content = await encrypt(remoteKeys), patches = 0;
+  let content = await encrypt(remoteKeys), patches = 0, networkOverride = null, nextTimer = 0;
+  const timers = new Map();
   const listeners = {}, ready = Promise.withResolvers();
   const window = {addEventListener:(type,fn)=>{listeners[type]=fn;},dispatchEvent:event=>{if(event.type==='lifehub-sync-ready')ready.resolve();}};
   if(options.bulk){let queue=Promise.resolve();window.FinanceStore=Bulk.create({storage:localStorage,indexedDB:new IDBFactory(),locks:{request(_name,fn){const p=queue.then(fn);queue=p.catch(()=>{});return p;}}});}
   const context = {window,localStorage,document:{dispatchEvent(){},addEventListener(){},getElementById(){return null;}},
     CustomEvent:class{constructor(type){this.type=type;}},Event:class{constructor(type){this.type=type;}},
-    indexedDB:options.indexedDB,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,atob,btoa,
-    setTimeout:()=>1,clearTimeout(){},setInterval(){},
+    indexedDB:options.indexedDB,crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,atob,btoa,AbortController,
+    setTimeout:(fn,ms)=>{const id=++nextTimer;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),setInterval(){},
     fetch:async (_url,options={})=>{
+      if(networkOverride)return networkOverride(_url,options);
       if(options.method==='PATCH'){patches++;content=JSON.parse(options.body).files[filename].content;}
       return {ok:true,json:async()=>({files:{[filename]:{content}}})};
     },
@@ -60,7 +62,8 @@ async function harness(kind, initial = {}, remoteKeys = {}, options = {}) {
   if(partner) engine=window.PartnerSync.init(encode(fixedBytes),{keys:['fin_budget_v3','fin_shared_goals_v1','finp_shared']});
   else {await ready.promise;engine=window.LifeHubSync;}
   return {map,engine,meta:()=>JSON.parse(map.get(metaKey)||'{}'),remote:async()=>(await decrypt(content)).keys,decode:decrypt,failWrites:()=>{failWrites=true;},writes:()=>writeCount,patches:()=>patches,
-    store:window.FinanceStore,setRemote:async keys=>{content=await encrypt(keys);},listeners};
+    store:window.FinanceStore,setRemote:async keys=>{content=await encrypt(keys);},listeners,
+    setNetwork:fn=>{networkOverride=fn;},expireTimers:ms=>{const due=[...timers].filter(([,timer])=>timer.ms===ms);for(const [id,timer]of due){timers.delete(id);timer.fn();}return due.length;}};
 }
 
 for (const kind of ['partner','hub']) {
@@ -160,6 +163,37 @@ test('a validated GitHub token survives a later sync failure',async()=>{
  await assert.rejects(h.engine.connect('replacement-dummy-token'),/interrupted Finance save/);
  assert.equal(h.map.get('lifehub_gh_token'),'replacement-dummy-token');assert.equal(h.engine.state().status,'err');
 });
+
+for(const stage of ['API request','API response body','raw Gist request','raw Gist response body']){
+ test(`a stalled ${stage} times out without losing records or credentials and permits retry`,async()=>{
+  const ledger='[{"id":"saved","amount":17}]';
+  const h=await harness('hub',{fin_txns:ledger},{},{bulk:true});
+  const signals=[];
+  h.setNetwork((url,request)=>{
+   signals.push(request.signal);
+   const hang=()=>new Promise(()=>{});
+   if(stage==='API request')return hang();
+   if(stage==='API response body')return {ok:true,json:hang};
+   if(url==='https://example.test/raw-gist')return stage==='raw Gist request'?hang():{ok:true,text:hang};
+   return {ok:true,json:async()=>({files:{'lifehub-sync.enc.json':{content:'',truncated:true,raw_url:'https://example.test/raw-gist'}}})};
+  });
+  const pending=h.engine.syncNow();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.engine.state().status,'busy');
+  assert.equal(h.expireTimers(45000),1,'the outstanding request must have a bounded deadline');
+  await pending;
+  assert.equal(h.engine.state().status,'err');
+  assert.match(h.engine.state().detail,/timed out/i);
+  assert.ok(signals.at(-1)?.aborted,'the timed-out request must be aborted');
+  assert.equal((await h.store.inspect()).values.fin_txns,ledger);
+  assert.equal(h.map.get('lifehub_gh_token'),'dummy-token');
+  h.setNetwork(null);
+  await h.engine.syncNow();
+  assert.equal(h.engine.state().status,'ok','a timeout must release the busy state for a fresh retry');
+  assert.equal((await h.store.inspect()).values.fin_txns,ledger);
+  assert.equal(h.expireTimers(45000),0,'completed requests must cancel their deadlines');
+ });
+}
 
 test('a legacy tab cannot replace newer archived deletion history on migration',async()=>{
  const idb=memoryDB();idb.data.set('lifehub_record_versions_v1',JSON.stringify({fin_txns:{gone:{t:200,deleted:true}}}));

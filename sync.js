@@ -152,17 +152,38 @@ async function decrypt(str){
 }
 
 /* ---------- github ---------- */
+const REQUEST_TIMEOUT_MS = 45000;
+async function request(url, opts, readResponse){
+  const controller = new AbortController();
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error('GitHub sync timed out. Your saved records and token were kept. Try syncing again.'));
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+  });
+  try {
+    // The deadline covers response-body reads too, including large raw Gists.
+    return await Promise.race([
+      (async () => readResponse(await fetch(url, { ...opts, signal: controller.signal })))(),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function gh(path, opts = {}){
-  const r = await fetch(API + path, { ...opts, headers: {
+  return request(API + path, { ...opts, headers: {
     'Authorization': 'Bearer ' + token(),
     'Accept': 'application/vnd.github+json',
     ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
-  }});
-  if (!r.ok) throw new Error(
-    r.status === 401 ? 'GitHub did not accept this token. It may be expired or revoked.' :
-    r.status === 403 ? 'GitHub accepted the token but it does not have permission to read/write Gists, or GitHub rate-limited the request.' :
-    'GitHub sync error ' + r.status);
-  return r.json();
+  }}, async r => {
+    if (!r.ok) throw new Error(
+      r.status === 401 ? 'GitHub did not accept this token. It may be expired or revoked.' :
+      r.status === 403 ? 'GitHub accepted the token but it does not have permission to read/write Gists, or GitHub rate-limited the request.' :
+      'GitHub sync error ' + r.status);
+    return r.json();
+  });
 }
 async function findOrCreateGist(){
   let id = localStorage.getItem(G_KEY);
@@ -225,7 +246,10 @@ async function runSync(){
     const g = await gh('/gists/' + id);
     const file = g.files && g.files[FILE];
     let content = file ? file.content : '';
-    if (file && file.truncated) content = await (await fetch(file.raw_url)).text();
+    if (file && file.truncated) content = await request(file.raw_url, {}, async r => {
+      if (!r.ok) throw new Error('GitHub sync download failed (HTTP ' + r.status + ').');
+      return r.text();
+    });
     let remote = {};
     if (content && content.trim() && content.trim() !== '{}'){
       try { remote = (await decrypt(content)).keys || {}; }
