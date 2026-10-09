@@ -520,7 +520,9 @@ test('Matthew app mirrors Jaimi finance navigation and remains free of private f
 
 test('both finance apps provide a top-left app guide and Matthew overview uses a flat hierarchy', async () => {
   const [finance,partner]=await Promise.all([text('src/finance.html'),text('src/partner-finance.html')]);
-  for(const source of [finance,partner]) for(const marker of ['📖 Guide','What each section does','Best weekly routine','Get the most from it']) assert.match(source,new RegExp(marker));
+  for(const source of [finance,partner]) {assert.match(source,/📖 Guide/);assert.match(source,/interactive-guide\.js/);assert.match(source,/FinanceGuide\.open/);}
+  const guide=await text('finance/interactive-guide.js');
+  for(const marker of ['Start with Overview','Check Accounts','Explore Money Map','Understand the warnings','Your easy routine']) assert.ok(guide.includes(marker));
   assert.match(finance,/class="guide-link" onclick="openFinanceHelp\(\)"/);
   assert.match(partner,/class="guide-link" onclick="openPartnerHelp\(\)"/);
   for(const card of ['Right now','Safe to spend','money flow','Accounts snapshot','Top priorities','Insights','Save & Goals','Debts']) assert.match(partner,new RegExp(card.replace(/[&]/g,'&(?:amp;)?')));
