@@ -6,7 +6,7 @@ let HOUSEHOLD_PERIOD='fortnight';
 function setHouseholdPeriod(value){HOUSEHOLD_PERIOD=['week','fortnight','month','year'].includes(value)?value:'fortnight';renderMoneyMapView();}
 function householdSummary(transactions=TXNS,period='fortnight'){return HouseholdDashboard.summarise({transactions,today:todayISO(),period,budgets:CAT_BUDGET});}
 function householdSafePlan(){
- const ids=['everyday','bills','loanrepay'],forecasts=ids.map(id=>({id,...forecastAccount(id)})),loans=ACCTS.filter(a=>a.type==='loan'&&balance(a.id)<0);
+ const ids=['everyday','bills','loanrepay'],forecasts=ids.map(id=>{const f=forecastAccount(id),allowance=id==='everyday'?Math.max(0,+(acctById(id)?.budgetMo)||0)*12/365.25*14:0;return{id,...f,avgOut:Math.max(f.avgOut,allowance),haveData:f.haveData||(id!=='everyday'&&f.trusted&&TXNS.some(t=>t.acct===id&&!t.deleted&&!t.needsReview&&!t.needsDetails&&!t.sourceMissing&&t.date>=financeDatePlusDays(todayISO(),-27)&&t.date<=todayISO()&&t.amount!=null&&String(t.amount).trim()!==''&&Number.isFinite(+t.amount)))};}),loans=ACCTS.filter(a=>a.type==='loan'&&balance(a.id)<0);
  const internalTransfers=TRANSFERS.filter(t=>ids.includes(t.fromAcct)&&ids.includes(t.toAcct)).reduce((s,t)=>s+plannedTransferAmount(t,14),0);
  const loanTransfers=TRANSFERS.filter(t=>ids.includes(t.fromAcct)&&loans.some(a=>a.id===t.toAcct)).reduce((s,t)=>s+plannedTransferAmount(t,14),0);
  const minimumRepayments=loans.reduce((s,a)=>s+Math.max(0,+a.minRepay||0)*2,0)+moneyMapTransfers().filter(t=>t.toAcct==='kubota-plan').reduce((s,t)=>s+plannedTransferAmount(t,14),0);
@@ -32,7 +32,11 @@ function partnerHouseholdDashboard(){const review=partnerHouseholdReview();if(!r
 `;
 function once(source,needle,replacement){if(!source.includes(needle))throw new Error('Household integration anchor missing');return source.replace(needle,replacement);}
 export function patchHouseholdFinance(source){
- if(source.includes('/* Household dashboard v1 */'))return source.replaceAll('({saved:goalSaved(g)})','({name:g.name,target:g.target,saved:goalSaved(g)})').replace('const result=HouseholdDashboard.householdSafe({forecasts,internalTransfers,minimumRepayments,loanTransfers});',"const additionalTransfers=moneyMapTransfers().filter(t=>ids.includes(t.fromAcct)&&!ids.includes(t.toAcct)&&t.toAcct!=='kubota-plan'&&!TRANSFERS.some(x=>x.id===t.id||x.fromAcct===t.fromAcct&&x.toAcct===t.toAcct&&+x.amount===+t.amount&&x.frequency===t.frequency)).reduce((s,t)=>s+plannedTransferAmount(t,14),0);\n const result=HouseholdDashboard.householdSafe({forecasts,internalTransfers,minimumRepayments,loanTransfers,additionalTransfers});");
+ if(source.includes('/* Household dashboard v1 */')){
+  const start=source.indexOf('function householdSafePlan(){'),end=source.indexOf('function householdDashboard()',start),plan=mainHelpers.slice(mainHelpers.indexOf('function householdSafePlan(){'),mainHelpers.indexOf('function householdDashboard()'));
+  if(start<0||end<0)throw new Error('Household plan upgrade anchor missing');
+  return (source.slice(0,start)+plan+source.slice(end)).replaceAll('({saved:goalSaved(g)})','({name:g.name,target:g.target,saved:goalSaved(g)})');
+ }
  source=once(source,'<script src="../finance/money-map.js"></script>','<script src="../finance/money-map.js"></script>\n'+assets);
  source=source.replace(/<body(\s[^>]*)?>/,'<body class="finance-jaimi">');
  const start=source.indexOf('function renderToday(){'),end=source.indexOf('/* ---- Save & Goals:',start);if(start<0||end<0)throw new Error('Overview anchor missing');

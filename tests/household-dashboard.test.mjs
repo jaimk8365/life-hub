@@ -54,12 +54,19 @@ test('publisher calculates full-period shared totals without private accounts, p
 test('production household adapter protects planned private routes once, including when a real route exists',()=>{
  const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
  const extra={id:'private-route',fromAcct:'everyday',toAcct:'mspend-plan',amount:50,frequency:'weekly'};
- const ctx=vm.createContext({HouseholdDashboard:H,ACCTS:[{id:'house',type:'loan',minRepay:100}],TRANSFERS:[],BILLS:[],balance:()=>-1000,moneyMapTransfers:()=>[extra],plannedTransferAmount:t=>t.amount*2});
+ const ctx=vm.createContext({HouseholdDashboard:H,acctById:()=>({budgetMo:0}),ACCTS:[{id:'house',type:'loan',minRepay:100}],TRANSFERS:[],BILLS:[],balance:()=>-1000,moneyMapTransfers:()=>[extra],plannedTransferAmount:t=>t.amount*2});
  ctx.forecastAccount=id=>({trusted:true,haveData:true,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:ctx.TRANSFERS.filter(t=>t.fromAcct===id).reduce((s,t)=>s+t.amount*2,0),oneoffs:0,reserved:0,buffer:0});
  vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);
  assert.equal(vm.runInContext('householdSafePlan().remaining',ctx),2700);
  ctx.TRANSFERS.push({...extra,id:'real-route'});
  assert.equal(vm.runInContext('householdSafePlan().remaining',ctx),2700);
+});
+test('reviewed transfer-only funding accounts are usable while the Everyday allowance stays protected',()=>{
+ const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
+ const ctx=vm.createContext({HouseholdDashboard:H,ACCTS:[],TRANSFERS:[],BILLS:[],TXNS:['bills','loanrepay'].map(acct=>({acct,date:'2026-10-09',amount:100,cat:'transfer'})),todayISO:()=> '2026-10-10',financeDatePlusDays:()=> '2026-09-13',acctById:id=>({budgetMo:id==='everyday'?365.25:0}),balance:()=>1000,moneyMapTransfers:()=>[],plannedTransferAmount:()=>0,forecastAccount:id=>({trusted:true,haveData:id==='everyday',cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:0,reserved:0,buffer:0})});
+ vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);
+ const plan=vm.runInContext('householdSafePlan()',ctx);assert.equal(plan.trusted,true);assert.equal(plan.regular,168);assert.equal(plan.remaining,2832);
+ ctx.TXNS[0].needsReview=true;assert.equal(vm.runInContext('householdSafePlan().trusted',ctx),false);
 });
 test('partner dashboard refuses yesterday’s Safe to Spend without recalculating limited shared history',()=>{
  const source=readFileSync(new URL('../src/partner-finance.html',import.meta.url),'utf8');
