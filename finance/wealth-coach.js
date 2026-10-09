@@ -4,9 +4,13 @@
   const YEAR_DAYS=365.25,MONTH_DAYS=YEAR_DAYS/12;
   const clamp=(n,min=0,max=100)=>Math.max(min,Math.min(max,Number(n)||0));
   const number=v=>Number.isFinite(Number(v))?Number(v):0;
-  const provided=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
+  const provided=v=>typeof v==='number'?Number.isFinite(v):typeof v==='string'&&/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim())&&Number.isFinite(Number(v));
   const round=(v,d=0)=>{const m=10**d;return Math.round(number(v)*m)/m;};
-  const iso=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'');
+  const iso=v=>{
+    if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+    const parsed=new Date(v+'T00:00:00Z');
+    return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===v;
+  };
   const daysBetween=(a,b)=>Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/86400000);
   const monthlyAmount=(amount,freq)=>number(amount)*({weekly:52/12,fortnightly:26/12,monthly:1,quarterly:1/3,yearly:1/12}[freq]??1);
   const percent=v=>round(clamp(v),0);
@@ -15,9 +19,24 @@
   const EXCLUDE_RE=/(?:redraw|edraw proceeds|internal transfer|transfer to|transfer from|opening balance|balance adjustment|transaction details missing)/i;
 
   function validTransaction(t,today){
-    if(!t||!iso(t.date)||t.date>today||!Number.isFinite(Number(t.amount))||Number(t.amount)===0)return false;
-    if(t.needsDetails||String(t.cat||'').toLowerCase()==='transfer')return false;
+    if(!t||!iso(t.date)||t.date>today||!provided(t.amount)||Number(t.amount)===0)return false;
+    if(t.deleted||t.needsDetails||t.needsReview||t.sourceMissing||String(t.cat||'').toLowerCase()==='transfer')return false;
     return !EXCLUDE_RE.test(`${t.note||''} ${t.src||''}`);
+  }
+  function currentSourceBalancesMatch(accounts,transactions,today){
+    if(!accounts.length)return false;
+    return accounts.every(a=>{
+      const snapshot=a&&a.sourceBalance;
+      if(!a.id||!snapshot||!iso(snapshot.date)||!provided(snapshot.amount)||!provided(a.openBal)||typeof snapshot.source!=='string'||!snapshot.source.trim())return false;
+      const age=daysBetween(snapshot.date,today);
+      if(!Number.isFinite(age)||age<0||age>7)return false;
+      // Reconciliation uses the complete retained ledger, including transfers.
+      // Unresolved rows stay in that ledger but separately prevent recommendations.
+      const ledgerRows=transactions.filter(t=>t&&!t.deleted&&String(t.acct)===String(a.id));
+      if(ledgerRows.some(t=>!iso(t.date)||!provided(t.amount)))return false;
+      const ledger=number(a.openBal)+ledgerRows.filter(t=>t.date<=snapshot.date).reduce((sum,t)=>sum+number(t.amount),0);
+      return Math.abs(round(number(snapshot.amount)-ledger,2))<0.01;
+    });
   }
   function isIncome(t){return number(t.amount)>0&&(/^(?:income|wage|salary|pay)$/i.test(t.cat||'')||/(?:salary|wage|pay(?:roll)?|income)/i.test(t.note||''));}
   function budgetRows(groups=[]){
@@ -77,9 +96,15 @@
     const propertyValue=Math.max(0,number(settings.propertyValue)),superBalance=Math.max(0,number(settings.superBalance)),otherAssets=Math.max(0,number(settings.otherAssets)),otherDebts=Math.max(0,number(settings.otherDebts));
     const trackedPosition=cashAssets+investmentValue+propertyValue+superBalance+otherAssets-loanDebt-otherDebts;
     const enoughBehaviour=spanDays>=60&&included.length>=12&&monthlyIncome>0;
-    const level=spanDays>=180&&included.length>=60&&staleDays!==null&&staleDays<=7?'high':spanDays>=90&&included.length>=24&&staleDays!==null&&staleDays<=14?'medium':'low';
-    const confidence={level,spanDays,includedTransactions:included.length,lastTransaction:last,staleDays,why:!included.length?'No reviewed transaction history is available.':level==='low'?'Less than 90 days of current, reviewed transaction evidence is available.':level==='medium'?'At least 90 days of current, reviewed transactions support directional estimates.':'At least six months of current, reviewed transactions support the strongest estimates available in this app.'};
+    const sourceBalancesVerified=currentSourceBalancesMatch(accounts,all,today);
+    const unresolvedTransactions=all.filter(t=>t&&!t.deleted&&(t.needsDetails||t.needsReview||t.sourceMissing)).length;
+    const evidenceVerified=sourceBalancesVerified&&!unresolvedTransactions,trustedBehaviour=enoughBehaviour&&evidenceVerified;
+    const historyLevel=spanDays>=180&&included.length>=60&&staleDays!==null&&staleDays<=7?'high':spanDays>=90&&included.length>=24&&staleDays!==null&&staleDays<=14?'medium':'low';
+    const level=evidenceVerified?historyLevel:'low';
+    const confidence={level,spanDays,includedTransactions:included.length,lastTransaction:last,staleDays,why:!sourceBalancesVerified?'Current dated source balances have not been reconciled with the retained ledger for every tracked account. Cash-flow forecasts and allocation recommendations are paused.':unresolvedTransactions?`${unresolvedTransactions} unresolved transaction record${unresolvedTransactions===1?' remains':'s remain'}. Review them before relying on cash-flow forecasts or allocation recommendations.`:!included.length?'No reviewed transaction history is available.':level==='low'?'Less than 90 days of current, reviewed transaction evidence is available.':level==='medium'?'At least 90 days of current, reviewed transactions and reconciled source balances support directional estimates.':'At least six months of current, reviewed transactions and reconciled source balances support the strongest estimates available in this app.'};
     const missing=[];
+    if(!sourceBalancesVerified)missing.push('Current dated source balances that reconcile with the retained ledger for every tracked account');
+    if(unresolvedTransactions)missing.push('Review unresolved or missing-source transaction records');
     if(spanDays<90)missing.push('At least 90 days of reviewed transaction history');
     if(staleDays==null||staleDays>14)missing.push('A current transaction upload from the last 14 days');
     if(!plannedIncome)missing.push('Base income in the Income tab');
@@ -97,15 +122,15 @@
 
     const budgetRatio=monthlySpending>0&&budgetMonthly>0?budgetMonthly/monthlySpending:null;
     const savingsRate=monthlyIncome>0?monthlyNet/monthlyIncome:null;
-    const incomeManagement=enoughBehaviour&&plannedIncome>0?clamp(70+(monthlyIncome/plannedIncome-1)*100):null;
-    const spendingDiscipline=enoughBehaviour&&budgetRatio!=null?clamp(budgetRatio*100):null;
-    const savingsScore=enoughBehaviour&&savingsRate!=null?clamp(savingsRate*200):null;
+    const incomeManagement=trustedBehaviour&&plannedIncome>0?clamp(70+(monthlyIncome/plannedIncome-1)*100):null;
+    const spendingDiscipline=trustedBehaviour&&budgetRatio!=null?clamp(budgetRatio*100):null;
+    const savingsScore=trustedBehaviour&&savingsRate!=null?clamp(savingsRate*200):null;
     const hasInvestments=investmentValue+superBalance>0,hasContribution=provided(settings.monthlyInvestment)&&number(settings.monthlyInvestment)>0;
     const investingScore=hasInvestments||hasContribution?(hasInvestments?50:0)+(hasContribution?50:0):null;
     const loanStates=loans.map(l=>({loan:l,projection:loanProjection(l,1200)}));
     const mortgageScore=loanStates.length?100*loanStates.filter(x=>x.projection.amortising).length/loanStates.length:null;
     const debtService=loans.reduce((s,l)=>s+Math.max(0,number(l.minRepay))*52/12,0);
-    const debtScore=enoughBehaviour&&monthlyIncome>0&&loans.length?clamp(100-(debtService/monthlyIncome)*100):loans.length?null:100;
+    const debtScore=trustedBehaviour&&monthlyIncome>0&&loans.length?clamp(100-(debtService/monthlyIncome)*100):loans.length?null:100;
     const reserveIds=new Set(Array.isArray(settings.emergencyAccountIds)?settings.emergencyAccountIds:[]);
     const reserve=accounts.filter(a=>reserveIds.has(a.id)&&a.type!=='loan').reduce((s,a)=>s+Math.max(0,number(a.balance)),0);
     const essentialBudget=rows.filter(x=>!LIFESTYLE.has(x.category)).reduce((s,x)=>s+x.monthly,0);
@@ -139,11 +164,11 @@
       wealthBuilding:score(wealthBuilding,'Combines available saving and investing evidence.',{},level)
     };
     let health=average(Object.values(rawScores).map(x=>x.value));
-    if(!enoughBehaviour||Object.values(rawScores).filter(x=>x.value!=null).length<4)health=null;
+    if(!trustedBehaviour||Object.values(rawScores).filter(x=>x.value!=null).length<4)health=null;
     if(health!=null&&level==='low')health=Math.min(69,health);
     if(health!=null&&level==='medium')health=Math.min(84,health);
     rawScores.health=score(health,'Average of available evidence-backed scores. Low-confidence reviews cannot receive a high score.',{availableScores:Object.values(rawScores).filter(x=>x.value!=null).length},level);
-    const velocity=enoughBehaviour?average([rawScores.saving.value,rawScores.investing.value,rawScores.wealthBuilding.value]):null;
+    const velocity=trustedBehaviour?average([rawScores.saving.value,rawScores.investing.value,rawScores.wealthBuilding.value]):null;
     rawScores.wealthVelocity=score(velocity,'Combines saving, investing and wealth-building evidence.',{},level);
     const prior=(Array.isArray(history)?history:[]).filter(x=>String(x.at||'').slice(0,10)!==today).sort((a,b)=>String(a.at).localeCompare(String(b.at))).at(-1);
     const momentum=health!=null&&prior&&Number.isFinite(Number(prior.health))?clamp(50+(health-number(prior.health))*3):null;
@@ -154,7 +179,7 @@
     const longTermStart=investmentValue+superBalance;
     const horizons=[1,3,5,10].map(years=>{
       const months=years*12,investment=expectedReturn!=null&&monthlyInvestment!=null?investmentFuture(longTermStart,monthlyInvestment,expectedReturn,months):null;
-      return {years,cashflowChange:spanDays>=90?round(monthlyNet*months,2):null,investmentValue:investment==null?null:round(investment,2),loanBalance:round(loans.reduce((s,l)=>s+loanProjection(l,months).balance,0),2),confidence:level,assumption:`Current reviewed cash flow${investment!=null?`, ${round(expectedReturn,2)}% annual investment return and ${round(monthlyInvestment,2)} monthly contribution`:''}. Loan projection uses saved rates and minimum repayments.`};
+      return {years,cashflowChange:trustedBehaviour&&spanDays>=90?round(monthlyNet*months,2):null,investmentValue:investment==null?null:round(investment,2),loanBalance:round(loans.reduce((s,l)=>s+loanProjection(l,months).balance,0),2),confidence:level,assumption:`${evidenceVerified?'Current reviewed cash flow':'Cash-flow forecast paused pending source-balance reconciliation and transaction review'}${investment!=null?`, ${round(expectedReturn,2)}% annual investment return and ${round(monthlyInvestment,2)} monthly contribution`:''}. Loan projection uses saved rates and minimum repayments.`};
     });
     let retirement=null;
     if(number(settings.currentAge)>0&&number(settings.retirementAge)>number(settings.currentAge)&&expectedReturn!=null&&monthlyInvestment!=null){
@@ -172,17 +197,19 @@
     if(insuranceAge==null)risks.push({severity:'unknown',title:'Insurance risk cannot be assessed',detail:'Add the date household cover was last reviewed; this app does not assume policy limits or suitability.'});
     else if(insuranceAge>365)risks.push({severity:'medium',title:'Insurance review is more than a year old',detail:`The saved review date is ${settings.insuranceReviewDate}. Check cover, exclusions and beneficiaries against today’s household.`});
     const opportunities=[];
-    if(annualBudgetLeak>0)opportunities.push({impact:round(annualBudgetLeak,0),difficulty:'medium',title:'Bring lifestyle categories back to their saved budget',detail:`The evidenced over-budget pace is about ${round(annualBudgetLeak,0)} a year. Review the specific categories before cutting anything.`});
-    if(monthlyNet>0&&enoughBehaviour)opportunities.push({impact:round(monthlyNet*12,0),difficulty:'easy',title:'Give the current surplus a named job',detail:`About ${round(monthlyNet,0)} a month is unallocated by the reviewed pattern. Direct it to your chosen reserve, debt, investment or goal rather than treating it as guaranteed spending money.`});
-    if(riskScore!=null&&riskScore<100)opportunities.push({impact:round(Math.max(0,targetMonths*essentialBudget-reserve),0),difficulty:'medium',title:'Close the emergency-reserve gap',detail:'Use your own target and nominated reserve accounts; do not count money already allocated to bills or goals.'});
-    for(const g of goals.filter(x=>x.status==='behind'))opportunities.push({impact:round(g.requiredMonthly-g.observedMonthly,0),difficulty:'medium',title:`Repair the pace for ${g.name}`,detail:`Increase its allocation by about ${round(g.requiredMonthly-g.observedMonthly,0)} a month or move the due date.`});
+    if(trustedBehaviour&&annualBudgetLeak>0)opportunities.push({impact:round(annualBudgetLeak,0),difficulty:'medium',title:'Bring lifestyle categories back to their saved budget',detail:`The evidenced over-budget pace is about ${round(annualBudgetLeak,0)} a year. Review the specific categories before cutting anything.`});
+    if(monthlyNet>0&&trustedBehaviour)opportunities.push({impact:round(monthlyNet*12,0),difficulty:'easy',title:'Give the current surplus a named job',detail:`About ${round(monthlyNet,0)} a month is unallocated by the reviewed pattern. Direct it to your chosen reserve, debt, investment or goal rather than treating it as guaranteed spending money.`});
+    if(evidenceVerified&&riskScore!=null&&riskScore<100)opportunities.push({impact:round(Math.max(0,targetMonths*essentialBudget-reserve),0),difficulty:'medium',title:'Close the emergency-reserve gap',detail:'Use your own target and nominated reserve accounts; do not count money already allocated to bills or goals.'});
+    for(const g of goals.filter(x=>evidenceVerified&&x.status==='behind'))opportunities.push({impact:round(g.requiredMonthly-g.observedMonthly,0),difficulty:'medium',title:`Repair the pace for ${g.name}`,detail:`Increase its allocation by about ${round(g.requiredMonthly-g.observedMonthly,0)} a month or move the due date.`});
     for(const x of loanStates.filter(x=>x.projection.amortising&&x.loan.rate>0))opportunities.push({impact:null,difficulty:'review',title:`Check extra repayments against ${x.loan.name||'the loan'}`,detail:'Model an extra repayment in Debts first, while keeping bills and your chosen reserve protected.'});
     opportunities.sort((a,b)=>(number(b.impact)-number(a.impact))).splice(10);
     const priorities=[];
-    if(level==='low')priorities.push('Refresh and review enough transactions to reach at least 90 days of current evidence.');
-    if(monthlyNet<0&&enoughBehaviour)priorities.push('Use Budget Review to choose specific flexible spending changes that restore positive monthly cash flow.');
-    if(riskScore!=null&&riskScore<100)priorities.push('Choose a realistic transfer that closes part of the emergency-reserve gap over the next 90 days.');
-    if(goals.some(g=>g.status==='behind'))priorities.push('Repair the highest-priority goal that is behind, or change its due date.');
+    if(!sourceBalancesVerified)priorities.push('Check current source balances against the retained ledger before allocating a surplus or relying on cash-flow forecasts.');
+    if(unresolvedTransactions)priorities.push('Review unresolved or missing-source transactions before relying on cash-flow forecasts.');
+    if(historyLevel==='low')priorities.push('Refresh and review enough transactions to reach at least 90 days of current evidence.');
+    if(monthlyNet<0&&trustedBehaviour)priorities.push('Use Budget Review to choose specific flexible spending changes that restore positive monthly cash flow.');
+    if(evidenceVerified&&riskScore!=null&&riskScore<100)priorities.push('Choose a realistic transfer that closes part of the emergency-reserve gap over the next 90 days.');
+    if(evidenceVerified&&goals.some(g=>g.status==='behind'))priorities.push('Repair the highest-priority goal that is behind, or change its due date.');
     if(!priorities.length&&opportunities.length)priorities.push(...opportunities.slice(0,3).map(x=>x.title+'.'));
     if(!priorities.length)priorities.push('Keep transactions current and run this review again after the next pay cycle.');
 
@@ -197,7 +224,7 @@
     const behaviour={
       bestDecision:bestCategory?`${bestCategory.category} is about ${round(Math.abs(bestCategory.variance),0)} under its monthly budget pace.`:monthlyNet>0&&enoughBehaviour?`Reviewed cash flow is about ${round(monthlyNet,0)} positive per month.`:'There is not enough evidence to name a best financial decision yet.',
       biggestPressure:flexible90?`The largest reviewed flexible transaction in the last 90 days was ${round(Math.abs(number(flexible90.amount)),0)} for ${flexible90.note||flexible90.cat||'an uncategorised item'}. This is a prompt to review, not a claim that the purchase was a mistake.`:'No reviewed flexible transaction is available for a 90-day check.',
-      strongestHabit:monthlyNet>0&&enoughBehaviour?'Reviewed income is currently higher than reviewed spending. Keep assigning the difference deliberately.':'No strong repeatable habit can be confirmed from the current evidence.',
+      strongestHabit:monthlyNet>0&&trustedBehaviour?'Reviewed income is currently higher than reviewed spending. Keep assigning the difference deliberately.':'No strong repeatable habit can be confirmed from the current evidence.',
       mostCostlyHabit:worstCategory?`${worstCategory.category} is running about ${round(worstCategory.variance,0)} above its monthly budget pace.`:'No category is evidenced above budget, or the current data is incomplete.',
       categoryRows
     };
@@ -205,7 +232,7 @@
     const concentration=investmentValue>0&&largestHolding?number(largestHolding.value)/investmentValue:null;
     const investmentReview={total:round(investmentValue,2),superBalance:round(superBalance,2),monthlyContribution:monthlyInvestment,largestHolding:largestHolding?{name:largestHolding.name||'Largest holding',share:round(concentration*100,1)}:null,observations:[concentration>0.7?`${largestHolding.name||'One holding'} is ${round(concentration*100,0)}% of recorded non-super investments. Review diversification rather than assuming this concentration suits your goals.`:'No concentration warning can be supported by the recorded holding values.',holdings.some(x=>!x.assetClass)?'Asset classes are not recorded, so diversification and risk alignment cannot be assessed reliably.':'Recorded asset classes support a basic diversification review.']};
     const truths=[];
-    if(level==='low')truths.push('The app does not yet have enough current history for confident behavioural forecasting. Any precise long-term claim would be false precision.');
+    if(level==='low')truths.push(`${confidence.why} Any precise long-term claim would be false precision.`);
     if(monthlyNet<0&&enoughBehaviour)truths.push(`Current reviewed spending exceeds income by about ${round(Math.abs(monthlyNet),0)} a month. Goals will compete with cash-flow survival until that reverses.`);
     if(annualBudgetLeak>0)truths.push(`Flexible categories are running about ${round(annualBudgetLeak,0)} a year above their saved budgets if the current pace continues.`);
     if(riskScore!=null&&riskScore<100)truths.push('The nominated emergency reserve is below the target you chose; allocated bills and goal money are not a substitute.');
@@ -218,12 +245,12 @@
     const growthScore=priorPosition&&daysBetween(String(priorPosition.at).slice(0,10),today)>=30?clamp(50+(trackedPosition-number(priorPosition.trackedPosition))/Math.max(1,Math.abs(number(priorPosition.trackedPosition)))*500):null;
     const ratings10={saving:rawScores.saving.value==null?null:round(rawScores.saving.value/10,1),investing:rawScores.investing.value==null?null:round(rawScores.investing.value/10,1),assetGrowth:growthScore==null?null:round(growthScore/10,1),retirementReadiness:retirementProjectedProgress==null?null:round(clamp(retirementProjectedProgress*100)/10,1),netWorthGrowth:growthScore==null?null:round(growthScore/10,1),financialIndependence:retirementProgress==null?null:round(clamp(retirementProgress*100)/10,1)};
     const stress=risks.some(x=>x.severity==='high')?'high':risks.some(x=>x.severity==='medium')?'moderate':level==='low'?'unknown':'low';
-    const bestMonthly=budgetMonthly&&monthlyIncome?monthlyIncome-Math.min(monthlySpending,budgetMonthly):null,likelyMonthly=enoughBehaviour?monthlyNet:null,stressMonthly=enoughBehaviour?monthlyIncome*.7-monthlySpending:null;
+    const bestMonthly=trustedBehaviour&&budgetMonthly&&monthlyIncome?monthlyIncome-Math.min(monthlySpending,budgetMonthly):null,likelyMonthly=trustedBehaviour?monthlyNet:null,stressMonthly=trustedBehaviour?monthlyIncome*.7-monthlySpending:null;
     const fiveYear={likelyChange:likelyMonthly==null?null:round(likelyMonthly*60,2),recommendationOpportunity:bestMonthly==null||likelyMonthly==null?null:round(Math.max(0,bestMonthly-likelyMonthly)*60,2),stressChange:stressMonthly==null?null:round(stressMonthly*60,2)};
-    const executive={health:rawScores.health.value,trajectory:rawScores.momentum.value==null?'Not enough review history to measure direction.':rawScores.momentum.value>=55?'Improving':rawScores.momentum.value<=45?'Weakening':'Broadly steady',biggestRisk:risks[0]?.title||'No material risk is evidenced from current tracked data.',biggestOpportunity:opportunities[0]?.title||'Keep evidence current before making a larger change.',investmentOutlook:retirement?`The long-term illustration reaches ${round(retirement.value,0)} by age ${retirement.age} under the saved assumptions.`:'Add investment assumptions before relying on a long-term outlook.',mortgageOutlook:loanStates.length&&loanStates.every(x=>x.projection.amortising)?'Saved minimum repayments are above estimated interest for every tracked loan.':'At least one tracked loan needs its rate and repayment checked.',wealthOutlook:fiveYear.likelyChange==null?'A five-year outcome is not supportable until at least 90 days of reviewed data exists.':`If the reviewed cash-flow pattern repeats, cash flow adds ${round(fiveYear.likelyChange,0)} over five years before investment growth, tax and inflation.`};
+    const executive={health:rawScores.health.value,trajectory:rawScores.momentum.value==null?'Not enough review history to measure direction.':rawScores.momentum.value>=55?'Improving':rawScores.momentum.value<=45?'Weakening':'Broadly steady',biggestRisk:risks[0]?.title||'No material risk is evidenced from current tracked data.',biggestOpportunity:opportunities[0]?.title||'Keep evidence current before making a larger change.',investmentOutlook:retirement?`The long-term illustration reaches ${round(retirement.value,0)} by age ${retirement.age} under the saved assumptions.`:'Add investment assumptions before relying on a long-term outlook.',mortgageOutlook:loanStates.length&&loanStates.every(x=>x.projection.amortising)?'Saved minimum repayments are above estimated interest for every tracked loan.':'At least one tracked loan needs its rate and repayment checked.',wealthOutlook:!evidenceVerified?confidence.why:fiveYear.likelyChange==null?'A five-year outcome is not supportable until enough current, reviewed data exists.':`If the reviewed cash-flow pattern repeats, cash flow adds ${round(fiveYear.likelyChange,0)} over five years before investment growth, tax and inflation.`};
 
     return {
-      generatedAt:new Date(today+'T12:00:00Z').toISOString(),confidence,missing,evidence:{includedTransactions:included.length,excludedTransactions:all.length-included.length,firstTransaction:first,lastTransaction:last,spanDays},
+      generatedAt:new Date(today+'T12:00:00Z').toISOString(),confidence,missing,evidence:{includedTransactions:included.length,excludedTransactions:all.length-included.length,firstTransaction:first,lastTransaction:last,spanDays,sourceBalancesVerified,unresolvedTransactions},
       cashflow:{monthlyIncome:round(monthlyIncome,2),monthlySpending:round(monthlySpending,2),monthlyNet:round(monthlyNet,2),plannedIncome:round(plannedIncome,2),budgetMonthly:round(budgetMonthly,2),lifestyleMonthly:round(lifestyleSpend,2),lifestyleBudget:round(lifestyleBudget,2),annualBudgetLeak:round(annualBudgetLeak,2),annualBudgetLeakWhy:'Only reviewed lifestyle spending above its saved category budget is annualised; ordinary lifestyle spending is not labelled waste.'},
       position:{cashAssets:round(cashAssets,2),investments:round(investmentValue,2),propertyValue:round(propertyValue,2),superBalance:round(superBalance,2),otherAssets:round(otherAssets,2),trackedDebt:round(loanDebt+otherDebts,2),trackedPosition:round(trackedPosition,2),scope:`Tracked accounts, investments, loans${propertyValue?', property':''}${superBalance?', super':''}${otherAssets?', other assets':''}${otherDebts?', other debts':''}. Blank items are not assumed.`},
       risk:{emergencyReserve:round(reserve,2),emergencyMonths:emergencyMonths==null?null:round(emergencyMonths,1),targetMonths,essentialBudget:round(essentialBudget,2)},

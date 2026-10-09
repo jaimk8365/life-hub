@@ -19,7 +19,8 @@ const oldFunctions = ['daysInMonth','addPeriod','billNextDue','billOccurrencesIn
   'safeSpend','buildWeeklyEverydayPlan','forecastAccount','expectedBillsTransfersBefore','billsFundingOutlook',
   'loanPaymentSummary','loanPayoffWeeks','billAllocationPlan'];
 const optionalHelpers = ['financeDatePlusDays','billOccurrenceAt','billOccurrencesBetween','plannedTransferAmount',
-  'everydayCommitments','payMatchRows','futureBaseIncome','isLoanBalanceAdjustment'];
+  'everydayCommitments','payMatchRows','futureBaseIncome','isLoanBalanceAdjustment',
+  'goalSaved','reservedForAccount','ledgerDifference','forecastAccountEvidence'];
 function runtime(overrides = {}) {
   const ctx = vm.createContext({
     Date: class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-09-12T12:00:00+10:00'])); } },
@@ -27,6 +28,7 @@ function runtime(overrides = {}) {
     ymd: (y,m,d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,
     daysTo: d => Math.round((new Date(d+'T12:00:00')-new Date('2026-09-12T12:00:00'))/86400000),
     ACCTS: [{id:'everyday',name:'Everyday',budgetMo:0}], TXNS:[], BILLS:[], BASE_PAY:[], BUDGET:[],
+    WISH:[], FUNDS:[], GOALS:[],
     BUFFERS:{everyday:200}, TRANSFERS:[], ONEOFFS:[], WEEK_PLAN:{selectedCats:[],oneOffs:[]},
     CAT_BUDGET:{}, BILL_ALLOC:[], K_LOAN_EXTRA_LOG:'dummy-extra-log', K_BILLS:'dummy-bills',
     load: () => [], save: () => {}, render: () => {},
@@ -51,7 +53,8 @@ test('Everyday safe spend and weekly plan reserve the same transfers and one-off
 });
 test('Weekly plan protects all Everyday transfers, wishlist and dated one-offs', () => {
   const r = runtime({TRANSFERS:[{fromAcct:'everyday',toAcct:'loanrepay',amount:200,frequency:'weekly'}],
-    ONEOFFS:[{id:'repair',acct:'everyday',due:'2026-09-15',amount:100}], wishlistAllocatedForAccount:()=>50});
+    ONEOFFS:[{id:'repair',acct:'everyday',due:'2026-09-15',amount:100}],
+    WISH:[{acct:'everyday',saved:50}], wishlistAllocatedForAccount:()=>50});
   assert.equal(r.run('safeSpend().safe'), 450);
   assert.equal(r.run('buildWeeklyEverydayPlan().remaining'), 450);
 });

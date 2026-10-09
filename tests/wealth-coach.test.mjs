@@ -30,6 +30,16 @@ function txns(months=6){
   }
   return rows;
 }
+function longHistory(){return txns(7).flatMap(t=>[{...t,id:t.id+'a',amount:t.amount/2},{...t,id:t.id+'b',amount:t.amount/2}]);}
+function reconciledAccounts(rows){
+  return accounts.map(a=>{
+    const amount=a.balance+rows.filter(t=>t.acct===a.id&&!t.deleted&&t.date<=today).reduce((sum,t)=>sum+t.amount,0);
+    return {...a,openBal:a.balance,balance:amount,sourceBalance:{amount,date:today,source:'pocketsmith'}};
+  });
+}
+function reviewInput(transactions=longHistory(),savedAccounts=reconciledAccounts(transactions)){
+  return {today,accounts:savedAccounts,transactions,incomeBudget:[{mo:5000,type:'base'}],budgetGroups:budget,goals:[],investments:[],bills:[]};
+}
 
 test('does not manufacture health or retirement scores from missing history',()=>{
   const r=analyze({today,accounts,transactions:[],incomeBudget:[],budgetGroups:[],goals:[],investments:[],bills:[]},{},[]);
@@ -51,6 +61,132 @@ test('excludes redraws, transfers, future rows and balance adjustments from beha
   assert.equal(r.evidence.excludedTransactions,4);
   assert.ok(r.cashflow.monthlyIncome>4500&&r.cashflow.monthlyIncome<5500);
   assert.ok(r.cashflow.monthlySpending>1900&&r.cashflow.monthlySpending<2200);
+});
+
+test('unresolved and deleted source records never change reviewed spending or income',()=>{
+  const clean=txns(),baseline=analyze(reviewInput(clean));
+  const unresolved=[
+    {id:'review',date:'2026-09-13',acct:'everyday',amount:-90000,cat:'eating',needsReview:true},
+    {id:'missing',date:'2026-09-13',acct:'everyday',amount:90000,cat:'income',note:'Salary',sourceMissing:true},
+    {id:'deleted',date:'2026-09-13',acct:'everyday',amount:-90000,cat:'groceries',deleted:true}
+  ];
+  const r=analyze(reviewInput([...clean,...unresolved]));
+  assert.equal(r.evidence.includedTransactions,clean.length);
+  assert.equal(r.evidence.excludedTransactions,unresolved.length);
+  assert.deepEqual(r.cashflow,baseline.cashflow);
+});
+
+test('long current history alone does not verify finances or recommend allocating a surplus',()=>{
+  const rows=longHistory(),r=analyze(reviewInput(rows,accounts));
+  assert.equal(r.confidence.level,'low');
+  assert.match(r.confidence.why,/source balance|reconcil/i);
+  assert.ok(r.cashflow.monthlyNet>0,'historical metrics remain available');
+  assert.equal(r.scores.health.value,null);
+  assert.ok(r.forecasts.horizons.every(x=>x.cashflowChange===null));
+  assert.equal(r.forecasts.scenarios.likely,null);
+  assert.equal(r.forecasts.scenarios.best,null);
+  assert.equal(r.forecasts.scenarios.stress,null);
+  assert.ok(!r.opportunities.some(x=>/surplus a named job/.test(x.title)));
+  assert.match(r.priorities[0],/source balance|reconcil/i);
+});
+
+test('current reconciled source balances enable evidence-based cashflow forecasts',()=>{
+  const rows=longHistory(),input=reviewInput(rows),r=analyze(input);
+  assert.equal(r.confidence.level,'high');
+  assert.ok(r.scores.health.value!==null);
+  assert.ok(r.forecasts.horizons.every(x=>x.cashflowChange>0));
+  assert.ok(r.forecasts.scenarios.likely>0);
+  assert.ok(r.opportunities.some(x=>/surplus a named job/.test(x.title)));
+  assert.deepEqual(input,reviewInput(rows),'analysis does not modify stored input records');
+});
+
+test('stale, future, missing or mismatched source balances cannot support allocation advice',()=>{
+  for(const mutate of [
+    a=>({...a,sourceBalance:{...a.sourceBalance,date:'2026-09-01'}}),
+    a=>({...a,sourceBalance:{...a.sourceBalance,date:'2026-09-16'}}),
+    a=>({...a,sourceBalance:undefined}),
+    a=>({...a,openBal:undefined}),
+    a=>({...a,sourceBalance:{...a.sourceBalance,amount:a.sourceBalance.amount+1}})
+  ]){
+    const input=reviewInput();input.accounts[0]=mutate(input.accounts[0]);
+    const r=analyze(input);
+    assert.equal(r.confidence.level,'low');
+    assert.equal(r.forecasts.scenarios.likely,null);
+    assert.ok(!r.opportunities.some(x=>/surplus a named job/.test(x.title)));
+  }
+});
+
+test('unresolved records pause confidence even when the retained ledger reconciles',()=>{
+  const rows=[...longHistory(),{id:'unknown',date:today,acct:'bills',amount:-25,cat:'insurance',sourceMissing:true}];
+  const r=analyze(reviewInput(rows));
+  assert.equal(r.confidence.level,'low');
+  assert.match(r.confidence.why,/unresolved|review/i);
+  assert.equal(r.forecasts.scenarios.likely,null);
+  assert.ok(!r.opportunities.some(x=>/surplus a named job/.test(x.title)));
+});
+
+test('ledger verification includes transfers and excludes deleted rows',()=>{
+  const rows=[...longHistory(),
+    {id:'transfer',date:today,acct:'bills',amount:100,cat:'transfer'},
+    {id:'removed',date:today,acct:'bills',amount:-5000,cat:'other',deleted:true}
+  ];
+  const r=analyze(reviewInput(rows));
+  assert.equal(r.confidence.level,'high');
+  assert.equal(r.evidence.excludedTransactions,2);
+});
+
+test('impossible calendar dates cannot qualify as current source-balance evidence',()=>{
+  const input={today:'2026-03-03',accounts:[{id:'cash',type:'spend',openBal:100,balance:90,sourceBalance:{amount:90,date:'2026-03-03',source:'bank'}}],transactions:[{id:'valid',acct:'cash',date:'2026-02-28',amount:-10,cat:'groceries'}]};
+  assert.equal(analyze(input).evidence.sourceBalancesVerified,true,'a real date still reconciles');
+  for(const date of ['2026-02-31','2026-02-29']){
+    const invalid={...input,accounts:input.accounts.map(a=>({...a,sourceBalance:{...a.sourceBalance,date}}))};
+    assert.equal(analyze(invalid).evidence.sourceBalancesVerified,false,date);
+  }
+});
+
+test('invalid retained ledger dates block verification and never enter reviewed totals',()=>{
+  for(const amount of [90,100]){
+    const input={today:'2026-03-03',accounts:[{id:'cash',type:'spend',openBal:100,balance:amount,sourceBalance:{amount,date:'2026-03-03',source:'bank'}}],transactions:[{id:'invalid',acct:'cash',date:'2026-02-31',amount:-10,cat:'groceries'}]};
+    const r=analyze(input);
+    assert.equal(r.evidence.includedTransactions,0);
+    assert.equal(r.evidence.sourceBalancesVerified,false,'invalid records cannot be silently dropped to make the ledger match');
+  }
+});
+
+test('a real leap day remains valid transaction and reconciliation evidence',()=>{
+  const r=analyze({today:'2024-03-03',accounts:[{id:'cash',type:'spend',openBal:100,balance:90,sourceBalance:{amount:90,date:'2024-03-03',source:'bank'}}],transactions:[{id:'leap',acct:'cash',date:'2024-02-29',amount:-10,cat:'groceries'}]});
+  assert.equal(r.evidence.includedTransactions,1);
+  assert.equal(r.evidence.sourceBalancesVerified,true);
+});
+
+test('source evidence requires real numeric values and never coerces blanks to zero',()=>{
+  const input={today,accounts:[{id:'cash',type:'spend',openBal:0,balance:0,sourceBalance:{amount:0,date:today,source:'bank'}}],transactions:[]};
+  assert.equal(analyze(input).evidence.sourceBalancesVerified,true,'recorded zero is valid evidence');
+  const numericStrings={...input,accounts:input.accounts.map(a=>({...a,openBal:'0',sourceBalance:{...a.sourceBalance,amount:'0'}}))};
+  assert.equal(analyze(numericStrings).evidence.sourceBalancesVerified,true,'explicit numeric strings retain compatibility');
+  for(const value of [undefined,null,'',' ', '\t\n',false,[], 'invalid']){
+    for(const key of ['openBal','amount']){
+      const a=input.accounts[0],changed=key==='openBal'?{...a,openBal:value}:{...a,sourceBalance:{...a.sourceBalance,amount:value}};
+      assert.equal(analyze({...input,accounts:[changed]}).evidence.sourceBalancesVerified,false,`${key}: ${JSON.stringify(value)}`);
+    }
+  }
+});
+
+test('source-balance provenance requires a nonblank source name',()=>{
+  const input={today,accounts:[{id:'cash',type:'spend',openBal:100,balance:100,sourceBalance:{amount:100,date:today,source:'bank'}}],transactions:[]};
+  assert.equal(analyze(input).evidence.sourceBalancesVerified,true);
+  for(const source of ['', ' ', '\t\n',{},true,1]){
+    const a=input.accounts[0];
+    assert.equal(analyze({...input,accounts:[{...a,sourceBalance:{...a.sourceBalance,source}}]}).evidence.sourceBalancesVerified,false,JSON.stringify(source));
+  }
+});
+
+test('malformed retained ledger amounts block verification instead of becoming zero',()=>{
+  for(const amount of [undefined,null,'',' ',false,[], 'invalid']){
+    const r=analyze({today,accounts:[{id:'cash',type:'spend',openBal:100,balance:100,sourceBalance:{amount:100,date:today,source:'bank'}}],transactions:[{id:'invalid-amount',acct:'cash',date:today,amount,cat:'groceries'}]});
+    assert.equal(r.evidence.sourceBalancesVerified,false,JSON.stringify(amount));
+    assert.equal(r.evidence.includedTransactions,0);
+  }
 });
 
 test('annual leakage is only evidenced lifestyle spending above its budget',()=>{
