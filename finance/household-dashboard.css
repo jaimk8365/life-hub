@@ -64,3 +64,16 @@ body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .guide-link
 @media(min-width:1100px){.hh-layout{grid-template-columns:1.2fr 1.05fr .9fr}.hh-now{grid-column:1}.hh-safe{grid-column:2}.hh-glance{grid-column:3}.hh-layout .hh-panel{padding:16px}.hh-layout .hh-now h3{font-size:21px}}
 @media(max-width:950px) and (min-width:641px){.hh-layout{grid-template-columns:1fr 1fr}.hh-now{grid-column:1/-1}.hh-source{grid-column:1/-1}.hh-loans{grid-column:1/-1}}
 @media(max-width:640px){.hh-layout{grid-template-columns:minmax(0,1fr);gap:12px;padding-top:0}.hh-layout .hh-panel{padding:18px}.hh-layout .hh-safe .hh-stat>strong{font-size:36px}.hh-layout .hh-account{font-size:13px;min-height:53px}.hh-layout .hh-stat .hh-detail{font-size:12px}.hh-layout h2{font-size:11px}.hh-layout .hh-source{padding:12px}.hh-layout .hh-priorities .hh-action{font-size:13px}.hh-layout .hh-safe p{max-width:290px;align-self:center}.hh-layout .hh-account b{font-size:13px}}
+/* Keep the active tab legible against the cream background. */
+body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .wrap>.pills button.on{color:var(--ink)!important}
+@media(min-width:1080px){
+ .hh-layout{gap:12px}.hh-layout .hh-panel{padding:12px;gap:4px}
+ .hh-layout .hh-accounts{gap:0}.hh-layout .hh-account{padding:7px 0;min-height:44px}
+ .hh-layout .hh-safe .hh-stat>strong{font-size:34px}
+ .hh-layout .hh-panel-title .hh-action{min-height:32px}
+ body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .wrap>div:first-child{align-items:center!important}
+ body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .wrap>div:first-child>div:first-child{display:grid;grid-template-columns:auto 55px;column-gap:16px;align-items:center}
+ body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .wrap>div:first-child h1{grid-column:1;grid-row:1}
+ body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .wrap>div:first-child .sub{grid-column:1;grid-row:2}
+ body:is(.finance-jaimi,.finance-matthew):has(#today.on,#overview.on) .wrap>div:first-child .guide-link{grid-column:2;grid-row:1/3}
+}

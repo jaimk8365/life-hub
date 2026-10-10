@@ -60,7 +60,7 @@
   const action=(key,label)=>`<button type="button" class="hh-action" onclick="openDashboardAction('${key}')">${esc(label)} <span aria-hidden="true">›</span></button>`;
   const progress=items=>items.slice(0,2).map(g=>`<div class="hh-progress"><div><b>${esc(g.name)}</b><span>${money(+g.saved||0)} / ${money(+g.target||0)}</span></div><div class="hh-track" role="meter" aria-label="${esc(g.name)} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.max(0,Math.min(100,+g.target>0?(+g.saved||0)/g.target*100:0))}"><span style="width:${Math.max(0,Math.min(100,+g.target>0?(+g.saved||0)/g.target*100:0))}%"></span></div></div>`).join('');
   const checks=Number.isFinite(attention.count)?attention.count:null;
-  const attentionTitle=trusted?'Your records are checked':attention.conflicts>0?'Sync records need review':checks===0?'Review your spending plan':checks===null?'Check your records':checks+' account'+(checks===1?'':'s')+' need a check';
+  const attentionTitle=trusted?'Your records are checked':attention.conflicts>0?'Sync records need review':checks===0?'Review your spending plan':checks===null?'Check your records':checks+' account'+(checks===1?' needs':'s need')+' a check';
   const snapshots=accounts.map((a,i)=>({a,i})).filter(({a})=>a.type!=='loan').slice(0,6);
   const income=summary&&!(summary.excluded&&summary.income===0)?money(summary.income):'Awaiting review';
   const fee=summary&&!(summary.excluded&&!summary.fees)?money(summary.fees||0):'Awaiting review';
