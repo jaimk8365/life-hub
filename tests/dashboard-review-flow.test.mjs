@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import {execFileSync} from 'node:child_process';
 import {decryptPage} from '../tools/refresh-crypto.mjs';
 import {patchDashboardFinance,patchDashboardPartner} from '../tools/dashboard-review-patches.mjs';
+import {patchOverviewFinance,patchOverviewPartner} from '../tools/overview-layout-patches.mjs';
 const require=createRequire(import.meta.url),H=require('../finance/household-dashboard.js'),G=require('../finance/interactive-guide.js'),P=require('../finance/pocketsmith-import.js');
 test('every overview tile is a keyboard-accessible link to a relevant detail',()=>{
  const html=H.renderOverview({});
@@ -15,7 +16,8 @@ test('every overview tile is a keyboard-accessible link to a relevant detail',()
 test('encrypted rebuild preserves private defaults and is idempotent for both profiles',()=>{
  for(const [page,key,patch]of [['finance/index.html','.hub-key',patchDashboardFinance],['partner/index.html','.partner-key',patchDashboardPartner]]){
   const pass=readFileSync(key,'utf8').trim(),before=decryptPage(execFileSync('git',['show','191d935:'+page],{encoding:'utf8'}),pass),after=decryptPage(readFileSync(page,'utf8'),pass);
-  assert.ok(patch(before)===after,'Encrypted output matches the reviewed source patch');assert.ok(patch(after)===after,'Patching again does not change the source');
+  const layout=page.startsWith('finance/')?patchOverviewFinance:patchOverviewPartner;
+  assert.ok(layout(patch(before))===after,'Encrypted output matches both reviewed source patches');assert.ok(layout(patch(after))===after,'Patching again does not change the source');
   for(const name of ['SEED_ACCTS','SEED_INCOME','SEED_BUDGET']){const re=new RegExp('const '+name+'=\\[[\\s\\S]*?\\n\\];'),a=before.match(re)?.[0],b=after.match(re)?.[0];assert.ok(a===b,'Existing defaults preserved');}
  }
 });
