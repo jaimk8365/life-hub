@@ -33,10 +33,10 @@ test('review editor waits for durable save, returns to remaining records and kee
 });
 test('review queue refreshes after confirmation and clamps the last page',()=>{
  let rows=Array.from({length:11},(_,i)=>({id:String(i),acct:'bills',date:'2026-10-09',amount:-1,cat:'other',note:'Example',needsReview:true}));
- const host={innerHTML:'',scrollTop:0,contains:()=>true,setAttribute:()=>{},querySelector:()=>null};let saved;
- G.open({host,show:()=>{},close:()=>{},readEvidence:()=>({accounts:[]}),transactions:()=>rows,edit:(id,callback)=>{saved=callback;rows=rows.map(t=>t.id===id?G.confirmRecord(t,{},'today'):t);}},'attention');
+ const host={innerHTML:'',scrollTop:0,contains:()=>true,setAttribute:()=>{},querySelector:()=>null};let saved,shown=0;
+ G.open({host,show:()=>{shown++;},close:()=>{},readEvidence:()=>({accounts:[]}),transactions:()=>rows,edit:(id,callback)=>{saved=callback;rows=rows.map(t=>t.id===id?G.confirmRecord(t,{},'today'):t);}},'attention');
  const click=(action,value)=>host.onclick({target:{closest:()=>({dataset:{guideAction:action,guideValue:value}})}});
- click('records','bills');click('page','10');click('edit','10');saved();assert.match(host.innerHTML,/Showing 1–10 of 10/);assert.doesNotMatch(host.innerHTML,/Showing 11/);
+ click('records','bills');click('page','10');click('edit','10');saved();assert.match(host.innerHTML,/Showing 1–10 of 10/);assert.doesNotMatch(host.innerHTML,/Showing 11/);assert.equal(shown,2,'The remaining queue is visible after closing the editor');
 });
 test('confirmed statement-checked record leaves the queue without deleting the ledger entry',()=>{
  const original={id:'one',acct:'bills',date:'2026-10-09',amount:-20,cat:'other',note:'Example',needsReview:true,needsDetails:true,sourceMissing:true,pocketsmithId:'123'};
