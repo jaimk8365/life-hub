@@ -17,6 +17,14 @@ test('backfilled history does not alter a newer confirmed bank balance',async()=
 test('recovery journal uses separate tab storage instead of duplicating the ledger quota',async()=>{const r=runtime(),journal=new Map(),markers=[];r.model.sessionStorage={getItem:k=>journal.get(k)??null,setItem:(k,v)=>journal.set(k,v),removeItem:k=>journal.delete(k)};const original=r.model.localStorage.setItem;r.model.localStorage.setItem=(k,v)=>{if(k==='lifehub_finance_pending_commit')markers.push(JSON.parse(v));original(k,v);};assert.equal((await r.api.apply(snapshot(150))).status,'ok');assert.deepEqual(markers,[{version:2,storage:'session'}]);assert.equal(journal.size,0);});
 
 test('unchanged atomic saves require no journal or quota headroom',()=>{const r=runtime();r.model.localStorage.setItem=()=>{throw Error('quota');};assert.doesNotThrow(()=>vm.runInContext('saveAtomic({fin_accounts:ACCTS,fin_txns:TXNS})',r.model));});
+test('statement-confirmed missing source stays reviewed until it returns and disappears again',async()=>{
+ const r=runtime(),data=snapshot(150);data.full=true;data.complete=true;
+ r.model.TXNS.push({id:'retained',pocketsmithId:'999',acct:'everyday',amount:-10,date:'2026-09-10',cat:'groceries',note:'Statement checked',sourceMissing:false,sourceMissingConfirmed:true});
+ await r.api.apply(data);assert.equal(r.model.TXNS.find(t=>t.id==='retained').sourceMissing,false);
+ data.transactions.push({id:999,transactionAccountId:1,amount:-10,date:'2026-09-10',payee:'Statement checked'});
+ await r.api.apply(data);assert.equal(r.model.TXNS.find(t=>t.id==='retained').sourceMissingConfirmed,undefined);
+ data.transactions=data.transactions.filter(t=>t.id!==999);await r.api.apply(data);assert.equal(r.model.TXNS.find(t=>t.id==='retained').sourceMissing,true);
+});
 test('atomic save will not overwrite an interrupted recovery journal',()=>{const r=runtime();r.stored.set('lifehub_finance_pending_commit','{"existing":"evidence"}');assert.throws(()=>vm.runInContext('saveAtomic({fin_txns:[]})',r.model),/interrupted/);assert.equal(r.stored.get('lifehub_finance_pending_commit'),' {"existing":"evidence"}'.trim());});
 test('failed rollback keeps the journal for recovery',()=>{const r=runtime();let calls=0;const setter=r.model.localStorage.setItem;r.model.localStorage.setItem=(k,v)=>{if(k!=='lifehub_finance_pending_commit'&&++calls>1)throw Error('quota');setter(k,v);};assert.throws(()=>vm.runInContext('saveAtomic({fin_accounts:[],fin_txns:[{id:"larger",note:"new"}]})',r.model));assert.equal(r.stored.has('lifehub_finance_pending_commit'),true);});
 test('bank importer waits for durable completion and rolls back on asynchronous failure',async()=>{
