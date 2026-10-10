@@ -11,3 +11,5 @@ body.finance-jaimi .btn.ghost{background:#fffdfa!important;border-color:#dcc9d1!
 @media(max-width:390px){.hh-grid{grid-template-columns:1fr}.hh-group summary{font-size:13px;gap:8px}}
 
 .hh-map .hh-status{padding:12px 14px;border-radius:10px;background:#fff7cf;color:#4b493b;font-weight:600}
+
+button.hh-stat{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;font:inherit;text-align:left;color:inherit;width:100%;cursor:pointer;transition:border-color .15s,box-shadow .15s}button.hh-stat:hover{border-color:var(--hh-accent);box-shadow:0 3px 12px #29483e12}button.hh-stat:focus-visible{outline:3px solid var(--hh-accent);outline-offset:3px}.hh-stat .hh-detail{font-size:13px;line-height:1.6;font-weight:400;color:var(--ink-soft)}.hh-stat .hh-open{font-size:12px;margin-top:auto;padding-top:12px;color:var(--hh-accent)}

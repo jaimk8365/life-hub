@@ -128,6 +128,8 @@
       const row={id:'ps_'+psId,acct,date:String(src.date).slice(0,10),amount:round2(src.amount),cat:categoryFor(src),note:String(src.payee||src.category?.title||'PocketSmith transaction'),src:'pocketsmith',pocketsmithId:psId,importKey:'pocketsmith:'+psId,sourceCategory:src.category||null,sourceStatus:src.status||null,needsReview:src.needsReview===true||categoryFor(src)==='other'||/pending/i.test(src.status||''),currencyCode:src.currencyCode||'AUD',sourceUpdatedAt:src.updatedAt||null,sourceCat:categoryFor(src)};
       const linked=byExternal.get(psId);
       if(linked){
+        const changed=['amount','date','acct','sourceStatus','sourceUpdatedAt','sourceCat'].some(k=>JSON.stringify(linked[k]??null)!==JSON.stringify(row[k]??null));
+        if(linked.reviewedAt){row.needsReview=changed||/pending/i.test(row.sourceStatus||'');if(changed)row.reviewedAt=null;}
         const overridden=linked.categoryOverride===true||(linked.sourceCat&&linked.cat!==linked.sourceCat);
         updates.push({existingId:linked.id,...row,id:linked.id,cat:overridden?linked.cat:row.cat,categoryOverride:overridden,note:linked.noteOverride?linked.note:row.note,noteOverride:!!linked.noteOverride});
         continue;
@@ -210,7 +212,7 @@
           TXNS.push({...row});known.add(row.importKey);added++;
         }
 
-        if(payload.full){const ids=new Set(payload.sourceIds);for(const t of TXNS)if(t.pocketsmithId)t.sourceMissing=!ids.has(String(t.pocketsmithId));}
+        if(payload.full){const ids=new Set(payload.sourceIds);for(const t of TXNS)if(t.pocketsmithId){const missing=!ids.has(String(t.pocketsmithId));t.sourceMissing=missing&&!t.sourceMissingConfirmed;if(!missing)delete t.sourceMissingConfirmed;}}
         for(const b of payload.balances){
           const acct=ACCTS.find(a=>String(a.id)===String(b.financeId));
           if(!acct)continue;
