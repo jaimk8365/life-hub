@@ -31,3 +31,6 @@ test('dashboard summary uses the Wednesday budget week with a comparable elapsed
  const dates=H.periodBounds('2026-10-15','payweek');assert.equal(dates.start,'2026-10-14');assert.equal(dates.end,'2026-10-15');assert.equal(dates.previousStart,'2026-10-07');assert.equal(dates.previousEnd,'2026-10-08');
  const summary=H.summarise({today:'2026-10-15',period:'payweek',transactions:[{id:'before',date:'2026-10-13',cat:'groceries',amount:-100},{id:'now',date:'2026-10-14',cat:'groceries',amount:-20},{id:'future',date:'2026-10-16',cat:'groceries',amount:-200}]});assert.equal(summary.spending,20);assert.match(H.renderOverview({summary}),/Current budget week/);
 });
+test('confirmed household repayment requirement is a floor for forecasts and invalid evidence stays untrusted',()=>{
+ assert.equal(P.minimumRepaymentFloor(2100,1200,14),2400);assert.equal(P.minimumRepaymentFloor(2600,1200,14),2600);assert.ok(Number.isNaN(P.minimumRepaymentFloor(2100,null,14)));
+});
