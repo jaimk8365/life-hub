@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
+const FinanceGuide=createRequire(import.meta.url)('../finance/interactive-guide.js');
 
 // Execute the production functions from the encrypted-page source with dummy data.
 // No live storage, personal seed records, keys or network are evaluated.
@@ -22,7 +24,7 @@ const optionalHelpers = ['financeDatePlusDays','billOccurrenceAt','billOccurrenc
   'everydayCommitments','payMatchRows','futureBaseIncome','isLoanBalanceAdjustment',
   'goalSaved','reservedForAccount','ledgerDifference','forecastAccountEvidence'];
 function runtime(overrides = {}) {
-  const ctx = vm.createContext({
+  const ctx = vm.createContext({FinanceGuide,
     Date: class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-09-12T12:00:00+10:00'])); } },
     todayISO: () => '2026-09-12', thisYM:'2026-09',
     ymd: (y,m,d) => `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,

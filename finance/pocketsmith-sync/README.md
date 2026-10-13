@@ -42,6 +42,6 @@ Both endpoints require `Authorization: Bearer <APP_SYNC_TOKEN>` and the configur
 
 ## Deployment
 
-Cloudflare Workers is used only as the proposed secret-holding runtime. Deployment is intentionally not automatic from this public repo until the owner has created the Worker and added its secrets. Cloudflare documents encrypted Worker secrets for API keys and provides a Free Workers plan suitable for low-volume personal use.
+Cloudflare Workers hosts the secret-holding bridge. Its Git-connected production branch is `pocketsmith-secure-sync`, with the build root `/finance/pocketsmith-sync/`. Preview builds must use that same root and `npx wrangler preview`; the empty `previews` block in `wrangler.jsonc` enables them. The Previews Base has no bank-feed secrets, so previews cannot fetch a PocketSmith snapshot. Do not copy production secrets into previews.
 
-After deployment, the Finance app still needs a small client adapter to map PocketSmith account IDs to its existing account IDs and import transactions through the app's existing deduplication/import path. Do not write directly into undocumented Finance localStorage structures.
+The Finance client maps PocketSmith account IDs to existing Finance accounts and imports through its checked, deduplicated save path. Do not write directly into undocumented Finance localStorage structures.
