@@ -1,3 +1,4 @@
+import {patchBudgetAlerts} from './budget-alerts-patches.mjs';
 const marker='<!-- Wednesday budget cycle v1 -->';
 function replace(source,old,value){if(!source.includes(old))throw Error('Pay-cycle integration anchor missing');return source.replace(old,value);}
 const helpers=String.raw`
@@ -18,7 +19,7 @@ function refreshBudgetCycle(){const start=PayCycle.cycle(todayISO()).start,heade
 `;
 function finishPay(source){return source.replace("const minimumRepayments=loans.reduce((s,a)=>s+Math.max(0,+a.minRepay||0)*2,0)+moneyMapTransfers().filter(t=>t.toAcct==='kubota-plan').reduce((s,t)=>s+plannedTransferAmount(t,14),0);","const calculatedMinimumRepayments=loans.reduce((s,a)=>s+Math.max(0,+a.minRepay||0)*2,0)+moneyMapTransfers().filter(t=>t.toAcct==='kubota-plan').reduce((s,t)=>s+plannedTransferAmount(t,14),0);const wagePlan=load(K_WAGE_PLAN,CONFIRMED_WAGE_PLAN),minimumRepayments=PayCycle.minimumRepaymentFloor(calculatedMinimumRepayments,wagePlan.requiredWeekly,14);").replace('const plan=load(K_WAGE_PLAN,CONFIRMED_WAGE_PLAN),c=PayCycle.wageCoverage(plan.fortnight,plan.requiredWeekly);',"const plan=load(K_WAGE_PLAN,CONFIRMED_WAGE_PLAN),wage=BASE_PAY.find(p=>p.id===plan.id),fortnight=wage?(wage.cadence==='weekly'?wage.base*2:wage.cadence==='monthly'?wage.base*12/26:wage.base):plan.fortnight,c=PayCycle.wageCoverage(fortnight,plan.requiredWeekly);").replace("function householdSummary(transactions=TXNS,period='fortnight')", "function householdSummary(transactions=TXNS,period='payweek')").replace("if(view==='money-map')HOUSEHOLD_PERIOD='fortnight';", "if(view==='money-map')HOUSEHOLD_PERIOD='payweek';").replace("const start=financeDatePlusDays(todayISO(),-13),category=key===", "const start=PayCycle.cycle(todayISO()).start,category=key===").replace("[['week','Week'],['fortnight','Fortnight'],['month','Month to date'],['year','Year to date']]", "[['payweek','Budget week'],['week','Last 7 days'],['fortnight','Last 14 days'],['month','Month to date'],['year','Year to date']]").replace(/household-dashboard\.(js|css)\?v=[^"']+/g,'household-dashboard.$1?v=20261013-cycle');}
 export function patchPayFinance(source,confirmedPlan){
- if(source.includes(marker))return finishPay(source);
+ if(source.includes(marker))return patchBudgetAlerts(finishPay(source));
  if(!confirmedPlan||confirmedPlan.id!=='jaimi'||!Number.isFinite(confirmedPlan.fortnight)||!Number.isFinite(confirmedPlan.requiredWeekly)||confirmedPlan.fortnight<=0||confirmedPlan.requiredWeekly<=0||confirmedPlan.toAcct!=='loanrepay'||confirmedPlan.topUpFrom!=='everyday')throw Error('A valid private confirmed wage plan is required.');
  source=replace(source,'function openStatementCheck(', 'const CONFIRMED_WAGE_PLAN='+JSON.stringify(confirmedPlan)+';\n'+helpers+'\nfunction openStatementCheck(');
  source=replace(source,"$('monthLbl').textContent=monthName(thisYM)+' · upload or update balances';","$('monthLbl').textContent=PayCycle.label(todayISO());");
@@ -27,6 +28,6 @@ export function patchPayFinance(source,confirmedPlan){
  source=replace(source,"function renderBudget(){\n", "function renderBudget(){\n");
  source=replace(source,"$('budget').innerHTML=html;","$('budget').innerHTML=cycleHeader()+cycleAlertsCard()+html;");
  source=replace(source,"publishMoneyDates();\nrender();", "publishMoneyDates();\nrender();\napplyConfirmedWagePlan().catch(()=>toastMsg('Confirmed wage plan could not be saved. Keep the app open and download a recovery backup.'));\nsetInterval(refreshBudgetCycle,60000);\ndocument.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshBudgetCycle();});");
- return finishPay(source.replace('</head>',marker+'\n<script src="../finance/pay-cycle.js?v=20261013"></script>\n</head>'));
+ return patchBudgetAlerts(finishPay(source.replace('</head>',marker+'\n<script src="../finance/pay-cycle.js?v=20261013"></script>\n</head>')));
 }
 export function patchPayPartner(source){return source.replace(/household-dashboard\.(js|css)\?v=[^"']+/g,'household-dashboard.$1?v=20261013-cycle');}
