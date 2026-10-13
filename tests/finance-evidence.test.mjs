@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
+const FinanceGuide=createRequire(import.meta.url)('../finance/interactive-guide.js');
 import {patchFinanceEvidence} from '../tools/finance-evidence-patches.mjs';
 
 // Run selected production functions only, with synthetic AUD records. Never run
@@ -17,7 +19,7 @@ function functionSource(name){
 }
 function runtime(overrides={}){
   const sheet={innerHTML:''};
-  const ctx=vm.createContext({
+  const ctx=vm.createContext({FinanceGuide,
     Date:class extends Date{constructor(...args){super(...(args.length?args:['2026-10-09T12:00:00+10:00']));}},
     todayISO:()=> '2026-10-09',thisYM:'2026-10',
     ACCTS:[{id:'everyday',name:'Everyday',type:'spend',openBal:1000,budgetMo:0,
@@ -265,4 +267,8 @@ test('Calculation repairs leave synthetic account and reservation records unchan
   const before=r.run('JSON.stringify({ACCTS,TXNS,WISH,FUNDS,GOALS,BUFFERS})');
   r.run("safeSpend();forecastAccount('everyday');offsetImpact({id:'house',rate:6,minRepay:100,offsetAccountIds:[]})");
   assert.equal(r.run('JSON.stringify({ACCTS,TXNS,WISH,FUNDS,GOALS,BUFFERS})'),before);
+});
+test('old category-only flags do not block a reconciled current forecast but missing or changed source evidence does',()=>{
+ const t={id:'old',acct:'everyday',date:'2025-12-01',amount:0,note:'Example',cat:'other',needsReview:true};const r=runtime({TXNS:[t]});assert.equal(r.run("forecastAccountEvidence('everyday').trusted"),true);assert.equal(r.run("forecastAccountEvidence('everyday').historicalUnreviewed"),1);
+ for(const change of [{sourceMissing:true},{sourceChanged:true},{reviewedAt:null},{needsDetails:true},{cat:'loan'}]){r.ctx.TXNS=[{...t,...change}];assert.equal(r.run("forecastAccountEvidence('everyday').trusted"),false);}
 });

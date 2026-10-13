@@ -86,7 +86,8 @@ export function patchFinanceEvidence(source){
   if(source.includes(marker)){
     if(source.split(marker).length!==2)throw new Error('Finance evidence patch marker is duplicated; review source before rebuilding.');
     for(const [,after] of replacements){
-      if(!source.includes(after))throw new Error('Finance evidence patch is incomplete; review source before rebuilding.');
+      const expected=source.includes('<!-- Statement review v1 -->')?after.replace('const unreviewed=TXNS.filter(t=>t.acct===id&&!t.deleted&&(t.needsReview||t.needsDetails||t.sourceMissing)).length;','const review=FinanceGuide.reviewGroups(TXNS,id,today),unreviewed=review.current.length,historicalUnreviewed=review.history.length;').replace('return {current,balanced,malformed,unreviewed,conflicts,trusted,reason,date:','return {current,balanced,malformed,unreviewed,historicalUnreviewed,conflicts,trusted,reason,date:'):after;
+      if(!source.includes(expected))throw new Error('Finance evidence patch is incomplete; review source before rebuilding.');
     }
     return source;
   }

@@ -129,7 +129,7 @@
       const linked=byExternal.get(psId);
       if(linked){
         const changed=['amount','date','acct','sourceStatus','sourceUpdatedAt','sourceCat'].some(k=>JSON.stringify(linked[k]??null)!==JSON.stringify(row[k]??null));
-        if(linked.reviewedAt){row.needsReview=changed||/pending/i.test(row.sourceStatus||'');if(changed)row.reviewedAt=null;}
+        if(linked.reviewedAt){row.needsReview=changed||/pending/i.test(row.sourceStatus||'');if(changed){row.reviewedAt=null;row.sourceChanged=true;}}
         const overridden=linked.categoryOverride===true||(linked.sourceCat&&linked.cat!==linked.sourceCat);
         updates.push({existingId:linked.id,...row,id:linked.id,cat:overridden?linked.cat:row.cat,categoryOverride:overridden,note:linked.noteOverride?linked.note:row.note,noteOverride:!!linked.noteOverride});
         continue;
