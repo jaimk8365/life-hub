@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const require=createRequire(import.meta.url);
-const H=require('../finance/household-dashboard.js');
+const H=require('../finance/household-dashboard.js'),P=require('../finance/pay-cycle.js');
 test('period summaries exclude transfers, redraw, deleted and unreviewed rows without hiding gaps',()=>{
  const transactions=[{id:'pay',date:'2026-10-10',amount:1000,cat:'income'}, {id:'food',date:'2026-10-10',amount:-100,cat:'groceries'}, {id:'own',date:'2026-10-10',amount:-200,cat:'transfer'}, {id:'redraw',date:'2026-10-10',amount:500,cat:'income',note:'Loan redraw'}, {id:'bad',date:'2026-10-10',amount:-50,cat:'fuel',needsReview:true}, {id:'gone',date:'2026-10-10',amount:-99,cat:'fuel',deleted:true}];
  const s=H.summarise({transactions,today:'2026-10-10',period:'week'});
@@ -47,14 +47,14 @@ test('shared summaries are bounded, strip arbitrary fields and escape transactio
 function selectedFunction(source,name){const lines=source.split('\n'),start=lines.findIndex(l=>l.startsWith('function '+name+'('));assert.ok(start>=0);if(lines[start].endsWith('}'))return lines[start];const end=lines.findIndex((l,i)=>i>start&&l==='}');assert.ok(end>start);return lines.slice(start,end+1).join('\n');}
 test('publisher calculates full-period shared totals without private accounts, private descriptions or mutations',()=>{
  const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
- const ctx=vm.createContext({HouseholdDashboard:H,TXNS:[{acct:'bills',date:'2026-01-01',amount:-50,cat:'rates'},{acct:'jspend',date:'2026-10-10',amount:-999,cat:'shopping',note:'private account'},{acct:'bills',date:'2026-10-10',amount:-999,cat:'shopping',note:'secret provider'}],SHARED_ACCT_IDS:['bills'],PARTNER_PRIVATE_RE:/secret/,GOALS:[{acct:'jspend',name:'private goal',saved:999}],todayISO:()=> '2026-10-10',acctById:id=>({id,type:'spend'}),balance:()=>100,householdSafePlan:()=>({trusted:false}),goalSaved:g=>g.saved,save:()=>{throw new Error('No writes permitted');}});
+ const ctx=vm.createContext({HouseholdDashboard:H,PayCycle:P,CONFIRMED_WAGE_PLAN:{requiredWeekly:0},K_WAGE_PLAN:'test-plan',load:(_k,fallback)=>fallback,TXNS:[{acct:'bills',date:'2026-01-01',amount:-50,cat:'rates'},{acct:'jspend',date:'2026-10-10',amount:-999,cat:'shopping',note:'private account'},{acct:'bills',date:'2026-10-10',amount:-999,cat:'shopping',note:'secret provider'}],SHARED_ACCT_IDS:['bills'],PARTNER_PRIVATE_RE:/secret/,GOALS:[{acct:'jspend',name:'private goal',saved:999}],todayISO:()=> '2026-10-10',acctById:id=>({id,type:'spend'}),balance:()=>100,householdSafePlan:()=>({trusted:false}),goalSaved:g=>g.saved,save:()=>{throw new Error('No writes permitted');}});
  vm.runInContext(selectedFunction(source,'sharedHouseholdReview'),ctx);
  const s=vm.runInContext('sharedHouseholdReview()',ctx);assert.equal(s.periods.year.spending,50);assert.equal(s.periods.fortnight.spending,0);assert.equal(s.goals.length,0);assert.doesNotMatch(JSON.stringify(s),/private|secret|999/);
 });
 test('production household adapter protects planned private routes once, including when a real route exists',()=>{
  const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
  const extra={id:'private-route',fromAcct:'everyday',toAcct:'mspend-plan',amount:50,frequency:'weekly'};
- const ctx=vm.createContext({HouseholdDashboard:H,everydayCommitments:()=>({regular:0,oneOffs:[]}),ONEOFFS:[],acctById:()=>({budgetMo:0}),ACCTS:[{id:'house',type:'loan',minRepay:100}],TRANSFERS:[],BILLS:[],balance:()=>-1000,moneyMapTransfers:()=>[extra],plannedTransferAmount:t=>t.amount*2});
+ const ctx=vm.createContext({HouseholdDashboard:H,PayCycle:P,CONFIRMED_WAGE_PLAN:{requiredWeekly:0},K_WAGE_PLAN:'test-plan',load:(_k,fallback)=>fallback,everydayCommitments:()=>({regular:0,oneOffs:[]}),ONEOFFS:[],acctById:()=>({budgetMo:0}),ACCTS:[{id:'house',type:'loan',minRepay:100}],TRANSFERS:[],BILLS:[],balance:()=>-1000,moneyMapTransfers:()=>[extra],plannedTransferAmount:t=>t.amount*2});
  ctx.forecastAccount=id=>({trusted:true,haveData:true,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:ctx.TRANSFERS.filter(t=>t.fromAcct===id).reduce((s,t)=>s+t.amount*2,0),oneoffs:0,reserved:0,buffer:0});
  vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);
  assert.equal(vm.runInContext('householdSafePlan().remaining',ctx),2700);
@@ -63,14 +63,14 @@ test('production household adapter protects planned private routes once, includi
 });
 test('reviewed transfer-only funding accounts are usable while the Everyday allowance stays protected',()=>{
  const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
- const ctx=vm.createContext({HouseholdDashboard:H,everydayCommitments:()=>({regular:84,oneOffs:[]}),ONEOFFS:[],ACCTS:[],TRANSFERS:[],BILLS:[],TXNS:['bills','loanrepay'].map(acct=>({acct,date:'2026-10-09',amount:100,cat:'transfer'})),todayISO:()=> '2026-10-10',financeDatePlusDays:()=> '2026-09-13',acctById:id=>({budgetMo:id==='everyday'?365.25:0}),balance:()=>1000,moneyMapTransfers:()=>[],plannedTransferAmount:()=>0,forecastAccount:id=>({trusted:true,haveData:id==='everyday',cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:0,reserved:0,buffer:0})});
+ const ctx=vm.createContext({HouseholdDashboard:H,PayCycle:P,CONFIRMED_WAGE_PLAN:{requiredWeekly:0},K_WAGE_PLAN:'test-plan',load:(_k,fallback)=>fallback,everydayCommitments:()=>({regular:84,oneOffs:[]}),ONEOFFS:[],ACCTS:[],TRANSFERS:[],BILLS:[],TXNS:['bills','loanrepay'].map(acct=>({acct,date:'2026-10-09',amount:100,cat:'transfer'})),todayISO:()=> '2026-10-10',financeDatePlusDays:()=> '2026-09-13',acctById:id=>({budgetMo:id==='everyday'?365.25:0}),balance:()=>1000,moneyMapTransfers:()=>[],plannedTransferAmount:()=>0,forecastAccount:id=>({trusted:true,haveData:id==='everyday',cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:0,reserved:0,buffer:0})});
  vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);
  const plan=vm.runInContext('householdSafePlan()',ctx);assert.equal(plan.trusted,true);assert.equal(plan.regular,168);assert.equal(plan.remaining,2832);
  ctx.TXNS[0].needsReview=true;assert.equal(vm.runInContext('householdSafePlan().trusted',ctx),false);
 });
 test('household plan includes undated saved weekly one-offs without charging linked dated items twice',()=>{
  const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8');
- const ctx=vm.createContext({HouseholdDashboard:H,ACCTS:[],TRANSFERS:[],BILLS:[],ONEOFFS:[{id:'linked',acct:'everyday',amount:30,due:'2026-10-11'}],todayISO:()=> '2026-10-10',financeDatePlusDays:()=> '2026-10-23',acctById:()=>({budgetMo:0}),balance:()=>1000,moneyMapTransfers:()=>[],plannedTransferAmount:()=>0,everydayCommitments:()=>({regular:0,oneOffs:[{id:'linked',amount:30},{id:'manual',amount:70}]}),forecastAccount:id=>({trusted:true,haveData:true,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:id==='everyday'?30:0,reserved:0,buffer:0})});
+ const ctx=vm.createContext({HouseholdDashboard:H,PayCycle:P,CONFIRMED_WAGE_PLAN:{requiredWeekly:0},K_WAGE_PLAN:'test-plan',load:(_k,fallback)=>fallback,ACCTS:[],TRANSFERS:[],BILLS:[],ONEOFFS:[{id:'linked',acct:'everyday',amount:30,due:'2026-10-11'}],todayISO:()=> '2026-10-10',financeDatePlusDays:()=> '2026-10-23',acctById:()=>({budgetMo:0}),balance:()=>1000,moneyMapTransfers:()=>[],plannedTransferAmount:()=>0,everydayCommitments:()=>({regular:0,oneOffs:[{id:'linked',amount:30},{id:'manual',amount:70}]}),forecastAccount:id=>({trusted:true,haveData:true,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:id==='everyday'?30:0,reserved:0,buffer:0})});
  vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);const plan=vm.runInContext('householdSafePlan()',ctx);assert.equal(plan.oneoffs,100);assert.equal(plan.remaining,2900);
 });
 test('partner dashboard refuses yesterday’s Safe to Spend without recalculating limited shared history',()=>{
@@ -78,4 +78,8 @@ test('partner dashboard refuses yesterday’s Safe to Spend without recalculatin
  const ctx=vm.createContext({Date:class extends Date{constructor(){super('2026-10-10T12:00:00Z');}},HouseholdDashboard:H,partnerHouseholdReview:()=>({date:'2026-10-09',safe:{trusted:true,remaining:12345,bills:0},periods:{fortnight:{income:0,spending:0}},accounts:[],goals:[]})});
  vm.runInContext(selectedFunction(source,'partnerHouseholdDashboard'),ctx);
  const html=vm.runInContext('partnerHouseholdDashboard()',ctx);assert.match(html,/Check data first/);assert.doesNotMatch(html,/12,345/);
+});
+test('production household adapter protects the confirmed total when individual saved loan minimums are lower',()=>{
+ const source=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8'),ctx=vm.createContext({HouseholdDashboard:H,PayCycle:P,CONFIRMED_WAGE_PLAN:{requiredWeekly:1200},K_WAGE_PLAN:'test-plan',load:(_k,fallback)=>fallback,ACCTS:[],TRANSFERS:[],BILLS:[],TXNS:[],ONEOFFS:[],todayISO:()=> '2026-10-14',financeDatePlusDays:()=> '2026-10-27',acctById:()=>({budgetMo:0}),balance:()=>1000,moneyMapTransfers:()=>[],plannedTransferAmount:()=>0,everydayCommitments:()=>({regular:0,oneOffs:[]}),forecastAccount:()=>({trusted:true,haveData:true,cur:1000,avgOut:0,scheduledTotal:0,outgoingTransfers:0,oneoffs:0,reserved:0,buffer:0})});
+ vm.runInContext(selectedFunction(source,'householdSafePlan'),ctx);const plan=vm.runInContext('householdSafePlan()',ctx);assert.equal(plan.trusted,true);assert.equal(plan.repaymentGap,2400);assert.equal(plan.remaining,600);
 });
