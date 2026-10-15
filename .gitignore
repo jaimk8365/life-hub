@@ -10,3 +10,9 @@ src/
 .lifehub-reminders*.log
 
 node_modules/
+
+# Local scratch and generated files
+tmp/
+output/
+*.pdf
+.superdesign/drafts/

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "finance:money-map": {
+      "targetKind": "existing-ui",
+      "projectId": "0c61f21a-ca87-4fd0-95f1-243f8d729ef0",
+      "baselineDraftId": "4bf885fa-dc7a-4775-9b4a-60c7283656dc",
+      "activeDraftId": "4bf885fa-dc7a-4775-9b4a-60c7283656dc",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "finance/money-map.js",
+        "finance/money-map.css",
+        "theme-jaimi.css"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "17069914e120155ffa6a348f7db6e4bc65cf8053d022755d6865f29512a85ff0",
+        "finance/money-map.js": "3515b4ecf45ec72d5bd26aa4afa26eaffcd1d2a92f84d102b7840c652668c50e",
+        "finance/money-map.css": "95eec980aae22a26f5b6064ea2ed63b6065bf43807db55d6f1685062389d2318",
+        "theme-jaimi.css": "2c50f8ed55e3b452311347993da407c8e9cb54df29419a1178fb69469840c787"
+      },
+      "components": [],
+      "drafts": {
+        "4bf885fa-dc7a-4775-9b4a-60c7283656dc": {
+          "title": "Current Money Map",
+          "visualDirection": "faithful current baseline",
+          "currentVersion": 1
+        },
+        "d0c57b8b-bd93-493b-b5c8-871f73b026a0": {
+          "title": "Money Map — Simple Map",
+          "visualDirection": "calm flat distribution map",
+          "parentDraftId": "4bf885fa-dc7a-4775-9b4a-60c7283656dc",
+          "currentVersion": 1
+        },
+        "4d02c0fc-7762-4949-a0c1-75cb5bf2d295": {
+          "title": "Money Map — Flow mode",
+          "visualDirection": "animated flowing connectors",
+          "parentDraftId": "4bf885fa-dc7a-4775-9b4a-60c7283656dc",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-09-15T10:06:50Z"
+    }
+  }
+}

@@ -1,0 +1,2378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Life Hub Template</title>
+<!-- iOS "Add to Home Screen" — makes it open like a standalone app -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Life Hub Template" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* calm warm "stationery" base */
+    --paper:#F7F3EC;
+    --paper-2:#FCFAF5;
+    --card:#FFFFFF;
+    --ink:#2B2722;
+    --ink-soft:#6B655C;
+    --ink-faint:#A39C90;
+    --line:#E7E0D4;
+    --line-soft:#F0EADF;
+
+    /* gentle, consistent category coding */
+    --urgent:#C75B45;     --urgent-bg:#F8E6E1;
+    --action:#C68A2E;     --action-bg:#F8EEDA;
+    --waiting:#7E78AE;    --waiting-bg:#ECEAF6;
+    --low:#5E9277;        --low-bg:#E4F0E9;
+    --done:#A39C90;       --done-bg:#F0EADF;
+
+    /* soft brand nods: coral / lavender / mint / sunshine */
+    --coral:#E8927C;
+    --mint:#7FB79B;
+    --sunshine:#E6B855;
+
+    --radius:18px;
+    --radius-sm:12px;
+    --shadow:0 1px 2px rgba(43,39,34,.04), 0 8px 24px rgba(43,39,34,.06);
+    --shadow-soft:0 1px 2px rgba(43,39,34,.03), 0 4px 14px rgba(43,39,34,.04);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Hanken Grotesk',system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, #FBEFE6 0%, transparent 55%),
+      radial-gradient(1000px 700px at -10% 110%, #EDF3EE 0%, transparent 50%),
+      var(--paper);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.45;
+  }
+
+  /* layout */
+  .app{display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+  .sidebar{
+    padding:26px 22px;
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;gap:18px;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .main{padding:26px 34px 60px;max-width:1180px}
+
+  /* brand */
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:4px}
+  .brand .dot{
+    width:34px;height:34px;border-radius:11px;flex:none;
+    background:linear-gradient(135deg,var(--coral),var(--sunshine));
+    box-shadow:0 4px 12px rgba(232,146,124,.35);
+  }
+  .brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:21px;letter-spacing:-.01em}
+  .brand small{display:block;color:var(--ink-faint);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;margin-top:1px}
+
+  /* sidebar cards */
+  .scard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-soft)}
+  .scard h3{font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:7px}
+
+  /* weather */
+  .weather-top{display:flex;align-items:center;justify-content:space-between}
+  .weather-temp{font-family:'Fraunces',serif;font-size:40px;font-weight:500;line-height:1}
+  .weather-ico{font-size:34px;line-height:1}
+  .weather-desc{color:var(--ink-soft);font-size:13.5px;margin-top:6px}
+  .weather-meta{display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--ink-soft)}
+  .weather-meta b{color:var(--ink);font-weight:600}
+
+  /* deadlines */
+  .deadline{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line-soft)}
+  .deadline:first-of-type{border-top:0}
+  .deadline .when{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--urgent);white-space:nowrap;padding-top:1px;min-width:54px}
+  .deadline .when.soon{color:var(--action)}
+  .deadline .when.later{color:var(--ink-faint)}
+  .deadline .what{font-size:13.5px;line-height:1.3}
+
+  /* inputs */
+  textarea,input[type=text]{
+    width:100%;border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:10px 12px;font-family:inherit;font-size:13.5px;color:var(--ink);
+    background:var(--paper-2);resize:vertical;outline:none;transition:border-color .15s, box-shadow .15s;
+  }
+  textarea:focus,input[type=text]:focus{border-color:var(--coral);box-shadow:0 0 0 3px rgba(232,146,124,.14);background:#fff}
+  textarea{min-height:62px}
+
+  .btn{
+    border:0;border-radius:var(--radius-sm);padding:10px 14px;font-family:inherit;font-weight:600;
+    font-size:13px;cursor:pointer;transition:transform .08s, filter .15s;display:inline-flex;
+    align-items:center;justify-content:center;gap:7px;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--ink);color:#fff}
+  .btn-primary:hover{filter:brightness(1.12)}
+  .btn-soft{background:var(--line-soft);color:var(--ink)}
+  .btn-soft:hover{background:var(--line)}
+  .btn-block{width:100%}
+  .btn-coral{background:linear-gradient(135deg,var(--coral),var(--sunshine));color:#fff}
+
+  /* refresh + status */
+  .syncrow{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:8px}
+  .status{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
+  .status .led{width:9px;height:9px;border-radius:50%;background:var(--ink-faint);box-shadow:0 0 0 4px rgba(163,156,144,.18)}
+  .status.live .led{background:var(--low);box-shadow:0 0 0 4px rgba(94,146,119,.2)}
+  .status.demo .led{background:var(--action);box-shadow:0 0 0 4px rgba(198,138,46,.2)}
+  .spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* header / tabs */
+  .topbar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+  .hello h2{font-family:'Fraunces',serif;font-weight:600;font-size:30px;letter-spacing:-.015em;line-height:1.1}
+  .hello p{color:var(--ink-soft);font-size:14.5px;margin-top:3px}
+  .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);padding:5px;border-radius:14px;box-shadow:var(--shadow-soft)}
+  .tab{border:0;background:transparent;font-family:inherit;font-weight:600;font-size:13.5px;color:var(--ink-soft);
+    padding:9px 15px;border-radius:10px;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .tab:hover{color:var(--ink)}
+  .tab.active{background:var(--ink);color:#fff}
+
+  .view{display:none;animation:fade .3s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* generic card */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px}
+  .card + .card{margin-top:18px}
+  .card-title{font-family:'Fraunces',serif;font-weight:600;font-size:18px;margin-bottom:3px;letter-spacing:-.01em}
+  .card-sub{color:var(--ink-soft);font-size:13px;margin-bottom:16px}
+
+  /* glance row */
+  .glance{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .glance .g{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-soft)}
+  .glance .num{font-family:'Fraunces',serif;font-size:30px;font-weight:600;line-height:1}
+  .glance .lbl{font-size:12px;color:var(--ink-soft);margin-top:5px;font-weight:500}
+  .glance .g.alert .num{color:var(--urgent)}
+
+  /* top 3 */
+  .top3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .pri{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow-soft);overflow:hidden}
+  .pri::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--coral)}
+  .pri:nth-child(2)::before{background:var(--sunshine)}
+  .pri:nth-child(3)::before{background:var(--mint)}
+  .pri .rank{font-family:'Fraunces',serif;font-size:13px;color:var(--ink-faint);font-weight:600}
+  .pri .txt{font-size:15px;font-weight:600;margin-top:4px;line-height:1.3}
+  .pri .meta{font-size:12px;color:var(--ink-soft);margin-top:8px;display:flex;gap:10px;flex-wrap:wrap}
+
+  /* daily routines */
+  .rtn-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px}
+  .rtn-toggle{display:inline-flex;background:var(--line-soft,#efe9e2);border-radius:999px;padding:3px;gap:2px}
+  .rtn-toggle button{border:0;background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);padding:6px 13px;border-radius:999px;cursor:pointer;transition:.15s}
+  .rtn-toggle button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow-soft)}
+  .rtn-steps{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+  .rtn-step{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px;cursor:pointer;transition:.15s}
+  .rtn-step:hover{border-color:var(--coral)}
+  .rtn-step .rbox{flex:none;width:22px;height:22px;border:2px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;transition:.15s}
+  .rtn-step .rem{font-size:19px;flex:none}
+  .rtn-step .rtxt{font-size:14.5px;font-weight:500;line-height:1.3}
+  .rtn-step.done{opacity:.6}
+  .rtn-step.done .rbox{background:var(--mint,#7FB79B);border-color:var(--mint,#7FB79B)}
+  .rtn-step.done .rtxt{text-decoration:line-through;color:var(--ink-soft)}
+  .rtn-done-msg{margin-top:12px;font-size:13.5px;color:var(--ink-soft);text-align:center;font-style:italic}
+
+  /* tasks by date */
+  .msc{display:flex;flex-direction:column;gap:6px}
+  .date-group{margin-bottom:4px}
+  .date-group-header{display:flex;align-items:center;gap:8px;padding:6px 10px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line-soft);margin-bottom:4px}
+  .date-group-header.overdue{color:var(--urgent)}
+  .date-group-header.today{color:var(--action)}
+  .date-group-header.tomorrow{color:#e09a3a}
+  .date-group-header.week{color:var(--ink-soft)}
+  .date-group-header.later{color:var(--ink-faint)}
+  .date-group-header.nodate{color:var(--ink-faint)}
+  .pill-count{font-size:11px;background:var(--line-soft);color:var(--ink-soft);border-radius:20px;padding:2px 8px;font-weight:700}
+
+  .task{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:10px;transition:background .12s;cursor:default}
+  .task:hover{background:var(--paper-2)}
+  .task .check{width:18px;height:18px;border:2px solid var(--line);border-radius:6px;flex:none;margin-top:2px;cursor:pointer;transition:all .15s}
+  .task .check:hover{border-color:var(--low)}
+  .task.done .check{background:var(--low);border-color:var(--low)}
+  .task.done .t-body .t-name{text-decoration:line-through;color:var(--ink-faint)}
+  .t-body{flex:1;min-width:0}
+  .t-name{font-size:13.5px;font-weight:500;line-height:1.3}
+  .t-tags{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:2px 7px;border-radius:20px}
+  .tag.list{background:var(--line-soft);color:var(--ink-soft)}
+  .tag.energy{background:var(--waiting-bg);color:var(--waiting)}
+  .tag.time{background:var(--paper-2);color:var(--ink-soft);border:1px solid var(--line)}
+  .tag.over{background:var(--urgent-bg);color:var(--urgent)}
+  .tag.today{background:var(--action-bg);color:var(--action)}
+
+  /* schedule timeline */
+  /* --- calendar snapshot --- */
+  .cal-event{display:grid;grid-template-columns:70px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line-soft);align-items:start}
+  .cal-event:first-child{border-top:0}
+  .cal-event .ev-time{font-size:11.5px;font-weight:700;color:var(--ink-faint);line-height:1.4;text-align:right;padding-top:2px}
+  .cal-event .ev-body{min-width:0}
+  .cal-event .ev-title{font-size:14px;font-weight:600;line-height:1.3}
+  .cal-event .ev-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px}
+  .cal-event .ev-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;flex-shrink:0;vertical-align:middle}
+  .cal-event.clash .ev-title{color:var(--urgent)}
+  .timeline{position:relative;margin-top:6px}
+  .slot{display:grid;grid-template-columns:62px 1fr;gap:14px;padding:7px 0;border-top:1px solid var(--line-soft)}
+  .slot:first-child{border-top:0}
+  .slot .time{font-size:12px;font-weight:700;color:var(--ink-faint);padding-top:9px;text-align:right}
+  .block{border-radius:12px;padding:11px 14px;font-size:13.5px;font-weight:600;border:1px solid transparent}
+  .block.event{background:#EEF1F7;border-color:#DDE2EE;color:#3C4664}
+  .block.focus{background:var(--coral);color:#fff}
+  .block.task{background:var(--low-bg);border-color:#CFE4D8;color:#2F5F47}
+  .block.gap{background:transparent;border:1px dashed var(--line);color:var(--ink-faint);font-weight:500}
+  .block.break{background:var(--action-bg);border-color:#EBD9AE;color:var(--action)}
+  .block small{display:block;font-weight:500;font-size:11.5px;opacity:.85;margin-top:2px}
+
+  /* weekly */
+  .week{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+  .wday{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 10px;min-height:170px;box-shadow:var(--shadow-soft)}
+  .wday.today{border-color:var(--coral);box-shadow:0 0 0 2px rgba(232,146,124,.18),var(--shadow-soft)}
+  .wday .wname{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);font-weight:700}
+  .wday .wnum{font-family:'Fraunces',serif;font-size:22px;font-weight:600;margin:1px 0 6px;display:flex;align-items:center;justify-content:space-between}
+  .wday .load{height:4px;border-radius:4px;background:var(--line-soft);overflow:hidden;margin-bottom:9px}
+  .wday .load span{display:block;height:100%;background:var(--coral)}
+  .wev{font-size:11.5px;background:var(--paper-2);border:1px solid var(--line-soft);border-radius:8px;padding:5px 7px;margin-bottom:5px;line-height:1.25}
+  .wev .et{font-weight:700;color:var(--ink-soft);font-size:10.5px}
+  .wev.clash{border-color:var(--urgent);background:var(--urgent-bg)}
+
+  /* monthly */
+  .monthgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .mhead{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;text-align:center;padding:6px 0}
+  .mcell{background:var(--card);border:1px solid var(--line);border-radius:11px;min-height:84px;padding:8px;position:relative;box-shadow:var(--shadow-soft)}
+  .mcell.out{background:transparent;border-color:transparent;box-shadow:none}
+  .mcell.today{border-color:var(--coral);box-shadow:0 0 0 2px rgba(232,146,124,.18)}
+  .mcell .d{font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .mcell.busy::after{content:"";position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--urgent)}
+  .mcell.light::after{content:"";position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--low)}
+  .mdot{height:5px;border-radius:5px;margin-top:4px;background:var(--waiting);opacity:.7}
+  .mcount{font-size:10.5px;color:var(--ink-faint);font-weight:600;margin-top:5px}
+
+  /* legend */
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:11.5px;color:var(--ink-soft);font-weight:600}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:-1px}
+
+  /* tasks tab filters */
+  .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--card);font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);
+    padding:7px 13px;border-radius:20px;cursor:pointer;transition:all .15s}
+  .chip:hover{border-color:var(--ink-faint)}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* email triage */
+  .email{display:flex;gap:13px;padding:14px 4px;border-top:1px solid var(--line-soft);align-items:flex-start}
+  .email:first-child{border-top:0}
+  .email .cat{width:4px;align-self:stretch;border-radius:4px;flex:none}
+  .email .cat.urgent{background:var(--urgent)} .email .cat.action{background:var(--action)}
+  .email .cat.waiting{background:var(--waiting)} .email .cat.low{background:var(--low)}
+  .email .cat.newsletter{background:#bbb}
+  .email .cat.starred{background:#f5a623}
+  .email-section-toggle{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+  .email-section-toggle:hover .card-title{opacity:.8}
+  .email-section-badge{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--surface-raised);color:var(--ink-soft)}
+  .email-section-chevron{font-size:12px;color:var(--ink-faint);transition:transform .2s}
+  .email-section-chevron.open{transform:rotate(180deg)}
+  .starred-dot{color:#f5a623;font-size:13px;margin-right:3px}
+  /* keep old class names working */
+  .newsletter-toggle{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+  .newsletter-badge{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--surface-raised);color:var(--ink-soft)}
+  .newsletter-chevron{font-size:12px;color:var(--ink-faint);transition:transform .2s}
+  .newsletter-chevron.open{transform:rotate(180deg)}
+  .email .ebody{flex:1;min-width:0}
+  .email .efrom{font-size:12px;color:var(--ink-soft);font-weight:600;display:flex;justify-content:space-between;gap:10px}
+  .email .efrom .etime{color:var(--ink-faint);font-weight:500;white-space:nowrap}
+  .email .esubj{font-size:14px;font-weight:600;margin:2px 0 3px}
+  .email .esnip{font-size:12.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .email .eact{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .mini-del{color:#c0392b!important;border-color:#f5c6c6!important}
+  .mini-del:hover{background:#fdf0f0!important}
+  .mini-move{color:#2563eb!important;border-color:#bcd0f5!important}
+  .mini-move:hover{background:#eff4ff!important}
+  .email.removing{opacity:0;transform:translateX(30px);transition:opacity .3s,transform .3s}
+  .label-btn{text-align:left;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:13.5px;font-weight:500;color:var(--ink);transition:background .15s}
+  .label-btn:hover{background:var(--surface-raised)}
+  .email .ecat-lbl{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+  .ecat-lbl.urgent{background:var(--urgent-bg);color:var(--urgent)} .ecat-lbl.action{background:var(--action-bg);color:var(--action)}
+  .ecat-lbl.waiting{background:var(--waiting-bg);color:var(--waiting)} .ecat-lbl.low{background:var(--low-bg);color:var(--low)}
+  .mini{font-size:11.5px;font-weight:600;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 9px;cursor:pointer;color:var(--ink-soft);font-family:inherit;transition:all .15s}
+  .mini:hover{border-color:var(--coral);color:var(--coral)}
+  .reply-flag{font-size:11px;color:var(--coral);font-weight:700;margin-left:8px}
+
+  .empty{color:var(--ink-faint);font-size:13px;font-style:italic;padding:10px 4px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+    padding:12px 20px;border-radius:12px;font-size:13.5px;font-weight:600;opacity:0;transition:all .3s;pointer-events:none;z-index:50;box-shadow:var(--shadow)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media(max-width:960px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+    .glance,.top3,.msc,.week,.monthgrid{grid-template-columns:repeat(2,1fr)}
+    .main{padding:22px}
+  }
+  /* ---- Phone (≤640px) ---- */
+  @media(max-width:640px){
+    .sidebar{display:none}
+    .sidebar.open{display:block;position:fixed;inset:0;z-index:100;overflow-y:auto;background:var(--surface)}
+    .main{padding:14px 12px}
+    .nav{padding:0 12px;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .nav::-webkit-scrollbar{display:none}
+    .tab{font-size:12.5px;padding:7px 12px;white-space:nowrap;flex-shrink:0}
+  }
+  /* Life Hub is now the calm daily snapshot — planning lives in the My Planner tab,
+     email triage under Life Admin. Retire the extra dashboard tabs. */
+  .tab[data-view="weekly"],.tab[data-view="monthly"],.tab[data-view="tasks"],
+  .tab[data-view="email"],.tab[data-view="planner"],.tab[data-view="lifeos"]{display:none!important}
+  @media(max-width:640px){
+    .header-row{padding:14px 12px 0;gap:8px}
+    .greeting{font-size:22px}
+    .glance{grid-template-columns:repeat(2,1fr);gap:8px}
+    .glance .g{padding:12px}
+    .glance .num{font-size:24px}
+    .top3{grid-template-columns:1fr;gap:10px}
+    .week,.monthgrid{grid-template-columns:1fr}
+    .card{padding:16px}
+    .mobile-menu-btn{display:flex}
+  }
+  .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:18px;flex-shrink:0}
+
+  /* ── Weekly Planner ───────────────────────────────────────────── */
+  .planner-priority{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--radius-sm);background:var(--paper-2);border:1px solid var(--line-soft);margin-bottom:8px}
+  .planner-priority .rank-badge{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--coral),var(--sunshine));color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+  .planner-priority .rank-badge.b2{background:linear-gradient(135deg,var(--sunshine),#e8b04a)}
+  .planner-priority .rank-badge.b3{background:linear-gradient(135deg,var(--mint),#5e9277)}
+  .planner-priority .p-title{font-size:14px;font-weight:600;line-height:1.35}
+  .planner-priority .p-meta{font-size:12px;color:var(--ink-soft);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+  .planner-free-block{display:flex;gap:12px;align-items:center;padding:10px 14px;border-radius:var(--radius-sm);background:var(--low-bg);border:1px solid #CFE4D8;margin-bottom:6px}
+  .planner-free-block .day-name{font-weight:700;font-size:13.5px;color:var(--low);min-width:60px}
+  .planner-free-block .hours{font-size:12px;color:var(--ink-soft)}
+  .planner-prompt{padding:18px;border-radius:var(--radius-sm);background:var(--paper-2);border:2px solid var(--coral);margin-bottom:14px}
+  .planner-prompt .prompt-text{font-size:15px;font-weight:600;margin-bottom:12px;line-height:1.4}
+  .planner-prompt .prompt-opts{display:flex;gap:8px;flex-wrap:wrap}
+  .planner-prompt .prompt-opts button{border:2px solid var(--line);background:var(--card);border-radius:10px;padding:9px 16px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .15s;color:var(--ink)}
+  .planner-prompt .prompt-opts button:hover,.planner-prompt .prompt-opts button.chosen{border-color:var(--coral);background:var(--urgent-bg);color:var(--urgent)}
+  .planner-prompt .prompt-skip{font-size:12px;color:var(--ink-faint);cursor:pointer;margin-top:10px;display:inline-block;text-decoration:underline}
+  .planner-action-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--radius-sm);border:1px solid var(--line);background:var(--card)}
+  .planner-action-item input[type=checkbox]{width:20px;height:20px;border-radius:6px;cursor:pointer;accent-color:var(--coral);flex:none;margin-top:2px}
+  .planner-action-item .action-title{font-size:14px;font-weight:600;line-height:1.35}
+  .planner-action-item .action-meta{font-size:12px;color:var(--ink-soft);margin-top:4px}
+  .planner-action-item .action-type{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px}
+  .action-type.calendar{background:var(--waiting-bg);color:var(--waiting)}
+  .action-type.reminder{background:var(--action-bg);color:var(--action)}
+  .planner-glance-stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px;text-align:center;box-shadow:var(--shadow-soft)}
+  .planner-glance-stat .stat-num{font-family:'Fraunces',serif;font-size:28px;font-weight:600;line-height:1}
+  .planner-glance-stat .stat-lbl{font-size:11.5px;color:var(--ink-soft);margin-top:4px;font-weight:500}
+  #plannerTab.has-plan::after{content:"●";font-size:8px;color:var(--coral);vertical-align:super;margin-left:3px}
+
+  /* ── Life OS ── */
+  .los-pane{display:none;animation:fade .3s ease}
+  .los-pane.active{display:block}
+  .los-pane .card{margin-bottom:14px}
+  .los-pane .card + .card{margin-top:0}
+
+  .los-highlight{background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--ink-soft);line-height:1.65}
+
+  /* time blocks */
+  .los-tblock{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+  .los-tblock:last-child{border-bottom:none}
+  .los-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+  .los-tlabel{font-size:11px;font-weight:700;color:var(--ink-faint);width:70px;flex-shrink:0;padding-top:1px}
+  .los-tcontent{flex:1}
+  .los-tcontent strong{font-size:13.5px;display:block;margin-bottom:2px}
+  .los-tcontent p{font-size:12px;color:var(--ink-soft);line-height:1.5}
+
+  /* sub-panes within Life OS */
+  .los-sub{display:none}
+  .los-sub.active{display:block}
+
+  /* checklists */
+  .los-checklist{margin-top:8px}
+  .los-check{display:flex;gap:10px;align-items:flex-start;padding:9px 6px;border-bottom:1px solid var(--line-soft);cursor:pointer;border-radius:8px;transition:background .12s}
+  .los-check:last-child{border-bottom:none}
+  .los-check:hover{background:var(--paper-2)}
+  .los-cb{width:18px;height:18px;border:2px solid var(--line);border-radius:6px;flex-shrink:0;margin-top:1px;transition:all .15s}
+  .los-check.done .los-cb{background:var(--low);border-color:var(--low);position:relative}
+  .los-check.done .los-cb::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;line-height:1}
+  .los-check.done .los-ct{text-decoration:line-through;color:var(--ink-faint)}
+  .los-ct{font-size:13.5px;font-weight:500;line-height:1.35;color:var(--ink)}
+  .los-cs{font-size:11.5px;color:var(--ink-faint);margin-top:2px;line-height:1.4}
+
+  /* clean tasks */
+  .los-ctask{font-size:12.5px;padding:7px 9px;background:var(--card);border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px}
+  .los-ctask:hover{border-color:var(--coral)}
+  .los-ctask.done{background:var(--low-bg);color:var(--ink-faint);text-decoration:line-through;border-color:var(--line-soft)}
+  .los-ctick{width:13px;height:13px;border:1.5px solid var(--line);border-radius:4px;flex-shrink:0;position:relative}
+  .los-ctask.done .los-ctick{background:var(--low);border-color:var(--low)}
+  .los-ctask.done .los-ctick::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:700}
+
+  /* accordions */
+  .los-accord{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:8px;background:var(--card)}
+  .los-accord-head{padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13.5px;transition:background .12s;user-select:none}
+  .los-accord-head:hover{background:var(--paper-2)}
+  .los-arrow{font-size:11px;color:var(--ink-faint);transition:transform .2s}
+  .los-accord.open .los-arrow{transform:rotate(180deg)}
+  .los-accord-body{display:none;padding:0 16px 14px;font-size:13px;color:var(--ink-soft);line-height:1.7;border-top:1px solid var(--line-soft);padding-top:12px}
+  .los-accord.open .los-accord-body{display:block}
+
+  /* habit stacks */
+  .los-anchor{background:linear-gradient(135deg,var(--coral),var(--sunshine));color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:8px;font-size:13.5px;font-weight:700}
+  .los-chain{padding-left:12px;border-left:3px solid var(--line);margin-left:12px;margin-bottom:4px}
+  .los-link{background:var(--paper-2);border:1px solid var(--line-soft);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:13px;display:flex;gap:8px;align-items:flex-start}
+  .los-lnum{width:22px;height:22px;border-radius:50%;background:var(--line);color:var(--ink-soft);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+  /* automate rows */
+  .los-autorow{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+  .los-autoico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0}
+</style>
+
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:9999;padding:8px 14px;background:#254D4A;color:white;text-align:center;font:600 13px/1.4 system-ui">Template preview — all names, events, tasks, emails and amounts are fictional examples.</div>
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div><h1>Command Center</h1><small>Calm daily HQ</small></div>
+    </div>
+
+    <div class="scard" id="weatherCard">
+      <h3>☀️ Weather · Exampletown</h3>
+      <div class="weather-top">
+        <div><div class="weather-temp" id="wTemp">—</div><div class="weather-desc" id="wDesc">Loading…</div></div>
+        <div class="weather-ico" id="wIco">🌤️</div>
+      </div>
+      <div class="weather-meta">
+        <span>High <b id="wHi">—</b></span><span>Low <b id="wLo">—</b></span><span>Rain <b id="wRain">—</b></span>
+      </div>
+    </div>
+
+    <div class="scard">
+      <h3>⏳ Upcoming deadlines</h3>
+      <div id="deadlines"></div>
+    </div>
+
+    <div class="scard">
+      <h3>🧠 Brain dump</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 9px">Type anything. I'll turn each line into a task.</p>
+      <textarea id="brainInput" placeholder="e.g.
+Pay payment plan !urgent ~10m
+Email client provider re: invoice #action
+Book Buddy vet appt"></textarea>
+      <button class="btn btn-coral btn-block" style="margin-top:9px" onclick="processBrainDump()">✦ Convert to tasks</button>
+    </div>
+
+    <div class="scard" id="winsCard">
+      <h3>🏆 Done today</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 9px">Ticked tasks land here automatically — proof the day was productive.</p>
+      <div id="winsList"></div>
+      <div style="display:flex;gap:6px;margin-top:9px">
+        <input id="winInput" type="text" placeholder="Add a win manually…" style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px;background:var(--bg-card);color:var(--ink)" onkeydown="if(event.key==='Enter'){addWin(this.value);this.value=''}">
+        <button class="btn btn-soft" onclick="addWin(document.getElementById('winInput').value);document.getElementById('winInput').value=''">+</button>
+      </div>
+    </div>
+
+    <div class="scard" id="acrossHubCard">
+      <h3>📋 Also today, across your hub</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 9px">The things Life Admin and Money are tracking that don't show up above.</p>
+      <div id="acrossHubList"></div>
+    </div>
+
+    <div class="scard" id="weeklyReflectCard">
+      <h3>🌙 This week, across everything</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 9px">A quiet weekly tally — not a scoreboard, just proof of what happened.</p>
+      <div id="weeklyReflectList"></div>
+    </div>
+
+    <div class="scard" id="importCard">
+      <h3>📥 Refresh my data</h3>
+      <p style="font-size:12px;color:var(--ink-soft);margin:-4px 0 9px">This hub is <b>synced by your assistant</b> from your Google Calendar &amp; Apple Reminders. To pull fresh data, just tell your assistant <b>“refresh my hub”</b>. You can also paste a data snapshot below.</p>
+      <textarea id="importPaste" placeholder="Paste your Shortcut output here…"></textarea>
+      <button class="btn btn-soft btn-block" style="margin-top:8px" onclick="importFromPaste()">📋 Load pasted data</button>
+      <label class="btn btn-soft btn-block" style="margin-top:8px;cursor:pointer">
+        📄 …or choose a saved file
+        <input type="file" id="importFile" accept="application/json,.json,.txt" style="display:none" onchange="importFromFile(event)" />
+      </label>
+    </div>
+
+    <div class="syncrow">
+      <button class="btn btn-soft" id="refreshBtn" onclick="syncAll(true)" title="Your data was synced by your assistant. To pull fresh data, ask your assistant to “refresh my hub”.">
+        <span id="refreshIco">⟳</span> Refresh
+      </button>
+      <div class="status demo" id="status"><span class="led"></span><span id="statusTxt">Demo data</span></div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div id="staleBanner" style="display:none;margin:0 0 14px;padding:11px 16px;background:var(--waiting-bg,#FBEFD6);color:var(--waiting,#9A6A00);border:1px solid rgba(154,106,0,.28);border-radius:12px;font-size:13.5px;line-height:1.45"></div>
+    <div class="topbar">
+      <div class="hello">
+        <button class="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('open')" title="Menu">☰</button>
+        <div>
+          <h2 id="greeting">Good morning, Alex</h2>
+          <p id="dateLine">—</p>
+        </div>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-view="today" onclick="switchView('today',this)">Today</button>
+        <button class="tab" data-view="weekly" onclick="switchView('weekly',this)">Weekly</button>
+        <button class="tab" data-view="monthly" onclick="switchView('monthly',this)">Monthly</button>
+        <button class="tab" data-view="tasks" onclick="switchView('tasks',this)">Tasks</button>
+        <button class="tab" data-view="email" onclick="switchView('email',this)">Email Triage</button>
+        <button class="tab" data-view="planner" id="plannerTab" onclick="switchView('planner',this)">🗓 Week Plan</button>
+        <button class="tab" data-view="lifeos" onclick="switchView('lifeos',this)">✦ Life OS</button>
+      </div>
+    </div>
+
+    <!-- TODAY -->
+    <section class="view active" id="view-today">
+      <div class="glance" id="glance"></div>
+
+      <div class="card" id="questTodayCard" style="padding:14px 18px"></div>
+
+      <div class="card" id="routineCard">
+        <div class="rtn-head">
+          <div>
+            <div class="card-title" id="rtnTitle">🌅 Morning routine</div>
+            <div class="card-sub" id="rtnSub">A gentle on-ramp. No need to earn it — just start.</div>
+          </div>
+          <div class="rtn-toggle">
+            <button id="rtnBtnM" onclick="setRoutine('m')">🌅 Morning</button>
+            <button id="rtnBtnA" onclick="setRoutine('a')">🌇 Afternoon</button>
+          </div>
+        </div>
+        <div class="rtn-steps" id="rtnSteps"></div>
+        <div class="rtn-done-msg" id="rtnDoneMsg" style="display:none"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📅 Today's calendar</div>
+        <div class="card-sub" id="calSnapSub">Loading…</div>
+        <div id="calSnap"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Your Top 3 today</div>
+        <div class="card-sub">The few things that, if done, make today a win.</div>
+        <div class="top3" id="top3"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Your tasks</div>
+        <div class="card-sub">Sorted by date, then priority. Tick anything off and it lands in Done today.</div>
+        <div class="msc" id="msc"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">A realistic plan for today</div>
+        <div class="card-sub">Your meetings, plus focus blocks slotted into the gaps. Built around your real schedule.</div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </section>
+
+    <!-- WEEKLY -->
+    <section class="view" id="view-weekly">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div class="card-title" id="weekTitle">This week</div>
+            <div class="card-sub" id="weekRange">—</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn btn-soft" id="weekPrevBtn" onclick="shiftWeek(-1)" style="padding:7px 13px;font-size:13px">← Prev</button>
+            <button class="btn btn-soft" onclick="shiftWeek(0)" style="padding:7px 13px;font-size:13px">Today</button>
+            <button class="btn btn-soft" id="weekNextBtn" onclick="shiftWeek(1)" style="padding:7px 13px;font-size:13px">Next →</button>
+          </div>
+        </div>
+        <div class="week" id="week"></div>
+        <div class="legend">
+          <span><i style="background:var(--coral)"></i>Busy day</span>
+          <span><i style="background:var(--urgent)"></i>Overlapping events</span>
+          <span><i style="background:var(--low)"></i>Open time</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" id="weekTasksTitle">Tasks this week</div>
+        <div class="card-sub">Reminders due this week, sorted by day then priority.</div>
+        <div class="msc" id="weekTasks"></div>
+      </div>
+    </section>
+
+    <!-- MONTHLY -->
+    <section class="view" id="view-monthly">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:10px">
+          <div>
+            <div class="card-title" id="monthTitle">Month</div>
+            <div class="card-sub">Your schedule at a glance — tap a day to see full details.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn btn-soft" onclick="shiftMonth(-1)" style="padding:7px 13px;font-size:13px">← Prev</button>
+            <button class="btn btn-soft" onclick="shiftMonth(0)" style="padding:7px 13px;font-size:13px">Today</button>
+            <button class="btn btn-soft" onclick="shiftMonth(1)" style="padding:7px 13px;font-size:13px">Next →</button>
+          </div>
+        </div>
+        <div class="monthgrid" id="monthHead"></div>
+        <div class="monthgrid" id="month" style="margin-top:6px"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Tasks this month</div>
+        <div class="card-sub">All reminders due this month, sorted by date then priority.</div>
+        <div class="msc" id="monthTasks"></div>
+      </div>
+    </section>
+
+    <!-- TASKS -->
+    <section class="view" id="view-tasks">
+      <div class="card">
+        <div class="card-title">All tasks</div>
+        <div class="card-sub">From your Apple Reminders lists. Filter by what you've got the energy for right now.</div>
+        <div class="filters" id="taskFilters">
+          <button class="chip active" data-filter="all" onclick="filterTasks('all',this)">All</button>
+          <button class="chip" data-filter="overdue" onclick="filterTasks('overdue',this)">⚠ Overdue</button>
+          <button class="chip" data-filter="today" onclick="filterTasks('today',this)">Due today</button>
+          <button class="chip" data-filter="high" onclick="filterTasks('high',this)">High energy</button>
+          <button class="chip" data-filter="low" onclick="filterTasks('low',this)">Low energy</button>
+          <button class="chip" data-filter="quick" onclick="filterTasks('quick',this)">Quick (&lt;15m)</button>
+        </div>
+        <div id="taskList"></div>
+      </div>
+    </section>
+
+    <!-- EMAIL -->
+    <section class="view" id="view-email">
+      <div class="card">
+        <div class="card-title">Daily email triage</div>
+        <div class="card-sub">Unread mail, sorted so you reply to the right things first. ✱ = suggested reply for today.</div>
+        <div class="filters">
+          <button class="chip active" data-efilter="all" onclick="filterEmail('all',this)">All</button>
+          <button class="chip" data-efilter="urgent" onclick="filterEmail('urgent',this)">Urgent</button>
+          <button class="chip" data-efilter="action" onclick="filterEmail('action',this)">Action</button>
+          <button class="chip" data-efilter="waiting" onclick="filterEmail('waiting',this)">Waiting</button>
+          <button class="chip" data-efilter="low" onclick="filterEmail('low',this)">Low priority</button>
+        </div>
+        <div id="emailList"></div>
+      </div>
+      <div class="card" id="flaggedCard" style="margin-top:14px">
+        <div class="email-section-toggle" onclick="toggleFlagged()">
+          <div>
+            <div class="card-title" style="margin-bottom:2px">⭐ Flagged emails</div>
+            <div class="card-sub" style="margin:0">Starred in Gmail — things you marked to come back to.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span class="email-section-badge" id="flaggedBadge">0</span>
+            <span class="email-section-chevron" id="flaggedChevron">▼</span>
+          </div>
+        </div>
+        <div id="flaggedList" style="display:none;margin-top:8px"></div>
+      </div>
+      <div class="card" id="newsletterCard" style="margin-top:14px">
+        <div class="newsletter-toggle" onclick="toggleNewsletters()">
+          <div>
+            <div class="card-title" style="margin-bottom:2px">📰 Newsletters &amp; marketing</div>
+            <div class="card-sub" style="margin:0">Promotional emails — read when you have a moment.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span class="newsletter-badge" id="newsletterBadge">0</span>
+            <span class="newsletter-chevron" id="newsletterChevron">▼</span>
+          </div>
+        </div>
+        <div id="newsletterList" style="display:none;margin-top:8px"></div>
+      </div>
+    </section>
+
+    <!-- WEEKLY PLANNER -->
+    <section class="view" id="view-planner">
+
+      <!-- Banner shown when a fresh draft is ready (also shown inline here) -->
+      <div id="plannerBanner" style="display:none;background:linear-gradient(135deg,var(--coral),var(--sunshine));color:#fff;border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:var(--shadow)">
+        <div>
+          <div style="font-weight:700;font-size:15px">✨ Your Sunday Plan is ready</div>
+          <div style="font-size:13px;opacity:.9;margin-top:2px" id="plannerBannerSub">Generated just now</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button class="btn" style="background:rgba(255,255,255,.25);color:#fff;font-size:13px" onclick="plannerDismiss()">Later</button>
+          <button class="btn" style="background:#fff;color:var(--ink);font-size:13px" onclick="plannerReview()">Review →</button>
+        </div>
+      </div>
+
+      <!-- No plan yet -->
+      <div id="plannerEmpty" class="card" style="text-align:center;padding:48px 24px">
+        <div style="font-size:40px;margin-bottom:14px">🗓</div>
+        <div class="card-title" style="margin-bottom:8px">No plan yet this week</div>
+        <div class="card-sub" style="margin-bottom:20px">Your Sunday planner runs automatically at 8am each Sunday, or you can run it right now.</div>
+        <button class="btn btn-coral" onclick="plannerRunNow()" id="plannerRunBtn">✦ Build my weekly plan</button>
+      </div>
+
+      <!-- Plan content (hidden until a draft exists) -->
+      <div id="plannerContent" style="display:none">
+
+        <!-- Step progress bar -->
+        <div class="card" id="plannerStepCard" style="padding:16px 22px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="font-weight:700;font-size:14px" id="plannerStepLabel">Step 1 of 3</div>
+            <div style="font-size:12px;color:var(--ink-soft)" id="plannerStepHint">Review your plan</div>
+          </div>
+          <div style="height:6px;background:var(--line-soft);border-radius:6px;overflow:hidden">
+            <div id="plannerStepBar" style="height:100%;background:linear-gradient(90deg,var(--coral),var(--sunshine));border-radius:6px;transition:width .4s ease;width:33%"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-soft" id="plannerPrevBtn" onclick="plannerStep(-1)" style="display:none">← Back</button>
+            <button class="btn btn-primary" id="plannerNextBtn" onclick="plannerStep(1)">Next →</button>
+            <button class="btn btn-coral" id="plannerConfirmBtn" onclick="plannerConfirm()" style="display:none">✓ Confirm &amp; create</button>
+          </div>
+        </div>
+
+        <!-- STEP 1: Summary snapshot -->
+        <div id="plannerStep1" class="card" style="margin-top:0">
+          <div class="card-title" style="margin-bottom:4px">📋 Your week at a glance</div>
+          <div class="card-sub" id="plannerWeekLabel">Week of —</div>
+          <div id="plannerSummaryText" style="font-size:14.5px;line-height:1.6;color:var(--ink-soft);margin:12px 0 18px;padding:14px;background:var(--paper-2);border-radius:var(--radius-sm);border:1px solid var(--line-soft)"></div>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px" id="plannerGlance"></div>
+
+          <div class="card-title" style="font-size:15px;margin-bottom:10px">🏆 Top 3 priorities</div>
+          <div id="plannerTop3"></div>
+
+          <div id="plannerUrgentEmailsWrap" style="display:none;margin-top:16px">
+            <div class="card-title" style="font-size:15px;margin-bottom:10px">⚡ Urgent emails needing replies</div>
+            <div id="plannerUrgentEmails"></div>
+          </div>
+
+          <div id="plannerFreeBlocksWrap" style="display:none;margin-top:16px">
+            <div class="card-title" style="font-size:15px;margin-bottom:10px">🕐 Best days for focus work</div>
+            <div id="plannerFreeBlocks"></div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Fill-in prompts (one at a time) -->
+        <div id="plannerStep2" class="card" style="display:none;margin-top:0">
+          <div class="card-title" style="margin-bottom:4px">💬 Quick questions</div>
+          <div class="card-sub">Answer these so your plan is complete. Skip any you're not sure about.</div>
+          <div id="plannerPrompts" style="margin-top:16px"></div>
+          <button class="btn btn-soft" style="margin-top:12px;font-size:12px" onclick="plannerSkipPrompts()">Skip all &amp; use defaults</button>
+        </div>
+
+        <!-- STEP 3: Confirm actions -->
+        <div id="plannerStep3" class="card" style="display:none;margin-top:0">
+          <div class="card-title" style="margin-bottom:4px">✅ Confirm what to create</div>
+          <div class="card-sub">Toggle off anything you don't want. Then hit <strong>Confirm &amp; create</strong>.</div>
+
+          <div id="plannerNoActions" style="display:none;padding:20px;text-align:center;color:var(--ink-soft);font-size:13.5px">
+            Nothing to create automatically — your plan is saved above.
+          </div>
+
+          <div id="plannerActionList" style="margin-top:16px;display:flex;flex-direction:column;gap:10px"></div>
+
+          <div id="plannerConfirmSummary" style="margin-top:16px;font-size:13px;color:var(--ink-soft);font-weight:600;padding:12px 14px;background:var(--paper-2);border-radius:var(--radius-sm);border:1px solid var(--line-soft)"></div>
+        </div>
+
+        <!-- Post-confirm: undo banner -->
+        <div id="plannerUndoBanner" style="display:none;background:var(--low-bg);border:1px solid #CFE4D8;border-radius:var(--radius-sm);padding:14px 18px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div style="font-size:13.5px;color:var(--low);font-weight:600">✓ Items created! Changed your mind?</div>
+          <button class="btn btn-soft" style="font-size:12px" id="plannerUndoBtn" onclick="plannerUndo()">↩ Undo (5 min)</button>
+        </div>
+
+      </div>
+    </section>
+    <!-- LIFE OS — fictional template examples -->
+    <section class="view" id="view-lifeos">
+      <div class="section-title"><div><h2>✦ Life OS</h2><p>Example routines and planning ideas — replace these with your own.</p></div></div>
+      <div class="grid2">
+        <div class="card"><div class="card-title">🌅 Example morning anchors</div><div class="los-check"><div class="los-cb"></div><div><div class="los-ct">Drink water and review today</div><div class="los-cs">A small, repeatable start.</div></div></div><div class="los-check"><div class="los-cb"></div><div><div class="los-ct">Pack bags near the door</div><div class="los-cs">Reduce last-minute searching.</div></div></div></div>
+        <div class="card"><div class="card-title">🌙 Example evening reset</div><div class="los-check"><div class="los-cb"></div><div><div class="los-ct">Ten-minute kitchen reset</div><div class="los-cs">Stop when the timer ends.</div></div></div><div class="los-check"><div class="los-cb"></div><div><div class="los-ct">Choose tomorrow's top task</div><div class="los-cs">One priority is enough.</div></div></div></div>
+      </div>
+      <div class="card" style="margin-top:14px"><div class="card-title">🧠 Template note</div><p style="font-size:13px;color:var(--ink-soft);line-height:1.6">This page intentionally contains generic fictional examples. Personalise the routines, family labels, locations and planning windows before using it.</p></div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Move to folder modal -->
+<div id="moveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:16px;padding:24px;width:min(360px,90vw);box-shadow:0 8px 40px rgba(0,0,0,.18)">
+    <div style="font-weight:700;font-size:16px;margin-bottom:6px">📁 Move to folder</div>
+    <div style="font-size:13px;color:var(--ink-soft);margin-bottom:16px">Choose a Gmail label to file this email under.</div>
+    <div id="labelList" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
+    <button class="btn btn-soft" style="margin-top:16px;width:100%" onclick="closeMoveModal()">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG  —  edit these to point at your local helper & home
+   ============================================================ */
+const CONFIG = {
+  backend: "http://localhost:4000",   // the local helper (server.js). Leave as-is.
+  lat: -27.47, lon: 153.03,           // Example coordinates — replace with your location
+  workStart: 8,                        // start of your planning window (24h)
+  workEnd: 18,                         // end of your planning window
+  pickupHour: 15,                      // school-pickup-ish boundary (no deep focus blocks after)
+  ai: false                             // smart brain-dump parsing (works in your AI workspace; falls back to rules elsewhere)
+};
+
+/* ============================================================
+   SAMPLE DATA  —  shown until the local helper is connected.
+   Mirrors exactly the JSON shape server.js returns.
+   ============================================================ */
+/* Timezone-safe date helpers — Brisbane is UTC+10 with no DST, so
+   toISOString().slice(0,10) shifts the calendar day back for the first
+   ~10 hours of every local day (midnight–10am, exactly morning-check-the-hub
+   time). Always build date strings from LOCAL getters instead. */
+function ymd(y,m,d){ return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+const todayISO = ymd(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate());
+function at(h,m){const d=new Date();d.setHours(h,m||0,0,0);return d.toISOString();}
+function dayOffset(n){const d=new Date();d.setDate(d.getDate()+n);return ymd(d.getFullYear(),d.getMonth()+1,d.getDate());}
+
+const SAMPLE = {
+  calendar: [
+    {title:"School drop-off",       start:at(8,30),  end:at(9,0),   location:"Riverside Primary", calendar:"Family"},
+    {title:"Example Services — client calls",start:at(9,30), end:at(10,30), location:"Home office",    calendar:"Work"},
+    {title:"Flow Reformer Pilates", start:at(10,30), end:at(11,30), location:"Local Wellness Studio",       calendar:"Health"},
+    {title:"client invoicing block",  start:at(11,0),  end:at(12,0),  location:"",               calendar:"Work"}, // overlaps pilates
+    {title:"School pick-up",        start:at(15,0),  end:at(15,30), location:"Riverside Primary", calendar:"Family"},
+    {title:"School Committee Special Meeting",   start:at(18,30), end:at(19,30), location:"School hall",     calendar:"School Committee"}
+  ],
+  reminders: [
+    {title:"Pay payment plan instalment", list:"Life Admin", due:todayISO,      priority:1, energy:"low",  minutes:10, done:false},
+    {title:"Submit client claims (PACE)", list:"Example Services", due:todayISO,     priority:1, energy:"high", minutes:60, done:false},
+    {title:"School Committee treasurer report draft", list:"School Committee",     due:dayOffset(1),  priority:1, energy:"high", minutes:90, done:false},
+    {title:"Reply to school newsletter", list:"School Committee",     due:dayOffset(-1), priority:0, energy:"low",  minutes:15, done:false},
+    {title:"Book Buddy's vet check", list:"Life Admin",   due:dayOffset(2),  priority:0, energy:"low",  minutes:10, done:false},
+    {title:"Publish 2 online shop listings", list:"Sample Creative Shop", due:dayOffset(3), priority:0, energy:"high", minutes:45, done:false},
+    {title:"Meal plan + the supermarket order", list:"Life Admin", due:todayISO,    priority:0, energy:"low",  minutes:30, done:false},
+    {title:"Sort camping gear for July", list:"Caravan & Camping", due:dayOffset(20), priority:0, energy:"low", minutes:60, done:false}
+  ],
+  emails: [
+    {from:"Example Services Co", subject:"Outstanding invoice #4821 — needs approval today", snippet:"Hi Alex, the attached invoice is awaiting your approval so we can release payment. Could you confirm by EOD?", time:"8:12am", category:"urgent", needsReply:true},
+    {from:"Riverside Primary School Committee", subject:"Agenda items for special meeting?", snippet:"Just checking if you'd like anything added to the treasurer section before tonight's meeting.", time:"7:40am", category:"action", needsReply:true},
+    {from:"online shop", subject:"Your shop reinstatement update", snippet:"We've reviewed your account. Please see the details regarding next steps for Sample Creative Shop.", time:"Yesterday", category:"action", needsReply:false},
+    {from:"Bank — Example Bank", subject:"Your statement is ready", snippet:"Your latest account statement is now available to view in the Example Bank app.", time:"Yesterday", category:"low", needsReply:false},
+    {from:"Client — R.M.", subject:"Re: plan budget question", snippet:"Thanks so much for the explanation — that clears it up. No reply needed, just wanted to say thank you!", time:"Mon", category:"waiting", needsReply:false},
+    {from:"Local Wellness Studio", subject:"Class schedule changes next week", snippet:"A few of next week's Reformer times are shifting. Have a look and rebook if needed.", time:"Mon", category:"low", needsReply:false}
+  ]
+};
+
+/* ============================================================
+   LIVE  —  your REAL data, synced by your assistant from Google Calendar,
+   Apple Reminders & Gmail. Replaced each time you say
+   "refresh my hub". Shown instead of SAMPLE on load.
+   ============================================================ */
+const LIVE_SYNCED_AT = "Template example";
+const LIVE_SYNCED_ISO = new Date().toISOString();
+const LIVE = structuredClone(SAMPLE);
+
+
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let state = { live:true, source:"synced",
+  data:{ calendar:structuredClone(LIVE.calendar), reminders:structuredClone(LIVE.reminders), emails:structuredClone(LIVE.emails) },
+  starred:structuredClone(LIVE.starred),
+  taskFilter:"all", emailFilter:"all", notes:"", wins:[], weekOffset:0, monthOffset:0 };
+
+/* ============================================================
+   DATA LAYER  —  try the helper, gracefully fall back to demo
+   ============================================================ */
+async function syncAll(manual){
+  const ico = document.getElementById('refreshIco');
+  ico.classList.add('spin');
+  setStatus('syncing');
+  let ok = false, stillLoading = false;
+  try{
+    const res = await fetch(`${CONFIG.backend}/api/all`, {signal: AbortSignal.timeout(6000)});
+    if(res.ok){
+      const json = await res.json();
+      stillLoading = !!json.loading;
+      state.data = { calendar: json.calendar||[], reminders: json.reminders||[], emails: json.emails||[] };
+      state.starred = json.starred || [];
+      state.live = true; state.source = stillLoading ? "loading" : "live"; ok = true;
+    }
+  }catch(e){ /* helper not running */ }
+  if(!ok){
+    state.live = false;
+    if(state.source === "import"){
+      setStatus('imported');
+    } else if(state.source === "synced"){
+      setStatus('synced');          // keep your assistant-synced snapshot — no helper needed
+    } else {
+      state.source = "demo";
+      state.data = structuredClone(SAMPLE);
+      setStatus('demo');
+    }
+  } else if(stillLoading){
+    setStatus('loading');
+    // poll every 5 s until the background cache is ready
+    setTimeout(syncAll, 5000);
+  } else {
+    setStatus('live');
+  }
+  renderAll();
+  setTimeout(()=>ico.classList.remove('spin'),400);
+  if(ok && !stillLoading) toast("Synced calendar, reminders & email");
+  else if(stillLoading) toast("Reading your Calendar… won't be long");
+  else if(state.source==="synced"){ if(manual) toast("Showing your data from "+LIVE_SYNCED_AT+" — ask your assistant to “refresh my hub” for the latest ✨"); }
+  else if(state.source!=="import") toast("Helper offline — showing demo data");
+}
+
+function setStatus(mode){
+  const s=document.getElementById('status'), t=document.getElementById('statusTxt');
+  const live = (mode==='live'||mode==='imported'||mode==='synced');
+  s.className='status '+(live?'live':mode==='syncing'||mode==='loading'?'':'demo');
+  t.textContent = mode==='live'?'Live · connected':mode==='synced'?('Synced ✓ · '+LIVE_SYNCED_AT):mode==='imported'?'Loaded ✓ from Shortcut':mode==='syncing'?'Syncing…':mode==='loading'?'Loading your data…':'Demo data';
+}
+
+/* ---- Import data from an Apple Shortcut (the no-terminal path) ---- */
+function applyImported(json){
+  let obj;
+  try{ obj = typeof json==="string" ? JSON.parse(json) : json; }
+  catch(e){ toast("Hmm — that didn't look like valid data. Re-run the Shortcut and try again."); return false; }
+  // accept {calendar,reminders,emails} or {events,reminders}; drop the "_end" placeholder rows
+  const cal = (obj.calendar || obj.events || []).filter(e=>(e.title||e.name)!=="_end");
+  const rem = (obj.reminders || obj.tasks || []).filter(r=>(r.title||r.name)!=="_end");
+  // normalise reminders: infer energy/minutes the same way the helper does
+  const norm = rem.map(r=>{
+    let energy = r.energy||"medium", minutes = r.minutes||20, title = r.title||r.name||"";
+    const mm = title.match(/~\s*(\d+)\s*m/i); if(mm) minutes=parseInt(mm[1]);
+    if(/\[hi\]/i.test(title)) energy="high"; if(/\[lo\]/i.test(title)) energy="low";
+    if(energy==="medium"){
+      if(/\b(write|draft|report|plan|design|build|reconcile|prepare)\b/i.test(title)) energy="high";
+      if(/\b(call|email|reply|pay|book|order|send|file)\b/i.test(title)){energy="low"; if(!mm) minutes=15;}
+    }
+    title = title.replace(/~\s*\d+\s*m|\[hi\]|\[lo\]/gi,'').replace(/\s+/g,' ').trim();
+    return { title, list:r.list||"Reminders", due:r.due?String(r.due).slice(0,10):null,
+             priority:r.priority?1:0, energy, minutes, done:!!r.done };
+  });
+  state.data = { calendar: cal, reminders: norm, emails: state.data.emails && state.source!=="demo" ? state.data.emails : [] };
+  state.source = "import"; state.live = false;
+  setStatus('imported'); renderAll();
+  toast(`Loaded ${cal.length} events + ${norm.length} tasks from your Shortcut ✨`);
+  return true;
+}
+function importFromPaste(){
+  const v=document.getElementById('importPaste').value.trim();
+  if(!v){toast("Paste your Shortcut output into the box first");return;}
+  if(applyImported(v)) document.getElementById('importPaste').value='';
+}
+function importFromFile(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=()=>applyImported(reader.result);
+  reader.readAsText(f);
+  ev.target.value='';
+}
+
+/* ============================================================
+   PRIORITISATION ENGINE  (pure logic — runs on any data)
+   ============================================================ */
+function startOfToday(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function endOfToday(){const d=new Date();d.setHours(23,59,59,999);return d;}
+function fmtT(iso){const d=new Date(iso);let h=d.getHours(),m=d.getMinutes();const ap=h<12?'am':'pm';h=h%12||12;return `${h}${m?':'+String(m).padStart(2,'0'):''}${ap}`;}
+
+function todaysEvents(){
+  const s=startOfToday(), e=endOfToday();
+  return state.data.calendar
+    .filter(ev=>{const st=new Date(ev.start);return st>=s&&st<=e;})
+    .sort((a,b)=>new Date(a.start)-new Date(b.start));
+}
+function findClashes(evs){
+  const clash=new Set();
+  for(let i=0;i<evs.length;i++)for(let j=i+1;j<evs.length;j++){
+    if(new Date(evs[i].start)<new Date(evs[j].end) && new Date(evs[j].start)<new Date(evs[i].end)){clash.add(i);clash.add(j);}
+  }
+  return clash;
+}
+// score a reminder for "do this today" urgency
+function scoreReminder(r){
+  let s=0;
+  const due = r.due ? new Date(r.due+"T23:59:59") : null;
+  if(due){
+    if(due < startOfToday()) s+=100;            // overdue
+    else if(due <= endOfToday()) s+=60;          // due today
+    else { const days=(due-startOfToday())/864e5; s+= Math.max(0,30-days*4); }
+  }
+  if(r.priority>=1) s+=25;
+  if(r.minutes && r.minutes<=15) s+=6;           // quick wins nudge up
+  return s;
+}
+function classify(r){
+  const due=r.due?new Date(r.due+"T23:59:59"):null;
+  if(due && due<startOfToday()) return 'overdue';
+  if(due && due<=endOfToday()) return 'today';
+  return 'upcoming';
+}
+
+function buildPlan(){
+  const evs = todaysEvents();
+  const clashes = findClashes(evs);
+  const active = state.data.reminders.filter(r=>!r.done);
+  const ranked = active.map(r=>({...r,score:scoreReminder(r),when:classify(r)})).sort((a,b)=>b.score-a.score);
+
+  const must  = ranked.filter(r=>r.score>=60);            // overdue or due today / high priority — used for Top 3, NOT the day schedule
+  const should= ranked.filter(r=>r.score>=20 && r.score<60);
+  const could = ranked.filter(r=>r.score<20);
+  const top3  = ranked.slice(0,3);
+  // strictly what's actually due — this (not the fuzzy score buckets above) is what fills today's
+  // schedule, so a high-priority reminder due next week can't get slotted in as an 8am focus block today
+  const dueOrOverdue = ranked.filter(r=>r.when==='today'||r.when==='overdue');
+
+  return {evs, clashes, ranked, must, should, could, top3, dueOrOverdue};
+}
+
+// place must/should tasks into the gaps between today's events
+function buildSchedule(plan){
+  const slots=[];
+  const now=new Date();
+  let cursor=new Date(); cursor.setHours(Math.max(CONFIG.workStart, now.getHours()),0,0,0);
+  if(now.getHours()<CONFIG.workStart) cursor.setHours(CONFIG.workStart,0,0,0);
+  const dayEnd=new Date(); dayEnd.setHours(CONFIG.workEnd,0,0,0);
+
+  // merge events as fixed blocks
+  const fixed = plan.evs.map(e=>({start:new Date(e.start),end:new Date(e.end),ev:e}))
+                       .filter(b=>b.end>cursor).sort((a,b)=>a.start-b.start);
+
+  const focusQueue=[...plan.dueOrOverdue];
+  let qi=0, placedBreak=false;
+
+  function pushTask(start,mins){
+    if(qi>=focusQueue.length) return null;
+    const t=focusQueue[qi++];
+    const end=new Date(start.getTime()+Math.min(mins,t.minutes||30)*60000);
+    return {start:new Date(start),end,task:t};
+  }
+
+  fixed.forEach(b=>{
+    // gap before this event
+    while(cursor < b.start){
+      const gapMin=(b.start-cursor)/60000;
+      if(gapMin>=20 && qi<focusQueue.length && cursor.getHours()<CONFIG.pickupHour+1){
+        const block=pushTask(cursor, Math.min(gapMin, 60));
+        slots.push({type:'task', ...block});
+        cursor=block.end;
+      } else if(gapMin>=15){
+        slots.push({type:'gap', start:new Date(cursor), end:new Date(b.start)});
+        cursor=new Date(b.start);
+      } else { cursor=new Date(b.start); }
+    }
+    slots.push({type:'event', start:b.start, end:b.end, ev:b.ev});
+    cursor = b.end>cursor?new Date(b.end):cursor;
+    if(!placedBreak && cursor.getHours()>=12 && cursor.getHours()<14){
+      // gentle lunch nudge
+    }
+  });
+  // trailing gap → fill with remaining focus tasks
+  while(cursor<dayEnd && qi<focusQueue.length && cursor.getHours()<CONFIG.pickupHour){
+    const block=pushTask(cursor,45);
+    slots.push({type:'task',...block});
+    cursor=block.end;
+  }
+  return slots;
+}
+
+/* ============================================================
+   RENDERERS
+   ============================================================ */
+function renderAll(){
+  renderHeader(); renderDeadlines(); renderAcrossHub(); renderWeeklyReflect();
+  renderToday(); renderQuestToday(); renderWeek(); renderMonth(); renderTasks(); renderEmail();
+}
+
+function renderHeader(){
+  const h=new Date().getHours();
+  document.getElementById('greeting').textContent =
+    `Good ${h<12?'morning':h<17?'afternoon':'evening'}, Alex`;
+  document.getElementById('dateLine').textContent =
+    new Date().toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+
+function fmtTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',hour12:true}).toLowerCase().replace(' ','');
+}
+function calDotColor(calName=''){
+  const c = calName.toLowerCase();
+  if(c.includes('work')||c.includes('bay')) return '#4285f4';
+  if(c.includes('health')||c.includes('fitness')) return '#0b8043';
+  if(c.includes('family')) return '#e67c73';
+  if(c.includes('p&c')||c.includes('school')) return '#f4511e';
+  if(c.includes('personal')) return '#8e24aa';
+  return '#9aa0a6';
+}
+function renderCalSnap(evs, clashes){
+  const sub = document.getElementById('calSnapSub');
+  const snap = document.getElementById('calSnap');
+  if(!snap) return;
+  if(!evs.length){
+    if(sub) sub.textContent = 'Nothing in the calendar today — a clear run.';
+    snap.innerHTML = `<div class="empty" style="padding:8px 0">No events scheduled 🎉</div>`;
+    return;
+  }
+  const sorted = [...evs].sort((a,b)=>new Date(a.start)-new Date(b.start));
+  const now = new Date();
+  if(sub) sub.textContent = `${sorted.length} event${sorted.length!==1?'s':''} today`;
+  snap.innerHTML = sorted.map(e=>{
+    const start = new Date(e.start), end = new Date(e.end);
+    const isPast = end < now;
+    const isNow  = start <= now && end > now;
+    const isClash = clashes && clashes.has(e);
+    const dur = Math.round((end-start)/60000);
+    const durStr = dur>=60 ? `${Math.floor(dur/60)}h${dur%60?` ${dur%60}m`:''}` : `${dur}m`;
+    return `<div class="cal-event${isClash?' clash':''}" style="opacity:${isPast?'.45':'1'}">
+      <div class="ev-time">
+        ${fmtTime(e.start)}<br><span style="font-weight:500;font-size:10.5px">${durStr}</span>
+        ${isNow?'<br><span style="color:var(--action);font-weight:700;font-size:10px">NOW</span>':''}
+      </div>
+      <div class="ev-body">
+        <div class="ev-title">
+          <span class="ev-dot" style="background:${calDotColor(e.calendar)}"></span>${esc(e.title)}
+          ${isClash?'<span style="font-size:11px;color:var(--urgent);margin-left:6px">⚠ clash</span>':''}
+        </div>
+        <div class="ev-meta">
+          ${e.calendar?`<span>${esc(e.calendar)}</span>`:''}
+          ${e.location?`<span> · 📍 ${esc(e.location)}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+/* ---- daily routines (morning / afternoon) ---- */
+const RTN_KEY = "template_hq_routines_v1";
+const ROUTINES = {
+  m: { title:"🌅 Morning routine", sub:"A gentle on-ramp. No need to earn it — just start.",
+    steps:[
+      {id:"m0", em:"📵", t:"No phone for the first 15 minutes"},
+      {id:"m1", em:"☕", t:"Make a coffee — drink it sitting down"},
+      {id:"m2", em:"🪟", t:"Look out a window or step outside"},
+      {id:"m3", em:"💊", t:"Meds + a big glass of water"},
+      {id:"m4", em:"🧠", t:"5-min brain dump → pick today's Top 3"},
+    ]},
+  a: { title:"🌇 Afternoon reset", sub:"Refuel and steady the ship. One loop, then carry on.",
+    steps:[
+      {id:"a0", em:"🍎", t:"Eat something proper"},
+      {id:"a1", em:"💧", t:"Refill your water"},
+      {id:"a2", em:"🚶", t:"Move for 5 min — stretch or a lap outside"},
+      {id:"a3", em:"🧹", t:"One tidy loop — clear a single surface"},
+      {id:"a4", em:"🎯", t:"Glance at what's left — pick just ONE thing"},
+    ]},
+};
+let rtnMode = new Date().getHours() < 12 ? 'm' : 'a';
+function loadRtn(){ try{ return JSON.parse(localStorage.getItem(RTN_KEY))||{}; }catch(e){ return {}; } }
+function saveRtn(o){ try{ localStorage.setItem(RTN_KEY, JSON.stringify(o)); }catch(e){} }
+function setRoutine(m){ rtnMode=m; renderRoutines(); }
+function toggleRtn(id){
+  const today=todayISO, all=loadRtn();
+  // prune to today so it resets each day + doesn't bloat
+  const day = all[today] && all[today].__d===today ? all[today] : {__d:today};
+  day[id] = !day[id];
+  saveRtn({[today]:day});
+  renderRoutines();
+}
+function renderRoutines(){
+  const R=ROUTINES[rtnMode]; if(!R) return;
+  document.getElementById('rtnTitle').textContent=R.title;
+  document.getElementById('rtnSub').textContent=R.sub;
+  document.getElementById('rtnBtnM').classList.toggle('on', rtnMode==='m');
+  document.getElementById('rtnBtnA').classList.toggle('on', rtnMode==='a');
+  const day=loadRtn()[todayISO]||{};
+  const doneN=R.steps.filter(s=>day[s.id]).length;
+  document.getElementById('rtnSteps').innerHTML = R.steps.map(s=>{
+    const on=!!day[s.id];
+    return `<div class="rtn-step ${on?'done':''}" onclick="toggleRtn('${s.id}')">
+      <div class="rbox">${on?'✓':''}</div>
+      <div class="rem">${s.em}</div>
+      <div class="rtxt">${esc(s.t)}</div>
+    </div>`;
+  }).join('');
+  const msg=document.getElementById('rtnDoneMsg');
+  if(doneN===R.steps.length){ msg.style.display='block'; msg.textContent = rtnMode==='m' ? "That's the whole routine — you've set yourself up beautifully. 🌟" : "All done. You reset — proud of you. 🌿"; }
+  else { msg.style.display='none'; }
+}
+
+function renderToday(){
+  const plan=buildPlan();
+  const dueTodayN=plan.ranked.filter(r=>r.when==='today'&&!r.done).length;
+  const overdue=plan.ranked.filter(r=>r.when==='overdue').length;
+
+  // daily routine
+  renderRoutines();
+
+  // calendar snapshot
+  renderCalSnap(plan.evs, plan.clashes);
+
+  // glance
+  document.getElementById('glance').innerHTML = `
+    <div class="g"><div class="num">${plan.evs.length}</div><div class="lbl">events today</div></div>
+    <div class="g ${overdue?'alert':''}"><div class="num">${overdue}</div><div class="lbl">overdue tasks</div></div>
+    <div class="g ${plan.clashes.size?'alert':''}"><div class="num">${plan.clashes.size?plan.clashes.size/2:0}</div><div class="lbl">clashes</div></div>
+    <div class="g"><div class="num">${dueTodayN}</div><div class="lbl">due today</div></div>`;
+
+  // top 3
+  document.getElementById('top3').innerHTML = plan.top3.length ? plan.top3.map((t,i)=>`
+    <div class="pri">
+      <div class="rank">Priority ${i+1}</div>
+      <div class="txt">${esc(t.title)}</div>
+      <div class="meta">
+        <span>📋 ${esc(t.list)}</span>
+        ${t.when==='overdue'?'<span style="color:var(--urgent);font-weight:700">⚠ Overdue</span>':t.when==='today'?'<span style="color:var(--action);font-weight:700">Due today</span>':''}
+        <span>~${t.minutes||30}m</span>
+      </div>
+    </div>`).join('') : `<div class="empty">Nothing urgent — enjoy the breathing room.</div>`;
+
+  // Today tab — only overdue + due today, sorted by priority
+  const todayReminders = plan.ranked.filter(r => {
+    if(!r.due) return false;
+    const d = new Date(r.due+'T23:59:59');
+    return d <= endOfToday(); // overdue + today
+  }).sort((a,b) => b.priority - a.priority || (a.due||'').localeCompare(b.due||''));
+  const overdueToday = todayReminders.filter(r => new Date(r.due+'T23:59:59') < startOfToday());
+  const dueToday    = todayReminders.filter(r => new Date(r.due+'T23:59:59') >= startOfToday());
+  let mscHtml = '';
+  if(overdueToday.length) mscHtml += `<div class="date-group"><div class="date-group-header overdue">⚠ Overdue <span class="pill-count">${overdueToday.length}</span></div>${overdueToday.map(taskRow).join('')}</div>`;
+  if(dueToday.length)    mscHtml += `<div class="date-group"><div class="date-group-header today">Today <span class="pill-count">${dueToday.length}</span></div>${dueToday.map(taskRow).join('')}</div>`;
+  document.getElementById('msc').innerHTML = mscHtml || `<div class="empty">Nothing due today 🎉</div>`;
+
+  // schedule
+  const slots=buildSchedule(plan);
+  document.getElementById('timeline').innerHTML = slots.length ? slots.map(s=>{
+    const time=fmtT(s.start.toISOString());
+    if(s.type==='event') return `<div class="slot"><div class="time">${time}</div><div class="block event">${esc(s.ev.title)}<small>${s.ev.location?esc(s.ev.location)+' · ':''}${fmtT(s.start.toISOString())}–${fmtT(s.end.toISOString())}</small></div></div>`;
+    if(s.type==='task')  return `<div class="slot"><div class="time">${time}</div><div class="block focus">🎯 ${esc(s.task.title)}<small>Focus block · ~${Math.round((s.end-s.start)/60000)}m</small></div></div>`;
+    if(s.type==='gap')   return `<div class="slot"><div class="time">${time}</div><div class="block gap">Open time — breathe, or pull from "could do"</div></div>`;
+    return '';
+  }).join('') : `<div class="empty">No events today — a blank canvas. Pick your Top 3 and go.</div>`;
+}
+
+function taskRow(t){
+  const tags=[`<span class="tag list">${esc(t.list)}</span>`];
+  if(t.when==='overdue') tags.push(`<span class="tag over">⚠ overdue</span>`);
+  else if(t.when==='today') tags.push(`<span class="tag today">due today</span>`);
+  if(t.energy) tags.push(`<span class="tag energy">${t.energy} energy</span>`);
+  if(t.minutes) tags.push(`<span class="tag time">~${t.minutes}m</span>`);
+  return `<div class="task ${t.done?'done':''}" data-id="${esc(t.title)}">
+    <div class="check" data-task="${esc(t.title)}" onclick="toggleTask(this.dataset.task)"></div>
+    <div class="t-body"><div class="t-name">${esc(t.title)}</div><div class="t-tags">${tags.join('')}</div></div>
+    <button class="btn btn-soft" style="padding:6px 9px;font-size:12px" onclick="sendDashboardToQuests('${encodeURIComponent(t.title)}')" title="Send to Quests" aria-label="Send to Quests">🌙</button>
+  </div>`;
+}
+
+const QUEST_INBOX_KEY='template_lifehub_quest_inbox_v1';
+function openQuests(){ try{ parent.show('quest'); }catch(e){ location.href='../quest/'; } }
+function sendDashboardToQuests(encodedTitle){
+  const title=decodeURIComponent(encodedTitle), ref='dashboard:'+title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const saved=readJSON('template_ncg_save_v1',{}), inbox=readJSON(QUEST_INBOX_KEY,[]);
+  if((saved.quests||[]).some(q=>q.externalRef===ref)||inbox.some(q=>q.id===ref)) return;
+  inbox.push({id:ref,title,realm:'admin',difficulty:'easy',minutes:15,source:'Dashboard'});
+  localStorage.setItem(QUEST_INBOX_KEY,JSON.stringify(inbox)); renderQuestToday();
+}
+function renderQuestToday(){
+  const el=document.getElementById('questTodayCard'); if(!el) return;
+  const s=readJSON('template_ncg_save_v1',{}), p=s.player||{level:1,xp:0}, quests=(s.quests||[]).filter(q=>!q.completed&&!q.locked);
+  const next=quests.sort((a,b)=>(a.minutes||15)-(b.minutes||15))[0], today=todayISO();
+  const stars=(s.log||[]).filter(x=>x.t===today).length, need=Math.round(55+42*Math.pow(p.level||1,1.42));
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="font-size:25px" aria-hidden="true">🌙</div>
+    <div style="flex:1;min-width:190px"><div class="card-title" style="margin:0">Next Quest</div>
+      <div style="font-size:14px;margin-top:3px">${next?esc(next.title):'Your sky is clear — add a tiny win when you are ready.'}</div></div>
+    <div style="display:flex;gap:15px;font-size:12px;color:var(--ink-soft)"><span><b style="color:var(--ink)">${stars}</b> Today’s stars</span><span>Level ${p.level||1} · ${p.xp||0}/${need}</span></div>
+    <button class="btn btn-soft" onclick="openQuests()">Open Quests</button>
+  </div>`;
+}
+
+function shiftWeek(dir){
+  if(dir===0){ state.weekOffset=0; }
+  else { state.weekOffset=Math.min(4, Math.max(-1, state.weekOffset+dir)); }
+  renderWeek();
+}
+
+function renderWeek(){
+  const today=new Date();
+  // Monday of the current real week
+  const baseMonday=new Date(today); baseMonday.setDate(today.getDate()-((today.getDay()+6)%7)); baseMonday.setHours(0,0,0,0);
+  // Shift by weekOffset weeks
+  const start=new Date(baseMonday); start.setDate(baseMonday.getDate()+state.weekOffset*7);
+
+  const names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const weekLabel=start.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+  const weekEnd=new Date(start); weekEnd.setDate(start.getDate()+6);
+  const weekEndLabel=weekEnd.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+
+  const isCurrentWeek=state.weekOffset===0;
+  document.getElementById('weekTitle').textContent=isCurrentWeek?'This week': state.weekOffset===1?'Next week':`Week of ${weekLabel}`;
+  document.getElementById('weekRange').textContent=`${weekLabel} – ${weekEndLabel}`;
+  document.getElementById('weekPrevBtn').style.opacity=state.weekOffset<=-1?'0.4':'1';
+  document.getElementById('weekNextBtn').style.opacity=state.weekOffset>=4?'0.4':'1';
+
+  let html='';
+  for(let i=0;i<7;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const dayEvs=state.data.calendar.filter(e=>new Date(e.start).toDateString()===d.toDateString())
+                  .sort((a,b)=>new Date(a.start)-new Date(b.start));
+    const clashes=findClashes(dayEvs);
+    const isToday=d.toDateString()===today.toDateString();
+    const load=Math.min(100, dayEvs.reduce((m,e)=>m+(new Date(e.end)-new Date(e.start))/36e5,0)/8*100);
+    html+=`<div class="wday ${isToday?'today':''}">
+      <div class="wname">${names[i]}</div>
+      <div class="wnum">${d.getDate()}</div>
+      <div class="load"><span style="width:${load}%"></span></div>
+      ${dayEvs.slice(0,4).map((e,idx)=>`<div class="wev ${clashes.has(idx)?'clash':''}"><span class="et">${fmtT(e.start)}</span> ${esc(e.title)}</div>`).join('')}
+      ${dayEvs.length>4?`<div class="mcount">+${dayEvs.length-4} more</div>`:''}
+      ${dayEvs.length===0?`<div class="mcount" style="color:var(--low)">Open day ✓</div>`:''}
+    </div>`;
+  }
+  document.getElementById('week').innerHTML=html;
+
+  // Tasks for this displayed week
+  const weekDays=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
+  const wkStart=weekDays[0], wkEnd=new Date(weekDays[6]); wkEnd.setHours(23,59,59,999);
+  const weekRems=state.data.reminders.filter(r=>!r.done&&r.due&&new Date(r.due+'T23:59:59')>=wkStart&&new Date(r.due+'T23:59:59')<=wkEnd);
+  const dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  let wHtml='';
+  weekDays.forEach((d,i)=>{
+    const dayRems=weekRems.filter(r=>new Date(r.due+'T23:59:59').toDateString()===d.toDateString()).sort((a,b)=>b.priority-a.priority);
+    if(!dayRems.length) return;
+    const isToday=d.toDateString()===today.toDateString();
+    const isPast=d<startOfToday()&&!isToday;
+    wHtml+=`<div class="date-group"><div class="date-group-header ${isPast?'overdue':isToday?'today':''}">${dayNames[i]} ${d.getDate()} <span class="pill-count">${dayRems.length}</span></div>${dayRems.map(taskRow).join('')}</div>`;
+  });
+  document.getElementById('weekTasks').innerHTML=wHtml||`<div class="empty">No tasks due this week 🎉</div>`;
+}
+
+function shiftMonth(dir){
+  if(dir===0){ state.monthOffset=0; }
+  else { state.monthOffset+=dir; }
+  renderMonth();
+}
+
+function renderMonth(){
+  const today=new Date();
+  const y=today.getFullYear(), baseM=today.getMonth();
+  // Apply offset
+  const displayDate=new Date(y, baseM+state.monthOffset, 1);
+  const dy=displayDate.getFullYear(), dm=displayDate.getMonth();
+
+  const monthStart=new Date(dy,dm,1), monthEnd=new Date(dy,dm+1,0,23,59,59,999);
+  document.getElementById('monthTitle').textContent=displayDate.toLocaleDateString('en-AU',{month:'long',year:'numeric'});
+  document.getElementById('monthHead').innerHTML=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(n=>`<div class="mhead">${n}</div>`).join('');
+
+  const startPad=(new Date(dy,dm,1).getDay()+6)%7;
+  const days=new Date(dy,dm+1,0).getDate();
+
+  // Colour map for calendar names → consistent dot colours
+  const calColors=['#7E78AE','#E8927C','#5E9277','#C68A2E','#C75B45','#4A90D9','#9B59B6'];
+  const calColorMap={};
+  let colorIdx=0;
+  function calColor(name){
+    if(!calColorMap[name]) calColorMap[name]=calColors[colorIdx++%calColors.length];
+    return calColorMap[name];
+  }
+
+  let html='';
+  for(let i=0;i<startPad;i++) html+=`<div class="mcell out"></div>`;
+  for(let d=1;d<=days;d++){
+    const date=new Date(dy,dm,d);
+    const evs=state.data.calendar
+      .filter(e=>new Date(e.start).toDateString()===date.toDateString())
+      .sort((a,b)=>new Date(a.start)-new Date(b.start));
+    const hours=evs.reduce((s,e)=>s+(new Date(e.end)-new Date(e.start))/36e5,0);
+    const isToday=date.toDateString()===today.toDateString();
+    const isPast=date<startOfToday()&&!isToday;
+    const busyCls=hours>=4?'busy':evs.length>0?'light':'';
+    // Show up to 3 events with time + title; remainder as "+N more"
+    const shown=evs.slice(0,3);
+    const extra=evs.length-shown.length;
+    html+=`<div class="mcell ${busyCls} ${isToday?'today':''}" style="${isPast?'opacity:.65':''}">
+      <div class="d" style="${isToday?'color:var(--coral);font-weight:700':''}">${d}</div>
+      ${shown.map(e=>`<div class="wev" style="font-size:10.5px;padding:3px 5px;margin-top:3px;border-radius:6px">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${calColor(e.calendar||'')};margin-right:3px;flex-shrink:0;vertical-align:middle"></span><span class="et" style="font-size:10px">${fmtT(e.start)}</span> ${esc(e.title.length>18?e.title.slice(0,16)+'…':e.title)}
+      </div>`).join('')}
+      ${extra>0?`<div class="mcount" style="margin-top:2px">+${extra} more</div>`:''}
+    </div>`;
+  }
+  document.getElementById('month').innerHTML=html;
+
+  // Tasks this month
+  const monthRems=state.data.reminders
+    .filter(r=>!r.done&&r.due&&new Date(r.due+'T23:59:59')>=monthStart&&new Date(r.due+'T23:59:59')<=monthEnd)
+    .sort((a,b)=>a.due.localeCompare(b.due)||b.priority-a.priority);
+  const monthGroups={};
+  monthRems.forEach(r=>{if(!monthGroups[r.due])monthGroups[r.due]=[];monthGroups[r.due].push(r);});
+  const mHtml=Object.keys(monthGroups).sort().map(due=>{
+    const d=new Date(due+'T12:00:00');
+    const label=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+    const isToday=d.toDateString()===today.toDateString();
+    const isPast=d<startOfToday();
+    return `<div class="date-group"><div class="date-group-header ${isPast?'overdue':isToday?'today':''}">${label} <span class="pill-count">${monthGroups[due].length}</span></div>${monthGroups[due].map(taskRow).join('')}</div>`;
+  }).join('');
+  document.getElementById('monthTasks').innerHTML=mHtml||`<div class="empty">No tasks due this month 🎉</div>`;
+}
+
+function renderTasks(){
+  const all=state.data.reminders.map(r=>({...r,when:classify(r)}));
+  let list=all;
+  const f=state.taskFilter;
+  if(f==='overdue') list=all.filter(r=>r.when==='overdue'&&!r.done);
+  else if(f==='today') list=all.filter(r=>r.when==='today'&&!r.done);
+  else if(f==='high') list=all.filter(r=>r.energy==='high'&&!r.done);
+  else if(f==='low') list=all.filter(r=>r.energy==='low'&&!r.done);
+  else if(f==='quick') list=all.filter(r=>(r.minutes||99)<15&&!r.done);
+  list.sort((a,b)=>scoreReminder(b)-scoreReminder(a));
+  document.getElementById('taskList').innerHTML = list.length?list.map(taskRow).join(''):`<div class="empty">No tasks match this filter.</div>`;
+}
+
+function emailRow(e, idx, fromStarred=false){
+  const catClass = fromStarred ? 'starred' : e.category;
+  const unreadDot = fromStarred && e.unread ? '<span class="starred-dot">●</span>' : '';
+  const emailId = esc(e.id || '');
+  return `<div class="email" id="email-row-${emailId}">
+    <div class="cat ${catClass}"></div>
+    <div class="ebody">
+      <div class="efrom"><span>${unreadDot}${esc(e.from)} ${e.needsReply?'<span class="reply-flag">✱ reply today</span>':''}</span><span class="etime">${esc(e.time)}</span></div>
+      <div class="esubj">${esc(e.subject)}</div>
+      <div class="esnip">${esc(e.snippet)}</div>
+      <div class="eact">
+        <span class="ecat-lbl ${e.category}">${e.category}</span>
+        ${fromStarred && e.unread ? '<span class="ecat-lbl" style="background:#fff3e0;color:#e65100">unread</span>' : ''}
+        <button class="mini" onclick="taskFromEmail(${idx})">+ Add as task</button>
+        ${e.needsReply?'<button class="mini">↩ Draft reply</button>':''}
+        ${emailId ? `<button class="mini mini-move" onclick="openMoveModal('${emailId}')">📁 Move</button>` : ''}
+        ${emailId ? `<button class="mini mini-del" onclick="deleteEmail('${emailId}')">🗑 Delete</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+function renderEmail(){
+  const allEmails = state.data.emails;
+  // Separate newsletters from main triage
+  const triage = allEmails.filter(e=>e.category!=='newsletter');
+  const newsletters = allEmails.filter(e=>e.category==='newsletter');
+  // Apply filter (newsletter filter never applies to main triage list)
+  let list = state.emailFilter==='all' ? triage : triage.filter(e=>e.category===state.emailFilter);
+  document.getElementById('emailList').innerHTML = list.length
+    ? list.map(e=>emailRow(e, allEmails.indexOf(e))).join('')
+    : `<div class="empty">Inbox zero in this category ✨</div>`;
+  // Flagged section badge
+  const flaggedBadge = document.getElementById('flaggedBadge');
+  const flaggedListEl = document.getElementById('flaggedList');
+  const starredEmails = state.starred || [];
+  if(flaggedBadge) flaggedBadge.textContent = starredEmails.length ? `${starredEmails.length} flagged` : '0';
+  if(flaggedListEl && flaggedListEl.style.display!=='none'){
+    flaggedListEl.innerHTML = starredEmails.length
+      ? starredEmails.map((e,i)=>emailRow(e, i, true)).join('')
+      : `<div class="empty">No flagged emails.</div>`;
+  }
+  // Newsletter section badge
+  const badge = document.getElementById('newsletterBadge');
+  const nlList = document.getElementById('newsletterList');
+  if(badge) badge.textContent = newsletters.length ? `${newsletters.length} unread` : '0';
+  if(nlList && nlList.style.display!=='none'){
+    nlList.innerHTML = newsletters.length
+      ? newsletters.map(e=>emailRow(e, allEmails.indexOf(e))).join('')
+      : `<div class="empty">No newsletters right now.</div>`;
+  }
+}
+function toggleFlagged(){
+  const el = document.getElementById('flaggedList');
+  const chevron = document.getElementById('flaggedChevron');
+  if(!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if(chevron){ chevron.textContent = open?'▲':'▼'; chevron.classList.toggle('open', open); }
+  if(open){
+    const starredEmails = state.starred || [];
+    el.innerHTML = starredEmails.length
+      ? starredEmails.map((e,i)=>emailRow(e, i, true)).join('')
+      : `<div class="empty">No flagged emails. Star something in Gmail and it'll show here.</div>`;
+  }
+}
+function toggleNewsletters(){
+  const nlList = document.getElementById('newsletterList');
+  const chevron = document.getElementById('newsletterChevron');
+  const allEmails = state.data.emails;
+  const newsletters = allEmails.filter(e=>e.category==='newsletter');
+  if(!nlList) return;
+  const open = nlList.style.display === 'none';
+  nlList.style.display = open ? 'block' : 'none';
+  if(chevron){ chevron.textContent = open?'▲':'▼'; chevron.classList.toggle('open', open); }
+  if(open){
+    nlList.innerHTML = newsletters.length
+      ? newsletters.map(e=>emailRow(e, allEmails.indexOf(e))).join('')
+      : `<div class="empty">No newsletters right now.</div>`;
+  }
+}
+
+function renderDeadlines(){
+  const upcoming=state.data.reminders.filter(r=>!r.done&&r.due)
+    .map(r=>({...r,d:new Date(r.due+'T23:59:59')}))
+    .sort((a,b)=>a.d-b.d).slice(0,5);
+  document.getElementById('deadlines').innerHTML = upcoming.length?upcoming.map(r=>{
+    const days=Math.round((new Date(r.due+'T00:00:00')-startOfToday())/864e5);
+    const lbl=days<0?`${Math.abs(days)}d ago`:days===0?'Today':days===1?'Tomorrow':`${days}d`;
+    const cls=days<0?'':days<=1?'soon':'later';
+    return `<div class="deadline"><div class="when ${cls}">${lbl}</div><div class="what">${esc(r.title)}</div></div>`;
+  }).join(''):`<div class="empty">No deadlines set.</div>`;
+}
+
+/* ============================================================
+   INTERACTIONS
+   ============================================================ */
+function switchView(v,el){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelector('.sidebar')?.classList.remove('open');
+  window.scrollTo(0,0);
+  if(v==='planner'){planner.currentStep=1;plannerRender();}
+  if(v==='weekly') renderWeek();
+  if(v==='monthly') renderMonth();
+}
+function filterTasks(f,el){state.taskFilter=f;document.querySelectorAll('#taskFilters .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderTasks();}
+function filterEmail(f,el){state.emailFilter=f;document.querySelectorAll('[data-efilter]').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderEmail();}
+
+/* ---- email actions: delete & move ---- */
+let _gmailLabels = null;
+let _moveTargetId = null;
+
+function removeEmailRow(id){
+  const row = document.getElementById('email-row-' + id);
+  if(row){ row.classList.add('removing'); setTimeout(()=>row.remove(), 320); }
+  // also remove from state so re-renders don't bring it back
+  state.data.emails = state.data.emails.filter(e=>e.id !== id);
+  state.starred = (state.starred||[]).filter(e=>e.id !== id);
+}
+
+async function deleteEmail(id){
+  if(!state.live){ toast("Connect to live data first"); return; }
+  if(!confirm("Move this email to Trash?")) return;
+  try {
+    removeEmailRow(id);
+    await fetch(`${CONFIG.backend}/api/email/trash`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id})});
+    toast("Moved to Trash ✓");
+  } catch(e){ toast("Couldn't delete — try again"); }
+}
+
+async function openMoveModal(id){
+  if(!state.live){ toast("Connect to live data first"); return; }
+  _moveTargetId = id;
+  const modal = document.getElementById('moveModal');
+  const labelList = document.getElementById('labelList');
+  modal.style.display = 'flex';
+  labelList.innerHTML = '<div style="padding:12px;color:var(--ink-soft);font-size:13px">Loading your folders…</div>';
+  if(!_gmailLabels){
+    try {
+      const r = await fetch(`${CONFIG.backend}/api/email/labels`);
+      _gmailLabels = await r.json();
+    } catch(e){ _gmailLabels = []; }
+  }
+  if(!_gmailLabels.length){
+    labelList.innerHTML = '<div style="padding:12px;color:var(--ink-soft);font-size:13px">No folders found in Gmail. Create a label in Gmail first.</div>';
+    return;
+  }
+  labelList.innerHTML = _gmailLabels.map(l=>`
+    <button class="label-btn" onclick="doMoveEmail('${esc(l.id)}', '${esc(l.name)}')">${esc(l.name)}</button>
+  `).join('');
+}
+
+function closeMoveModal(){
+  document.getElementById('moveModal').style.display = 'none';
+  _moveTargetId = null;
+}
+
+async function doMoveEmail(labelId, labelName){
+  closeMoveModal();
+  if(!_moveTargetId) return;
+  const id = _moveTargetId;
+  try {
+    removeEmailRow(id);
+    await fetch(`${CONFIG.backend}/api/email/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, labelId})});
+    toast(`Moved to ${labelName} ✓`);
+  } catch(e){ toast("Couldn't move — try again"); }
+}
+
+// Close modal if backdrop is clicked
+document.getElementById('moveModal')?.addEventListener('click', function(e){ if(e.target===this) closeMoveModal(); });
+
+function toggleTask(id){
+  const r=state.data.reminders.find(x=>x.title===id);
+  if(r){ r.done=!r.done; renderToday(); renderTasks(); renderDeadlines();
+    if(r.done) addWin(r.title); else { state.wins=state.wins.filter(w=>w!==r.title); renderWins(); }
+    if(state.live){ fetch(`${CONFIG.backend}/api/reminders/toggle`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:id,done:r.done})}).catch(()=>{}); }
+  }
+}
+
+function addWin(text){ if(!text||!text.trim()) return; state.wins.unshift(text.trim()); renderWins(); }
+function renderWins(){
+  const el=document.getElementById('winsList'); if(!el) return;
+  el.innerHTML = state.wins.length
+    ? state.wins.map(w=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--action)">✓</span><span>${esc(w)}</span></div>`).join('')
+    : `<div style="font-size:12px;color:var(--ink-soft)">Nothing yet — go get one!</div>`;
+}
+
+/* ---- Also today, across your hub — Life Admin due/overdue + Money's daily
+   check-in, read directly from their localStorage (same-origin). Deliberately
+   leaves out anything (like Kids' sport times) that's stored as free text
+   rather than a real date — safer to omit than to guess wrong about "today". */
+function renderAcrossHub(){
+  const el=document.getElementById('acrossHubList'); if(!el) return;
+  const today=todayISO;
+  const rows=[];
+
+  const admin=readJSON('template_la_items',[]);
+  const daysAway=(iso)=>{ if(!iso) return 9999; return Math.round((new Date(iso+'T00:00:00')-new Date(today+'T00:00:00'))/864e5); };
+  const overdue=admin.filter(i=>!i.done&&daysAway(i.nextDue)<0);
+  const dueSoon=admin.filter(i=>!i.done&&daysAway(i.nextDue)>=0&&daysAway(i.nextDue)<=2);
+  if(overdue.length) rows.push({e:'⏰',t:`${overdue.length} overdue in Life Admin`,sub:overdue.slice(0,3).map(i=>i.name).join(', ')});
+  if(dueSoon.length) rows.push({e:'📌',t:`${dueSoon.length} due in the next 2 days`,sub:dueSoon.slice(0,3).map(i=>i.name).join(', ')});
+
+  const daily=readJSON('template_fin_daily',null);
+  if(daily&&daily.date===today){
+    const n=Object.values(daily.done||{}).filter(Boolean).length;
+    if(n<5) rows.push({e:'💰',t:`Money check-in: ${n} of 5 done today`});
+  }
+
+  document.getElementById('acrossHubList').innerHTML = rows.length
+    ? rows.map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><div style="display:flex;gap:8px;align-items:center"><span>${r.e}</span><span>${r.t}</span></div>${r.sub?`<div style="font-size:11px;color:var(--ink-faint);margin:2px 0 0 24px">${esc(r.sub)}</div>`:''}</div>`).join('')
+    : `<div style="font-size:12px;color:var(--ink-soft)">Nothing outstanding there right now ✓</div>`;
+}
+
+/* ---- Weekly reflection — a quiet tally pulled from other modules' localStorage
+   (same-origin, so this frame can read them directly). Monday-anchored week,
+   matching the convention used across the hub (kitchen.html/beauty.html weekKey). */
+function mondayOfThisWeek(){
+  const d=new Date(); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); d.setHours(0,0,0,0);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function readJSON(key,fallback){ try{ const v=localStorage.getItem(key); return v==null?fallback:JSON.parse(v); }catch(e){ return fallback; } }
+function renderWeeklyReflect(){
+  const el=document.getElementById('weeklyReflectList'); if(!el) return;
+  const monday=mondayOfThisWeek();
+  const rows=[];
+
+  const homeLog=readJSON('template_home_log',[]);
+  const homeN=homeLog.filter(l=>l.date>=monday).length;
+  if(homeN) rows.push({e:'🏠',t:`${homeN} home task${homeN===1?'':'s'} done`});
+
+  const planDone=readJSON('template_plan_done',{});
+  const planN=Object.keys(planDone).filter(k=>k.split('|')[0]>=monday).length;
+  if(planN) rows.push({e:'📆',t:`${planN} planner block${planN===1?'':'s'} ticked off`});
+
+  const books=readJSON('template_book_books',[]);
+  const bookN=books.filter(b=>b.finished&&b.finished>=monday).length;
+  if(bookN) rows.push({e:'📖',t:`${bookN} book${bookN===1?'':'s'} finished`});
+
+  const rdone=readJSON('template_bty_routine_done',null);
+  const routine=readJSON('template_bty_routine',[]);
+  if(rdone&&rdone.week===monday&&routine.length){
+    const done=Object.values(rdone.done||{}).filter(Boolean).length;
+    if(done) rows.push({e:'💗',t:`${done} of ${routine.length} self-care things done`});
+  }
+
+  let questN=0;
+  try{ const save=readJSON('template_ncg_save_v1',null); if(save&&save.log) questN=save.log.filter(l=>l.t>=monday).length; }catch(e){}
+  if(questN) rows.push({e:'🌙',t:`${questN} star${questN===1?'':'s'} lit in your Quests`});
+
+  document.getElementById('weeklyReflectList').innerHTML = rows.length
+    ? rows.map(r=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${r.e}</span><span>${r.t}</span></div>`).join('')
+      + `<div style="font-size:11px;color:var(--ink-faint);margin-top:8px">Money tab → Review has your weekly stretch tips too.</div>`
+    : `<div style="font-size:12px;color:var(--ink-soft)">The week's just getting started — check back as you go.</div>`;
+}
+
+function taskFromEmail(i){
+  const e=state.data.emails[i];
+  const t={title:`Reply: ${e.subject}`.slice(0,60), list:"Life Admin", due:todayISO,
+           priority:e.category==='urgent'?1:0, energy:'low', minutes:15, done:false, when:'today'};
+  state.data.reminders.unshift(t);
+  if(state.live){ fetch(`${CONFIG.backend}/api/reminders/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)}).catch(()=>{}); }
+  renderToday(); renderTasks(); renderDeadlines();
+  toast(`Added "${t.title}" to your tasks`);
+}
+
+/* Brain dump parser — rule-based, works everywhere.
+   Conventions:  !urgent  #action  ~30m   list:Work   today/tomorrow  */
+async function processBrainDump(){
+  const raw=document.getElementById('brainInput').value.trim();
+  if(!raw){toast("Type something to convert first");return;}
+  toast("Sorting that into tasks…");
+  let tasks = await aiParseBrainDump(raw).catch(()=>null);
+  if(!tasks || !tasks.length) tasks = ruleParseBrainDump(raw);
+  if(!tasks.length){toast("Couldn't find a task in there — try one idea per line");return;}
+  addTasks(tasks);
+  if(state.live){ fetch(`${CONFIG.backend}/api/notes/apple`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:raw})}).catch(()=>{}); }
+  document.getElementById('brainInput').value='';
+  toast(`Captured ${tasks.length} task${tasks.length>1?'s':''} — saved to Apple Notes too`);
+}
+
+/* rule-based parser — works everywhere, no internet needed */
+function ruleParseBrainDump(raw){
+  const out=[];
+  raw.split('\n').map(l=>l.trim()).filter(Boolean).forEach(line=>{
+    let due=null, priority=0, energy='medium', minutes=20, list='Brain Dump';
+    if(/!urgent|!!/i.test(line)) priority=1;
+    const mins=line.match(/~\s*(\d+)\s*m/i); if(mins) minutes=parseInt(mins[1]);
+    const lst=line.match(/list:\s*([A-Za-z &]+)/i); if(lst) list=lst[1].trim();
+    if(/\btoday\b/i.test(line)){due=todayISO;priority=Math.max(priority,1);}
+    if(/\btomorrow\b/i.test(line)) due=dayOffset(1);
+    if(/#action|@action/i.test(line)) energy='high';
+    if(/\bcall\b|\bemail\b|\bpay\b|\bbook\b/i.test(line)&&minutes>=20){energy='low';minutes=Math.min(minutes,15);}
+    const title=line.replace(/!urgent|!!|~\s*\d+\s*m|list:\s*[A-Za-z &]+|#action|@action/gi,'')
+                    .replace(/\b(today|tomorrow)\b/gi,'').replace(/\s+/g,' ').trim();
+    if(title) out.push({title,list,due,priority,energy,minutes,done:false});
+  });
+  return out;
+}
+
+/* AI parser — only fires inside your AI workspace; returns null on any failure so the rules take over */
+async function aiParseBrainDump(raw){
+  if(!CONFIG.ai) return null;
+  const sys=`You turn a messy brain-dump into clean tasks. Today is ${todayISO}. Return ONLY a JSON array — no prose, no markdown fences. Each item: {"title": short action-first string with no tags, "list": one of "Brain Dump","Life Admin","Example Services","School Committee","Sample Creative Shop","Caravan & Camping", "due": "YYYY-MM-DD" or null, "priority": 0 or 1, "energy": "low"|"medium"|"high", "minutes": integer estimate}. Infer due dates from words like today, tomorrow, Friday. Set priority 1 if it's urgent or due today.`;
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514", max_tokens:1000,
+        messages:[{role:"user", content:`${sys}\n\nBrain dump:\n${raw}`}]}),
+      signal:AbortSignal.timeout(15000)
+    });
+    if(!res.ok) return null;
+    const data=await res.json();
+    const text=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").replace(/```json|```/g,"").trim();
+    const arr=JSON.parse(text);
+    return Array.isArray(arr) ? arr.map(t=>({title:t.title,list:t.list||"Brain Dump",due:t.due||null,
+      priority:t.priority?1:0,energy:t.energy||"medium",minutes:t.minutes||20,done:false})) : null;
+  }catch(e){ return null; }
+}
+
+function addTasks(tasks){
+  tasks.forEach(t=>{
+    t.when = t.due?classify({due:t.due}):'upcoming';
+    state.data.reminders.unshift(t);
+    if(state.live){ fetch(`${CONFIG.backend}/api/reminders/add`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)}).catch(()=>{}); }
+  });
+  renderToday(); renderTasks(); renderDeadlines();
+}
+
+
+/* weather — keyless Open-Meteo */
+async function loadWeather(){
+  try{
+    const u=`https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.lat}&longitude=${CONFIG.lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1`;
+    const r=await fetch(u,{signal:AbortSignal.timeout(5000)}); const j=await r.json();
+    const codes={0:['Clear','☀️'],1:['Mainly clear','🌤️'],2:['Partly cloudy','⛅'],3:['Overcast','☁️'],45:['Fog','🌫️'],48:['Fog','🌫️'],51:['Drizzle','🌦️'],61:['Rain','🌧️'],63:['Rain','🌧️'],65:['Heavy rain','🌧️'],80:['Showers','🌦️'],95:['Storms','⛈️']};
+    const c=codes[j.current.weather_code]||['—','🌤️'];
+    document.getElementById('wTemp').textContent=Math.round(j.current.temperature_2m)+'°';
+    document.getElementById('wDesc').textContent=c[0]; document.getElementById('wIco').textContent=c[1];
+    document.getElementById('wHi').textContent=Math.round(j.daily.temperature_2m_max[0])+'°';
+    document.getElementById('wLo').textContent=Math.round(j.daily.temperature_2m_min[0])+'°';
+    document.getElementById('wRain').textContent=(j.daily.precipitation_probability_max[0]??0)+'%';
+  }catch(e){
+    document.getElementById('wTemp').textContent='24°';document.getElementById('wDesc').textContent='Partly cloudy';
+    document.getElementById('wHi').textContent='27°';document.getElementById('wLo').textContent='16°';document.getElementById('wRain').textContent='10%';
+  }
+}
+
+/* helpers */
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+let _tt;
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2600);}
+
+/* stale-sync nudge — shows only when the embedded data is over a day old */
+function checkStale(){
+  try{
+    var el = document.getElementById('staleBanner');
+    if(!el || typeof LIVE_SYNCED_ISO==='undefined') return;
+    var hrs = (Date.now() - new Date(LIVE_SYNCED_ISO).getTime())/36e5;
+    if(!isFinite(hrs) || hrs < 24){ el.style.display='none'; return; }
+    var days = Math.floor(hrs/24);
+    var ago = days>=1 ? (days+(days===1?' day':' days')) : (Math.floor(hrs)+' hours');
+    el.innerHTML = '⚠️ <strong>Your hub data is '+ago+' old.</strong> Ask your assistant to <em>“refresh my hub”</em> for the latest. ✨';
+    el.style.display='block';
+  }catch(e){}
+}
+
+/* boot */
+renderAll();
+checkStale();
+loadWeather();
+syncAll();               // attempts live data immediately, falls back to demo
+setInterval(syncAll, 10*60*1000);   // gentle background re-sync every 10 min
+
+/* ============================================================
+   SUNDAY WEEKLY PLANNER
+   ============================================================ */
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const planner = {
+  draft: null,           // the plan object from the server
+  currentStep: 1,        // 1 = snapshot, 2 = prompts, 3 = confirm
+  totalSteps: 3,
+  promptAnswers: {},     // { promptId: chosenValue }
+  selectedEvents: {},    // { eventId: true/false }
+  selectedReminders: {}, // { reminderId: true/false }
+  undoToken: null
+};
+
+// ── Fetch draft from server ────────────────────────────────────────────────────
+async function plannerFetchDraft() {
+  try {
+    const res = await fetch(`${CONFIG.backend}/planner/draft`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && data.status !== 'none' ? data : null;
+  } catch { return null; }
+}
+
+// ── Run planner now ───────────────────────────────────────────────────────────
+async function plannerRunNow() {
+  const btn = document.getElementById('plannerRunBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Building your plan…'; }
+  try {
+    const res = await fetch(`${CONFIG.backend}/planner/run`, { method: 'POST', signal: AbortSignal.timeout(60000) });
+    if (!res.ok) throw new Error(await res.text());
+    const { plan } = await res.json();
+    planner.draft = plan;
+    plannerRender();
+    toast('✨ Your weekly plan is ready!');
+  } catch (e) {
+    toast('Could not build plan — is the server running?');
+    if (btn) { btn.disabled = false; btn.textContent = '✦ Build my weekly plan'; }
+  }
+}
+
+// ── Dismiss / snooze ──────────────────────────────────────────────────────────
+async function plannerDismiss() {
+  document.getElementById('plannerBanner').style.display = 'none';
+  try { await fetch(`${CONFIG.backend}/planner/dismiss`, { method: 'POST' }); } catch {}
+}
+
+function plannerReview() {
+  document.getElementById('plannerBanner').style.display = 'none';
+  switchView('planner', document.querySelector('[data-view="planner"]'));
+}
+
+// ── Navigate steps ────────────────────────────────────────────────────────────
+function plannerStep(dir) {
+  planner.currentStep = Math.min(planner.totalSteps, Math.max(1, planner.currentStep + dir));
+  plannerRenderStep();
+}
+
+function plannerSkipPrompts() {
+  planner.currentStep = 3;
+  plannerRenderStep();
+}
+
+// ── Confirm & create ──────────────────────────────────────────────────────────
+async function plannerConfirm() {
+  const btn = document.getElementById('plannerConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Creating…'; }
+
+  const draft = planner.draft;
+  if (!draft) { toast('No plan loaded'); return; }
+
+  const events = (draft.suggestedEvents || []).filter(ev => planner.selectedEvents[ev.id] !== false);
+  const reminders = (draft.suggestedReminders || []).filter(r => planner.selectedReminders[r.id] !== false);
+
+  try {
+    const res = await fetch(`${CONFIG.backend}/planner/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events, reminders })
+    });
+    const data = await res.json();
+    planner.undoToken = data.undoToken;
+    planner.draft = { ...draft, status: 'confirmed' };
+
+    // Show undo banner
+    const undoBanner = document.getElementById('plannerUndoBanner');
+    if (undoBanner) undoBanner.style.display = 'flex';
+    setTimeout(() => { if (undoBanner) undoBanner.style.display = 'none'; planner.undoToken = null; }, 5 * 60 * 1000);
+
+    const total = (data.created || []).length;
+    const pending = (data.created || []).filter(c => c.type === 'calendar-event-pending');
+    let msg = `✓ Created ${total} item${total !== 1 ? 's' : ''}`;
+    if (pending.length) msg += ` · ${pending.length} calendar event${pending.length > 1 ? 's' : ''} need adding manually`;
+    toast(msg);
+
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Done!'; }
+    cache && syncAll();
+  } catch (e) {
+    toast('Something went wrong — try again');
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Confirm & create'; }
+  }
+}
+
+// ── Undo ──────────────────────────────────────────────────────────────────────
+async function plannerUndo() {
+  if (!planner.undoToken) return;
+  try {
+    const res = await fetch(`${CONFIG.backend}/planner/undo/${planner.undoToken}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.failed && data.failed.length) {
+      toast(`⚠ Some items need manual deletion in Reminders app`);
+    } else {
+      toast('↩ Undone!');
+    }
+    document.getElementById('plannerUndoBanner').style.display = 'none';
+    planner.undoToken = null;
+  } catch { toast('Undo failed — delete manually in Reminders'); }
+}
+
+// ── Render helpers ─────────────────────────────────────────────────────────────
+function plannerFmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+function plannerDayName(iso) {
+  if (!iso) return '—';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long' });
+}
+
+// ── Render step progress bar ───────────────────────────────────────────────────
+function plannerRenderStep() {
+  const step = planner.currentStep;
+  const pct = Math.round((step / planner.totalSteps) * 100);
+  const labels = ['Review your plan', 'Answer quick questions', 'Confirm what to create'];
+  const hints = ['Step 1 of 3', 'Step 2 of 3', 'Step 3 of 3'];
+
+  document.getElementById('plannerStepBar').style.width = pct + '%';
+  document.getElementById('plannerStepLabel').textContent = hints[step - 1];
+  document.getElementById('plannerStepHint').textContent = labels[step - 1];
+
+  document.getElementById('plannerStep1').style.display = step === 1 ? '' : 'none';
+  document.getElementById('plannerStep2').style.display = step === 2 ? '' : 'none';
+  document.getElementById('plannerStep3').style.display = step === 3 ? '' : 'none';
+
+  document.getElementById('plannerPrevBtn').style.display = step > 1 ? '' : 'none';
+  document.getElementById('plannerNextBtn').style.display = step < planner.totalSteps ? '' : 'none';
+  document.getElementById('plannerConfirmBtn').style.display = step === planner.totalSteps ? '' : 'none';
+}
+
+// ── Render the whole planner view ─────────────────────────────────────────────
+function plannerRender() {
+  const draft = planner.draft;
+  const empty = document.getElementById('plannerEmpty');
+  const content = document.getElementById('plannerContent');
+  const tab = document.getElementById('plannerTab');
+
+  if (!draft || draft.status === 'none') {
+    empty.style.display = '';
+    content.style.display = 'none';
+    if (tab) tab.classList.remove('has-plan');
+    return;
+  }
+
+  empty.style.display = 'none';
+  content.style.display = '';
+  if (tab) tab.classList.add('has-plan');
+
+  // Week label
+  document.getElementById('plannerWeekLabel').textContent = draft.weekLabel || '';
+
+  // Summary text
+  document.getElementById('plannerSummaryText').textContent = draft.summary || '';
+
+  // Glance stats
+  const glance = document.getElementById('plannerGlance');
+  const evCount = (draft.weekEvents || []).length;
+  const taskCount = (draft.top3 || []).length + (draft.suggestedTasks || []).length;
+  const emailCount = (draft.urgentEmails || []).length + (draft.actionEmails || []).length;
+  glance.innerHTML = [
+    { num: evCount, lbl: 'Calendar events' },
+    { num: taskCount, lbl: 'Tasks this week' },
+    { num: emailCount, lbl: 'Emails to action' }
+  ].map(s => `<div class="planner-glance-stat"><div class="stat-num">${s.num}</div><div class="stat-lbl">${esc(s.lbl)}</div></div>`).join('');
+
+  // Top 3 priorities
+  const top3El = document.getElementById('plannerTop3');
+  const top3 = draft.top3 || [];
+  top3El.innerHTML = top3.length
+    ? top3.map((r, i) => `
+      <div class="planner-priority">
+        <div class="rank-badge ${i === 1 ? 'b2' : i === 2 ? 'b3' : ''}">${i + 1}</div>
+        <div>
+          <div class="p-title">${esc(r.title)}</div>
+          <div class="p-meta">
+            ${r.due ? `<span>📅 Due ${plannerFmtDate(r.due)}</span>` : '<span style="color:var(--ink-faint)">No due date</span>'}
+            ${r.energy ? `<span>${r.energy === 'high' ? '🔥' : r.energy === 'low' ? '🌿' : '⚡'} ${r.energy} energy</span>` : ''}
+            ${r.minutes ? `<span>⏱ ~${r.minutes} min</span>` : ''}
+          </div>
+        </div>
+      </div>`).join('')
+    : '<div class="empty">No priorities found — add some reminders with due dates.</div>';
+
+  // Urgent emails
+  const urgEl = document.getElementById('plannerUrgentEmailsWrap');
+  const urgEmails = [...(draft.urgentEmails || []), ...(draft.actionEmails || [])].slice(0, 4);
+  if (urgEmails.length) {
+    urgEl.style.display = '';
+    document.getElementById('plannerUrgentEmails').innerHTML = urgEmails.map(em => `
+      <div style="padding:10px 14px;border-radius:var(--radius-sm);background:var(--urgent-bg);border:1px solid #f5c6c6;margin-bottom:6px">
+        <div style="font-size:13.5px;font-weight:600">${esc(em.subject)}</div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:3px">From: ${esc(em.from)}</div>
+      </div>`).join('');
+  } else {
+    urgEl.style.display = 'none';
+  }
+
+  // Free blocks
+  const freeEl = document.getElementById('plannerFreeBlocksWrap');
+  const blocks = (draft.suggestedBlocks || []).slice(0, 4);
+  if (blocks.length) {
+    freeEl.style.display = '';
+    document.getElementById('plannerFreeBlocks').innerHTML = blocks.map(b => `
+      <div class="planner-free-block">
+        <div class="day-name">${esc(b.dayName.slice(0, 3))}</div>
+        <div class="hours">${b.freeHours}h free · ${esc(b.suggestion)}</div>
+      </div>`).join('');
+  } else {
+    freeEl.style.display = 'none';
+  }
+
+  // Step 2: prompts
+  plannerRenderPrompts();
+
+  // Step 3: actions
+  plannerRenderActions();
+
+  plannerRenderStep();
+}
+
+// ── Render fill-in prompts ────────────────────────────────────────────────────
+function plannerRenderPrompts() {
+  const draft = planner.draft;
+  const prompts = (draft && draft.fillInPrompts) || [];
+  const el = document.getElementById('plannerPrompts');
+
+  if (!prompts.length) {
+    el.innerHTML = '<div class="empty" style="padding:16px">No questions needed — your plan looks complete! ✓</div>';
+    return;
+  }
+
+  el.innerHTML = prompts.map(p => `
+    <div class="planner-prompt" id="prompt-${esc(p.id)}">
+      <div class="prompt-text">${esc(p.prompt)}</div>
+      <div class="prompt-opts">
+        ${(p.options || []).map(opt => `
+          <button onclick="plannerChoosePrompt('${esc(p.id)}', '${esc(opt.value)}', this)"
+                  class="${planner.promptAnswers[p.id] == opt.value ? 'chosen' : ''}">${esc(opt.label)}</button>`).join('')}
+      </div>
+      <span class="prompt-skip" onclick="plannerSkipPrompt('${esc(p.id)}')">Skip this one</span>
+    </div>`).join('');
+}
+
+function plannerChoosePrompt(id, value, btn) {
+  planner.promptAnswers[id] = value;
+  // Visually mark chosen
+  const prompt = document.getElementById('prompt-' + id);
+  if (prompt) prompt.querySelectorAll('button').forEach(b => b.classList.remove('chosen'));
+  if (btn) btn.classList.add('chosen');
+}
+
+function plannerSkipPrompt(id) {
+  const el = document.getElementById('prompt-' + id);
+  if (el) el.style.opacity = '0.4';
+}
+
+// ── Render confirm actions ────────────────────────────────────────────────────
+function plannerRenderActions() {
+  const draft = planner.draft;
+  const events = (draft && draft.suggestedEvents) || [];
+  const reminders = (draft && draft.suggestedReminders) || [];
+  const list = document.getElementById('plannerActionList');
+  const noActions = document.getElementById('plannerNoActions');
+  const summary = document.getElementById('plannerConfirmSummary');
+
+  if (!events.length && !reminders.length) {
+    noActions.style.display = '';
+    list.innerHTML = '';
+    summary.textContent = '';
+    return;
+  }
+  noActions.style.display = 'none';
+
+  const eventItems = events.map(ev => {
+    if (planner.selectedEvents[ev.id] === undefined) planner.selectedEvents[ev.id] = true;
+    return `<div class="planner-action-item">
+      <input type="checkbox" id="evck-${esc(ev.id)}" ${planner.selectedEvents[ev.id] ? 'checked' : ''}
+             onchange="planner.selectedEvents['${esc(ev.id)}'] = this.checked; plannerUpdateSummary()">
+      <div>
+        <div class="action-title">${esc(ev.title)}</div>
+        <div class="action-meta">📅 ${plannerFmtDate(ev.date)} · ~${ev.durationMins || 60} min · ${esc(ev.calendar)}</div>
+        <span class="action-type calendar">Calendar event</span>
+        ${ev.note ? `<div style="font-size:11.5px;color:var(--ink-faint);margin-top:4px">ℹ ${esc(ev.note)}</div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  const reminderItems = reminders.map(r => {
+    if (planner.selectedReminders[r.id] === undefined) planner.selectedReminders[r.id] = true;
+    return `<div class="planner-action-item">
+      <input type="checkbox" id="rmck-${esc(r.id)}" ${planner.selectedReminders[r.id] ? 'checked' : ''}
+             onchange="planner.selectedReminders['${esc(r.id)}'] = this.checked; plannerUpdateSummary()">
+      <div>
+        <div class="action-title">${esc(r.title)}</div>
+        <div class="action-meta">📋 ${esc(r.list)}${r.dueDate ? ' · Due ' + plannerFmtDate(r.dueDate) : ''}</div>
+        <span class="action-type reminder">Reminder</span>
+      </div>
+    </div>`;
+  });
+
+  list.innerHTML = [...eventItems, ...reminderItems].join('');
+  plannerUpdateSummary();
+}
+
+function plannerUpdateSummary() {
+  const draft = planner.draft;
+  if (!draft) return;
+  const evCount = (draft.suggestedEvents || []).filter(ev => planner.selectedEvents[ev.id] !== false).length;
+  const remCount = (draft.suggestedReminders || []).filter(r => planner.selectedReminders[r.id] !== false).length;
+  const parts = [];
+  if (evCount) parts.push(`${evCount} calendar event${evCount > 1 ? 's' : ''}`);
+  if (remCount) parts.push(`${remCount} reminder${remCount > 1 ? 's' : ''}`);
+  const summary = document.getElementById('plannerConfirmSummary');
+  if (summary) summary.textContent = parts.length ? `Create ${parts.join(' and ')} →` : 'Nothing selected — toggle items above.';
+}
+
+// ── SSE — listen for server push when a new draft is ready ───────────────────
+function plannerConnectSSE() {
+  if (!window.EventSource) return;
+  try {
+    const es = new EventSource(`${CONFIG.backend}/api/events`);
+    es.onmessage = async (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'planner-draft-ready') {
+          const draft = await plannerFetchDraft();
+          if (!draft) return;
+          planner.draft = draft;
+          // Show banner on all tabs
+          const banner = document.getElementById('plannerBanner');
+          if (banner) {
+            const d = new Date(draft.generatedAt);
+            document.getElementById('plannerBannerSub').textContent =
+              'Generated ' + d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+            banner.style.display = 'flex';
+          }
+          // If already on planner tab, render immediately
+          if (document.getElementById('view-planner').classList.contains('active')) plannerRender();
+          // Badge the tab
+          const tab = document.getElementById('plannerTab');
+          if (tab) tab.classList.add('has-plan');
+        }
+      } catch {}
+    };
+    es.onerror = () => { es.close(); setTimeout(plannerConnectSSE, 30000); };
+  } catch {}
+}
+
+// ── On page load / tab switch — fetch latest draft ────────────────────────────
+async function plannerInit() {
+  const draft = await plannerFetchDraft();
+  if (draft) {
+    planner.draft = draft;
+    // Show banner if draft is fresh (< 4h old) and not yet confirmed/dismissed
+    if (draft.status === 'draft') {
+      const age = Date.now() - new Date(draft.generatedAt).getTime();
+      if (age < 4 * 60 * 60 * 1000) {
+        const banner = document.getElementById('plannerBanner');
+        if (banner) {
+          const d = new Date(draft.generatedAt);
+          document.getElementById('plannerBannerSub').textContent =
+            'Generated ' + d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+          banner.style.display = 'flex';
+        }
+      }
+    }
+    // If already on planner tab, render
+    if (document.getElementById('view-planner').classList.contains('active')) plannerRender();
+    // Badge tab
+    const tab = document.getElementById('plannerTab');
+    if (tab) tab.classList.add('has-plan');
+  }
+  plannerConnectSSE();
+}
+
+// ── PWA: register service worker ──────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+}
+
+// ── Refresh on visibility change (coming back to the tab) ─────────────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncAll();
+});
+window.addEventListener('focus', () => syncAll());
+
+// ── Kick off planner init ─────────────────────────────────────────────────────
+plannerInit();
+
+/* ============================================================
+   LIFE OS  —  navigation + interactive helpers
+   ============================================================ */
+
+function losShow(paneId, chipEl) {
+  // Update nav chips
+  document.querySelectorAll('#losNav .chip').forEach(c => c.classList.remove('active'));
+  if (chipEl) chipEl.classList.add('active');
+
+  // Show correct pane
+  document.querySelectorAll('.los-pane').forEach(p => p.classList.remove('active'));
+  const pane = document.getElementById('los-' + paneId);
+  if (pane) pane.classList.add('active');
+
+  // Reset sub-sections in the pane to first active
+  if (pane) {
+    const subs = pane.querySelectorAll('.los-sub');
+    if (subs.length) {
+      subs.forEach(s => s.classList.remove('active'));
+      subs[0].classList.add('active');
+    }
+    const subChips = pane.querySelectorAll('.chip');
+    subChips.forEach((c, i) => { c.classList.remove('active'); if (i === 0) c.classList.add('active'); });
+  }
+}
+
+function losSub(chipEl, subId) {
+  // Find the parent pane and deactivate all subs within it
+  const pane = chipEl.closest('.los-pane');
+  if (!pane) return;
+  pane.querySelectorAll('.los-sub').forEach(s => s.classList.remove('active'));
+  const sub = document.getElementById(subId);
+  if (sub) sub.classList.add('active');
+
+  // Update chips in this group only
+  const chipGroup = chipEl.parentElement;
+  chipGroup.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chipEl.classList.add('active');
+}
+
+function losToggle(el) {
+  el.classList.toggle('done');
+}
+
+/* ============================================================
+   CLEANING SCHEDULE — fully editable & saved to this device
+   ============================================================ */
+const CLEANING_DEFAULT = [
+  {title:"Daily · 10–15 mins", color:"urgent", sub:"", items:[
+    "Wipe kitchen bench","Dishes / dishwasher on","Quick pick-up — common areas",
+    "One load of laundry","Wipe stovetop after cooking","Hang / fold / put away washing"]},
+  {title:"Weekly · 1 Zone Per Day", color:"waiting", sub:"Mon–Fri, 10–20 mins each — one zone, never the whole house", items:[
+    "Mon — Bathrooms (wipe, toilet, floor)","Tue — Vacuum all living areas","Wed — Mop kitchen + bathroom floors",
+    "Thu — Bedrooms (tidy, change sheets)","Fri — Empty & replace all bins","Fri — Wipe mirrors & glass"]},
+  {title:"Fortnightly · Pick a Sunday", color:"action", sub:"", items:[
+    "Clean inside microwave","Wipe appliance exteriors","Clean out fridge",
+    "Dust surfaces + ceiling fans","Vacuum sofas & cushions","Buddy — bedding wash + tidy"]},
+  {title:"Quarterly · 4× per year", color:"low", sub:"", items:[
+    "Deep clean oven","Clean rangehood filter","Descale kettle & coffee machine","Wash curtains or wipe blinds",
+    "Sort + declutter kids' wardrobes","Clean inside pantry","Wipe skirting boards","Test smoke alarms"]},
+  {title:"Half-Yearly · Jan & July", color:"amber", sub:"", items:[
+    "Flip & rotate mattresses","Deep clean bathrooms (grout, tiles)","Clean all windows inside + out",
+    "Declutter kids' toys & books","Check + organise garage / storage","Update emergency kit","Clean washing machine drum"]},
+  {title:"Yearly · Schedule in January", color:"grey", sub:"", items:[
+    "Replace smoke alarm batteries","Full wardrobe declutter (adults)","Pest control","Clean gutters + outside areas",
+    "Deep clean all kitchen cupboards","Service air conditioner filters","Purge + organise all paperwork","Full medicine cabinet + first aid audit"]}
+];
+const CLEAN_KEY = "template_hq_cleaning_v1";
+let cleaningEdit = false;
+function cleaningClone(d){ return d.map(s=>({title:s.title,color:s.color||"grey",sub:s.sub||"",items:(s.items||[]).map(it=> typeof it==="string"?{t:it,done:false}:{t:it.t,done:!!it.done})})); }
+function loadCleaning(){
+  try{ const s=JSON.parse(localStorage.getItem(CLEAN_KEY)); if(s&&Array.isArray(s)&&s.length) return cleaningClone(s); }catch(e){}
+  return cleaningClone(CLEANING_DEFAULT);
+}
+let cleaningState = loadCleaning();
+function saveCleaning(){ try{ localStorage.setItem(CLEAN_KEY, JSON.stringify(cleaningState)); }catch(e){} }
+function cleanAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function cleanColors(c){ return ({urgent:["var(--urgent-bg)","var(--urgent)"],waiting:["var(--waiting-bg)","var(--waiting)"],action:["var(--action-bg)","var(--action)"],low:["var(--low-bg)","var(--low)"],amber:["#FEF3C7","#92400E"],grey:["var(--line-soft)","var(--ink-soft)"]})[c]||["var(--line-soft)","var(--ink-soft)"]; }
+
+function renderCleaning(){
+  const wrap=document.getElementById('cleaningCards'); if(!wrap) return;
+  wrap.innerHTML = cleaningState.map((sec,si)=>{
+    const col=cleanColors(sec.color), bg=col[0], fg=col[1];
+    const pill = cleaningEdit
+      ? `<input value="${cleanAttr(sec.title)}" onchange="cleaningEditTitle(${si},this.value)" title="Edit this label (cadence / days)" style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:${bg};color:${fg};border:1px dashed ${fg};border-radius:20px;padding:4px 10px;font-family:inherit;min-width:220px;max-width:100%">`
+      : `<div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:${bg};color:${fg};margin-bottom:10px">${esc(sec.title)}</div>`;
+    const subLine = cleaningEdit
+      ? `<input value="${cleanAttr(sec.sub)}" placeholder="optional note — e.g. days or timing…" onchange="cleaningEditSub(${si},this.value)" style="display:block;width:100%;font-size:12px;color:var(--ink-soft);border:1px solid var(--line);border-radius:8px;padding:5px 8px;margin:8px 0 10px;font-family:inherit;background:var(--paper-2)">`
+      : (sec.sub?`<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px">${esc(sec.sub)}</div>`:``);
+    const delSec = cleaningEdit ? `<button onclick="cleaningDelSection(${si})" style="float:right;border:1px solid #f5c6c6;background:#fdf0f0;color:#c0392b;border-radius:8px;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;font-family:inherit">✕ section</button>` : ``;
+    const items = sec.items.map((it,ii)=> cleaningEdit
+      ? `<div style="display:flex;gap:6px;align-items:center">`
+          + `<input value="${cleanAttr(it.t)}" onchange="cleaningEditItem(${si},${ii},this.value)" style="flex:1;font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-family:inherit;background:var(--card);color:var(--ink)">`
+          + `<button onclick="cleaningDelItem(${si},${ii})" title="Delete task" style="border:1px solid #f5c6c6;background:#fdf0f0;color:#c0392b;border-radius:8px;font-size:13px;padding:4px 9px;cursor:pointer;font-family:inherit">✕</button>`
+          + `</div>`
+      : `<div class="los-ctask${it.done?' done':''}" onclick="cleaningTick(this,${si},${ii})"><div class="los-ctick"></div><span style="flex:1;min-width:0">${esc(it.t)}</span><button onclick="event.stopPropagation();cleaningToReminder(${si},${ii})" title="Send to Apple Reminders" style="flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink-faint);border-radius:7px;font-size:11px;padding:2px 7px;cursor:pointer;font-family:inherit;text-decoration:none">＋⏰</button></div>`
+    ).join('');
+    const addBtn = cleaningEdit ? `<button onclick="cleaningAddItem(${si})" class="btn btn-soft" style="font-size:12px;padding:7px 12px;margin-top:10px">＋ Add task</button>` : ``;
+    const secRem = !cleaningEdit ? `<button onclick="cleaningSectionToReminders(${si})" title="Send all tasks in this section to Apple Reminders" style="float:right;border:1px solid var(--line);background:var(--paper-2);color:var(--ink-soft);border-radius:8px;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;font-family:inherit">＋⏰ All to Reminders</button>` : ``;
+    return `<div class="card">${delSec}${secRem}${pill}${subLine}<div style="display:grid;grid-template-columns:${cleaningEdit?'1fr':'1fr 1fr'};gap:6px">${items}</div>${addBtn}</div>`;
+  }).join('');
+}
+function cleaningToggleEdit(){
+  cleaningEdit=!cleaningEdit;
+  const b=document.getElementById('cleanEditBtn');
+  if(b){ b.textContent=cleaningEdit?'✓ Done editing':'✏️ Edit schedule'; b.className=cleaningEdit?'btn btn-primary':'btn btn-coral'; }
+  ['cleanAddSectionBtn','cleanResetBtn','cleanEditHint'].forEach(id=>{const e=document.getElementById(id); if(e) e.style.display=cleaningEdit?'':'none';});
+  renderCleaning();
+  if(!cleaningEdit) toast('Cleaning schedule saved ✓');
+}
+function cleaningTick(el,si,ii){ cleaningState[si].items[ii].done=!cleaningState[si].items[ii].done; el.classList.toggle('done'); saveCleaning(); }
+function cleaningEditItem(si,ii,v){ cleaningState[si].items[ii].t=v; saveCleaning(); }
+function cleaningEditTitle(si,v){ cleaningState[si].title=v; saveCleaning(); }
+function cleaningEditSub(si,v){ cleaningState[si].sub=v; saveCleaning(); }
+function cleaningDelItem(si,ii){ cleaningState[si].items.splice(ii,1); saveCleaning(); renderCleaning(); }
+function cleaningAddItem(si){ cleaningState[si].items.push({t:"New task",done:false}); saveCleaning(); renderCleaning(); }
+function cleaningDelSection(si){ if(!confirm('Delete this whole section?')) return; cleaningState.splice(si,1); saveCleaning(); renderCleaning(); }
+function cleaningAddSection(){ cleaningState.push({title:"New Section · when",color:"grey",sub:"",items:[{t:"New task",done:false}]}); saveCleaning(); renderCleaning(); toast('Section added — scroll down'); }
+function cleaningReset(){ if(!confirm('Reset the cleaning schedule back to the original? Your edits will be lost.')) return; cleaningState=cleaningClone(CLEANING_DEFAULT); saveCleaning(); renderCleaning(); toast('Cleaning schedule reset'); }
+
+/* Send cleaning tasks to Apple Reminders via a Shortcut named exactly CLEAN_SHORTCUT_NAME.
+   The Shortcut should: accept Text → Split by New Lines → Repeat → Add Reminder to "Cleaning". */
+const CLEAN_SHORTCUT_NAME = "Add Cleaning Task";
+function runCleanShortcut(text){ window.location.href = "shortcuts://run-shortcut?name="+encodeURIComponent(CLEAN_SHORTCUT_NAME)+"&input=text&text="+encodeURIComponent(text); }
+function cleaningToReminder(si,ii){ const t=cleaningState[si] && cleaningState[si].items[ii] && cleaningState[si].items[ii].t; if(!t){return;} runCleanShortcut(t); toast('Sending to Reminders: '+t); }
+function cleaningSectionToReminders(si){ const ts=(cleaningState[si]?cleaningState[si].items:[]).map(x=>x.t).filter(Boolean); if(!ts.length){toast('No tasks in this section');return;} runCleanShortcut(ts.join('\n')); toast('Sending '+ts.length+' tasks to Reminders…'); }
+renderCleaning();
+
+function losAccord(headEl) {
+  const accord = headEl.parentElement;
+  const wasOpen = accord.classList.contains('open');
+  // Close all accords in this pane
+  const pane = accord.closest('.los-pane, .los-sub');
+  if (pane) pane.querySelectorAll('.los-accord.open').forEach(a => a.classList.remove('open'));
+  if (!wasOpen) accord.classList.add('open');
+}
+
+function losBurnout(btn, level) {
+  const msgs = {
+    good: '<strong>🌟 You\'re in a good place!</strong> Protect what\'s working. This is the time to maintain your self-care — not skip it because you feel fine. Keep Pilates, your evening wind-down, and your Sunday Reset. Use any surplus energy for something genuinely joyful today.',
+    fraying: '<strong>⚠️ Time to top yourself back up.</strong> Something small but essential: a solo lunch walk, an early bedtime tonight, one thing dropped or delegated. This week: put 2 extra self-care things in your calendar and treat them like work appointments. Don\'t wait until you hit red.',
+    red: '<strong>🛑 STOP. You need rest, not more effort.</strong> Cancel one non-essential thing this week. Ask for help — kids\' pickup, a takeaway night, Ange covering something at work. Your one job this week: sleep, nourishment, and doing less. Recovery is the priority. Nothing on your to-do list matters more than you being okay.'
+  };
+  const colours = { good: 'var(--low-bg)', fraying: 'var(--action-bg)', red: 'var(--urgent-bg)' };
+  const msgEl = document.getElementById('los-burnout-msg');
+  msgEl.innerHTML = msgs[level] || '';
+  msgEl.style.display = 'block';
+  msgEl.style.background = colours[level] || 'var(--paper-2)';
+  msgEl.style.borderColor = 'var(--line)';
+
+  // Highlight the chosen button
+  btn.closest('div').querySelectorAll('.btn').forEach(b => {
+    b.style.background = '';
+    b.style.borderColor = '';
+    b.style.color = '';
+    b.classList.remove('btn-primary');
+    b.classList.add('btn-soft');
+  });
+  btn.style.background = colours[level];
+  btn.style.fontWeight = '700';
+}
+</script>
+</body>
+</html>
