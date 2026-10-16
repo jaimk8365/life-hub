@@ -19,7 +19,7 @@
   :root{
     --paper:#F7F3EC; --card:#FFFFFF; --ink:#2B2722; --ink-soft:#6B655C; --ink-faint:#A39C90;
     --line:#E7E0D4; --coral:#E8927C; --mint:#7FB79B; --sunshine:#E6B855;
-    --rail-w:210px; --tabbar-h:62px;
+    --rail-w:236px; --tabbar-h:66px;
     --sat: env(safe-area-inset-top, 0px);
     --sab: env(safe-area-inset-bottom, 0px);
   }
@@ -52,12 +52,28 @@
   nav button.active .ico{filter:none;opacity:1;transform:scale(1.08)}
 
   /* ---- iPad / Mac: left rail ---- */
+  nav .nav-label{display:none}
+  nav button.routebtn{position:relative}
+  .count-badge{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#C94F7C;color:#fff;font-size:10px;font-weight:800}
+  .mobile-bar{display:none}
+  .park-sheet{position:fixed;z-index:40;inset:0;background:#30263D66;display:grid;place-items:center;padding:16px}
+  .park-card{width:min(500px,100%);background:#fff;border:1px solid #E8DFF0;border-radius:22px;padding:22px;box-shadow:0 18px 55px #30263d33}
+  .park-card h2{font:600 25px Fraunces,serif;margin:0 0 6px}
+  .park-card p{color:#675D70;margin:0 0 13px}
+  .park-card textarea{width:100%;min-height:110px;border:1px solid #D9C9FA;border-radius:12px;padding:12px;font:inherit}
+  .park-card .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+  .park-card button{border:0;border-radius:12px;padding:12px 16px;min-height:44px;font-weight:800}
+  .park-card .submit{background:#C94F7C;color:#fff}
+  .park-card .cancel{background:#EEE7FF;color:#30263D}
+  .park-card .park-choices{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .park-card .park-choices button{background:#fff;border:1px solid #E8DFF0}
+  .park-card .park-choices button.selected{background:#30263D;color:#fff}
   @media (min-width:760px){
     .stage{top:0;bottom:0;left:var(--rail-w)}
     nav{
       top:0;bottom:0;left:0;right:auto;width:var(--rail-w);height:auto;
       flex-direction:column;justify-content:flex-start;gap:6px;
-      padding:calc(20px + var(--sat)) 14px 20px;border-top:0;border-right:1px solid var(--line);
+      padding:calc(20px + var(--sat)) 14px 20px;border-top:0;border-right:1px solid var(--line);overflow-y:auto;
     }
     nav::before{
       content:"Jaimi's Life Hub";
@@ -68,8 +84,20 @@
     nav button .ico, nav .finance-link .ico{font-size:19px}
     nav .spacer{flex:1}
     nav .foot{font-size:11px;color:var(--ink-faint);padding:0 10px;line-height:1.5}
+    nav .nav-label{display:block;padding:8px 10px 2px;color:var(--ink-faint);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    nav .nav-label:not(:first-of-type){margin-top:7px}
+    nav button, nav .finance-link{padding:9px 12px}
   }
-  @media (max-width:759px){ nav .foot{display:none} nav .spacer{display:none} nav button.syncbtn{flex:.65} }
+  @media (max-width:759px){
+    nav{display:none}
+    .mobile-bar{position:fixed;z-index:20;display:flex;left:0;right:0;bottom:0;height:calc(var(--tabbar-h) + var(--sab));padding:5px 9px calc(5px + var(--sab));align-items:center;justify-content:space-around;gap:4px;background:rgba(252,250,245,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line)}
+    .mobile-bar button{position:relative;flex:1;min-width:0;height:52px;border:0;border-radius:13px;background:transparent;color:var(--ink-faint);font:700 10px 'Hanken Grotesk',system-ui;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+    .mobile-bar .ico{font-size:20px;line-height:1}
+    .mobile-bar button.active{background:rgba(201,79,124,.13);color:#30263D}
+    .mobile-bar .park-fab{flex:0 0 58px;width:58px;height:58px;margin-top:-18px;border-radius:50%;background:#C94F7C;color:#fff;font-size:25px;box-shadow:0 7px 18px rgba(201,79,124,.35)}
+    .mobile-bar .park-fab span:last-child{display:none}
+    .mobile-bar .count-badge{position:absolute;right:4px;top:1px}
+  }
 
   /* ---- sync button + panel ---- */
   .syncbtn .dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--ink-faint);transition:background .3s}
@@ -97,7 +125,7 @@
   /* ---- More menu (phone only; iPad/Mac rail shows every section) ---- */
   .morebtn{display:none}
   @media (max-width:759px){ nav button.sec{display:none} .morebtn{display:flex} }
-  .morepanel{position:fixed;z-index:30;left:12px;right:12px;bottom:calc(var(--tabbar-h) + var(--sab) + 10px);
+  .morepanel{position:fixed;z-index:30;left:12px;right:12px;bottom:calc(var(--tabbar-h) + var(--sab) + 10px);max-height:calc(100vh - var(--tabbar-h) - var(--sab) - 24px);overflow:auto;
     background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 40px rgba(43,39,34,.18);padding:10px}
   .morepanel h2{font-family:'Fraunces',serif;font-size:14px;font-weight:600;color:var(--ink-faint);margin:6px 10px 6px;text-transform:uppercase;letter-spacing:.06em}
   .morepanel button{display:flex;align-items:center;gap:13px;width:100%;border:0;background:transparent;font-family:inherit;
@@ -110,6 +138,7 @@
 </head>
 <body>
   <div class="stage">
+    <iframe id="f-copilot" title="Co-Pilot"></iframe>
     <iframe id="f-hub" title="Life Hub"></iframe>
     <iframe id="f-quest" title="Night Court Questkeeper"></iframe>
     <iframe id="f-course" title="Brain — mental health"></iframe>
@@ -126,40 +155,74 @@
     <iframe id="f-family" title="Family"></iframe>
   </div>
 
-  <nav>
+  <nav aria-label="Life Hub sections">
+    <span class="nav-label">Your day</span>
+    <button id="b-copilot" class="routebtn" onclick="showCopilot('now')"><span class="ico">🎯</span><span>Now</span></button>
+    <button class="routebtn" onclick="showCopilot('today')"><span class="ico">📅</span><span>Today</span></button>
+    <button class="routebtn" onclick="showCopilot('inbox')"><span class="ico">📥</span><span>Inbox</span><span class="count-badge" data-inbox-count hidden>0</span></button>
+    <button class="routebtn" onclick="showCopilot('ideas')"><span class="ico">💡</span><span>Idea Vault</span></button>
+    <button class="routebtn" onclick="showCopilot('etsy')"><span class="ico">🛍️</span><span>Etsy Studio</span></button>
+    <span class="nav-label">Life</span>
     <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
     <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Planner</span></button>
     <button id="b-tasks" onclick="show('tasks')"><span class="ico">✅</span><span>Tasks</span></button>
-    <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
-    <a id="b-finance" class="finance-link" href="./finance/app.html" target="_blank" rel="noopener"><span class="ico" aria-hidden="true">💰</span><span>Open Finance ↗</span></a>
-    <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
     <button id="b-recipes" class="sec" onclick="show('recipes')"><span class="ico">📖</span><span>Recipes</span></button>
     <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
-    <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📖</span><span>Books</span></button>
-    <button id="b-beauty" class="sec" onclick="show('beauty')"><span class="ico">💄</span><span>Beauty</span></button>
     <button id="b-kids" class="sec" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
-    <button id="b-wardrobe" class="sec" onclick="show('wardrobe')"><span class="ico">👗</span><span>Wardrobe</span></button>
     <button id="b-family" class="sec" onclick="show('family')"><span class="ico">👨‍👩‍👧‍👦</span><span>Family</span></button>
+    <a id="b-finance" class="finance-link" href="./finance/app.html" target="_blank" rel="noopener"><span class="ico" aria-hidden="true">💰</span><span>Open Finance ↗</span></a>
+    <button class="routebtn" onclick="showCopilot('notes')"><span class="ico">🗒️</span><span>Notes</span></button>
+    <span class="nav-label">Just for me</span>
+    <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
+    <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
+    <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📚</span><span>Books</span></button>
+    <button id="b-beauty" class="sec" onclick="show('beauty')"><span class="ico">💄</span><span>Beauty</span></button>
+    <button id="b-wardrobe" class="sec" onclick="show('wardrobe')"><span class="ico">👗</span><span>Wardrobe</span></button>
     <button id="b-more" class="morebtn" onclick="toggleMore()"><span class="ico">⋯</span><span>More</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
-    <span class="foot">One calm place for everything.<br>Ask Claude to “refresh my hub” for fresh data.</span>
+    <span class="foot">One calm place. Park a thought: press .</span>
   </nav>
 
+  <div class="mobile-bar" aria-label="Co-Pilot navigation">
+    <button data-route="now" onclick="showCopilot('now')"><span class="ico">🎯</span><span>Now</span></button>
+    <button data-route="today" onclick="showCopilot('today')"><span class="ico">📅</span><span>Today</span></button>
+    <button class="park-fab" aria-label="Park this thought" onclick="openPark()"><span>＋</span><span>Park</span></button>
+    <button data-route="inbox" onclick="showCopilot('inbox')"><span class="ico">📥</span><span>Inbox</span><span class="count-badge" data-inbox-count hidden>0</span></button>
+    <button id="b-mobile-more" onclick="toggleMore()"><span class="ico">⋯</span><span>More</span></button>
+  </div>
+
   <div class="morepanel" id="morePanel" hidden>
-    <h2>More</h2>
+    <h2>Your day</h2>
+    <button onclick="showCopilot('now')"><span class="ico">🎯</span>Now</button>
+    <button onclick="showCopilot('today')"><span class="ico">📅</span>Today</button>
+    <button onclick="showCopilot('inbox')"><span class="ico">📥</span>Inbox <span class="count-badge" data-inbox-count hidden>0</span></button>
+    <button onclick="showCopilot('ideas')"><span class="ico">💡</span>Idea Vault</button>
+    <button onclick="showCopilot('etsy')"><span class="ico">🛍️</span>Etsy Studio</button>
+    <button onclick="showCopilot('notes')"><span class="ico">🗒️</span>Notes</button>
+    <button onclick="showCopilot('shutdown')"><span class="ico">🌙</span>Shutdown</button>
+    <button onclick="showCopilot('settings')"><span class="ico">⚙️</span>Settings</button>
+    <h2>Life</h2>
+    <button onclick="showFromMore('hub')"><span class="ico">🏡</span>Life Hub</button>
+    <button onclick="showFromMore('plan')"><span class="ico">📆</span>My Planner</button>
+    <button onclick="showFromMore('tasks')"><span class="ico">✅</span>Tasks</button>
     <button onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
     <button onclick="showFromMore('recipes')"><span class="ico">📖</span>Recipes</button>
     <button onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
     <button onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
-    <button onclick="showFromMore('reading')"><span class="ico">📖</span>Book Journal</button>
-    <button onclick="showFromMore('beauty')"><span class="ico">💄</span>Beauty &amp; Self-care</button>
     <button onclick="showFromMore('kids')"><span class="ico">🧒</span>Kids</button>
-    <button onclick="showFromMore('wardrobe')"><span class="ico">👗</span>Wardrobe</button>
     <button onclick="showFromMore('family')"><span class="ico">👨‍👩‍👧‍👦</span>Family</button>
+    <h2>Just for me</h2>
+    <button onclick="showFromMore('course')"><span class="ico">🧠</span>Brain</button>
+    <button onclick="showFromMore('quest')"><span class="ico">🌙</span>Quests</button>
+    <button onclick="showFromMore('reading')"><span class="ico">📚</span>Books</button>
+    <button onclick="showFromMore('beauty')"><span class="ico">💄</span>Beauty</button>
+    <button onclick="showFromMore('wardrobe')"><span class="ico">👗</span>Wardrobe</button>
+    <button onclick="toggleSync()"><span class="ico">🔄</span>Sync</button>
   </div>
+  <div id="parkRoot"></div>
 
   <div class="syncpanel" id="syncPanel" hidden>
     <h2>🔄 Device sync</h2>
@@ -168,23 +231,43 @@
   </div>
 
 <script>
-  const SRC = { hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
+  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
+  const BUTTONS = { copilot:'b-copilot' };
+  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family']);
+  let parkFocus = null;
+  let parkSelection = 'later';
+  let inboxTimer = 0;
+  let pendingCopilotTask = null;
+
+  function showCopilot(route='now'){
+    const f=document.getElementById('f-copilot');
+    if(!f.src||!f.src.includes('/copilot/index.html')){
+      f.src=SRC.copilot+'#'+encodeURIComponent(route);
+      show('copilot');
+      return;
+    }
+    show('copilot');
+    try{f.contentWindow.location.hash=route;}catch(e){}
+    try{f.contentWindow.postMessage({type:'copilot-route',route},location.origin);}catch(e){f.contentWindow.location.hash=route;}
+  }
   function show(which){
     // Keep old user-click navigation calls working without embedding Finance again.
     if (which === 'finance'){ window.open('./finance/app.html', '_blank', 'noopener'); return; }
     if (!Object.prototype.hasOwnProperty.call(SRC, which)) which = 'hub';
     for (const k of Object.keys(SRC)){
-      const f = document.getElementById('f-'+k), b = document.getElementById('b-'+k);
+      const f = document.getElementById('f-'+k), b = document.getElementById(BUTTONS[k]||'b-'+k);
       const on = k === which;
-      if (on && !f.src) f.src = SRC[k];          // lazy-load each section once
+      if (on && !f.src) f.src = SRC[k] + (k==='copilot'?'#now':''); // lazy-load each section once
       f.classList.toggle('active', on);
-      b.classList.toggle('active', on);
+      if(b)b.classList.toggle('active', on);
     }
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
     // on phone, highlight "More" when a tucked-away section is showing
-    const inMore = ['kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family'].includes(which);
+    const inMore = MOBILE_SECTIONS.has(which);
     const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
+    const mobileMore = document.getElementById('b-mobile-more'); if (mobileMore) mobileMore.classList.toggle('active', inMore);
+    document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===(location.hash.slice(1)||'now')));
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
   /* ---- More menu (phone) ---- */
@@ -193,7 +276,7 @@
     document.getElementById('syncPanel').hidden = true;
     p.hidden = !p.hidden;
     if (!p.hidden){ const cur = localStorage.getItem('lifehub_tab');
-      p.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.getAttribute('onclick').includes("'"+cur+"'"))); }
+      p.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.getAttribute('onclick')?.includes("'"+cur+"'"))); }
   }
   function showFromMore(which){ document.getElementById('morePanel').hidden = true; show(which); }
   document.addEventListener('click', (e)=>{
@@ -206,10 +289,14 @@
   const boot = () => {
     if (booted) return;
     booted = true;
-    let saved = 'hub';
-    try { saved = localStorage.getItem('lifehub_tab') || 'hub'; } catch(e){}
+    let saved = null;
+    try { saved = localStorage.getItem('lifehub_tab'); } catch(e){}
     // A previously saved Money tab must not launch a popup during startup.
-    show(saved === 'finance' ? 'hub' : saved);
+    const query=new URLSearchParams(location.search);
+    const requested=query.get('tab')==='copilot'?location.hash.slice(1)||'now':null;
+    if(requested){showCopilot(requested);return;}
+    if(saved){show(saved==='finance'?'hub':saved);return;}
+    showCopilot('now');
   };
   window.addEventListener('lifehub-sync-ready', boot, { once: true });
   setTimeout(boot, 7000);
@@ -297,6 +384,114 @@
     d.className = 'dot ' + ({ok:'ok', err:'err', busy:'busy', locked:'locked'}[e.detail.status] || '');
     const p = document.getElementById('syncPanel');
     if (!p.hidden && e.detail.status !== 'busy') renderSync();
+  });
+
+  function openPark(){
+    if(document.getElementById('parkSheet'))return;
+    parkFocus=document.activeElement;
+    parkSelection='later';
+    document.getElementById('parkRoot').innerHTML=`<div class="park-sheet" id="parkSheet"><section class="park-card" role="dialog" aria-modal="true" aria-labelledby="parkTitle"><p>Not now. It’s saved, so you won’t lose it.</p><h2 id="parkTitle">Park this thought</h2><label for="parkText">What came to mind?</label><textarea id="parkText" autofocus></textarea><div class="park-choices">${[['later','Sort later'],['home','Home task'],['work','Work task'],['idea','Idea'],['etsy','Etsy'],['note','Note']].map(([key,label])=>`<button data-park-choice="${key}" class="${key==='later'?'selected':''}" onclick="selectPark('${key}')">${label}</button>`).join('')}</div><div class="actions"><button class="cancel" onclick="closePark()">Cancel</button><button class="submit" onclick="savePark()">Park it and go back</button></div></section></div>`;
+    const input=document.getElementById('parkText');input?.focus();
+  }
+  function selectPark(value){
+    parkSelection=value;
+    document.querySelectorAll('[data-park-choice]').forEach(button=>button.classList.toggle('selected',button.dataset.parkChoice===value));
+  }
+  function closePark(){
+    document.getElementById('parkRoot').innerHTML='';
+    parkFocus?.focus?.();parkFocus=null;
+  }
+  function recordParkReward(){
+    const rewards=JSON.parse(localStorage.getItem('cp_rewards_v1')||'{}');
+    const log=JSON.parse(localStorage.getItem('cp_log_v1')||'[]');
+    if(!rewards||typeof rewards!=='object'||Array.isArray(rewards)||!log||!Array.isArray(log))throw new Error('Reward data is unreadable; the thought was saved without changing it.');
+    const byDate=rewards.byDate??{};
+    if(!byDate||typeof byDate!=='object'||Array.isArray(byDate))throw new Error('Spark history is unreadable; the thought was saved without changing it.');
+    const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Brisbane',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const next={...rewards,total:Math.max(0,Number(rewards.total)||0)+2,byDate:{...byDate,[date]:(Number(byDate[date])||0)+2},stickers:Array.isArray(rewards.stickers)?[...new Set(rewards.stickers)]:[],unlockedThemes:Array.isArray(rewards.unlockedThemes)?[...new Set(rewards.unlockedThemes)]:[]};
+    const stickerIds=['sprout','moon','star','coffee','sun','little-house','notebook','paintbrush','flower','cloud','rainbow','mug','book','leaf','sparkle','cat','pencil','heart','plant-pot','shell','lantern','butterfly','candle','mountain'];
+    const milestones=[25,60,100,150];for(let value=225;value<=next.total;value+=75)milestones.push(value);
+    for(const milestone of milestones){if(next.total>=milestone){const sticker=stickerIds[milestones.indexOf(milestone)%stickerIds.length];if(!next.stickers.includes(sticker))next.stickers.push(sticker);}}
+    for(const [threshold,theme] of [[100,'sunrise'],[250,'lagoon'],[500,'lavender-dusk'],[1000,'night-court']])if(next.total>=threshold&&!next.unlockedThemes.includes(theme))next.unlockedThemes.push(theme);
+    const cutoff=Date.now()-60*86400000;
+    const entries=log.filter(entry=>entry&&new Date(entry.at).getTime()>=cutoff);
+    entries.push({at:new Date().toISOString(),type:'park'});
+    localStorage.setItem('cp_rewards_v1',JSON.stringify(next));
+    localStorage.setItem('cp_log_v1',JSON.stringify(entries));
+  }
+  function savePark(){
+    const input=document.getElementById('parkText'),text=input?.value.trim();
+    if(!text){input?.focus();return;}
+    let items;
+    try{
+      const raw=localStorage.getItem('cp_inbox_v1');
+      items=raw===null?[]:JSON.parse(raw);
+      if(!Array.isArray(items))throw new Error('Inbox data is not a list.');
+      const suggested=parkSelection==='idea'?{kind:'idea',ideaCat:'someday'}:parkSelection==='note'?{kind:'note'}:parkSelection==='etsy'?{kind:'etsy',area:'etsy',tier:'important',mins:20}:parkSelection==='work'?{kind:'task',area:'work',tier:'important',mins:20}:{kind:'task',area:'home',tier:'important',mins:20};
+      items.push({id:crypto.randomUUID?.()||Date.now().toString(36),text,at:new Date().toISOString(),source:'park',suggested});
+      localStorage.setItem('cp_inbox_v1',JSON.stringify(items));
+      try{recordParkReward();}catch(error){window.alert(error.message||'The thought was saved, but its reward could not be recorded.');}
+      window.dispatchEvent(new CustomEvent('lifehub-park'));
+      const copilot=document.getElementById('f-copilot');
+      if(copilot?.src)copilot.contentWindow.postMessage({type:'copilot-refresh'},location.origin);
+      refreshInboxBadge();
+      closePark();
+    }catch(error){
+      const card=document.querySelector('.park-card');
+      if(card&&!card.querySelector('.park-error'))card.insertAdjacentHTML('beforeend',`<p class="park-error" role="alert">${String(error.message||'Could not save this thought.').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}</p>`);
+    }
+  }
+  function refreshInboxBadge(){
+    let count=0;
+    try{
+      const items=JSON.parse(localStorage.getItem('cp_inbox_v1')||'[]');
+      const rendered=Number(localStorage.getItem('cp_inbox_count_v1')||0);
+      count=Math.max(Array.isArray(items)?items.length:0,rendered);
+    }catch(e){count=0;}
+    document.querySelectorAll('[data-inbox-count]').forEach(b=>{b.textContent=count>99?'99+':String(count);b.hidden=count===0;});
+  }
+  window.addEventListener('storage',event=>{if(!event.key||event.key.startsWith('cp_'))refreshInboxBadge();});
+  window.addEventListener('message',event=>{
+    if(event.origin!==location.origin)return;
+    const tasks=document.getElementById('f-tasks');
+    if(event.source===tasks?.contentWindow&&event.data?.type==='copilot-start-task'&&typeof event.data.taskId==='string'){
+      pendingCopilotTask=event.data.taskId;
+      showCopilot('now');
+      const copilot=document.getElementById('f-copilot');
+      if(copilot.dataset.copilotReady==='true'){
+        copilot.contentWindow.postMessage({type:'copilot-start-task',taskId:pendingCopilotTask},location.origin);
+        pendingCopilotTask=null;
+      }
+    }
+    if(event.source===document.getElementById('f-copilot')?.contentWindow&&event.data?.type==='copilot-ready'){
+      const copilot=document.getElementById('f-copilot');
+      copilot.dataset.copilotReady='true';
+      if(pendingCopilotTask){
+        event.source.postMessage({type:'copilot-start-task',taskId:pendingCopilotTask},location.origin);
+        pendingCopilotTask=null;
+      }
+    }
+    if(event.source===document.getElementById('f-copilot')?.contentWindow&&event.data?.type==='copilot-mode-color'){
+      document.querySelector('meta[name=theme-color]').content=event.data.color||'#F7F3EC';
+    }
+  });
+  window.setInterval(refreshInboxBadge,60000);
+  refreshInboxBadge();
+  let keySequence='';
+  let keyTimer=0;
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&document.getElementById('parkSheet')){closePark();return;}
+    const tag=event.target?.tagName?.toLowerCase();
+    if(tag==='input'||tag==='textarea'||event.target?.isContentEditable)return;
+    if(event.key==='.'&&!event.metaKey&&!event.ctrlKey&&!event.altKey){event.preventDefault();openPark();return;}
+    if(keySequence==='g'){
+      clearTimeout(keyTimer);keySequence='';
+      if(event.key==='n')showCopilot('now');
+      else if(event.key==='t')showCopilot('today');
+      else if(event.key==='i')showCopilot('inbox');
+      return;
+    }
+    if(event.key==='g'){keySequence='g';keyTimer=setTimeout(()=>keySequence='',800);}
   });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});

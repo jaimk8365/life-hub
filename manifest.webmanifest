@@ -1,7 +1,7 @@
 {
   "name": "Jaimi's Life Hub",
   "short_name": "Life Hub",
-  "description": "One calm place: daily HQ, Night Court quests, and the Steady ADHD course.",
+  "description": "One calm place: what to do now, your plan, ideas, Etsy and notes.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
@@ -11,5 +11,10 @@
     { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Now", "short_name": "Now", "url": "./?tab=copilot#now", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Park a thought", "short_name": "Park", "url": "./?tab=copilot#park", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Today", "short_name": "Today", "url": "./?tab=copilot#today", "icons": [{ "src": "./icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

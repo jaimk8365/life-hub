@@ -1,0 +1,45 @@
+name: Refresh Life Hub
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: lifehub-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out Life Hub
+        uses: actions/checkout@v4
+
+      - name: Refresh encrypted calendar and reminders
+        env:
+          HUB_KEY: ${{ secrets.HUB_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: node tools/refresh-lifehub.mjs
+
+      - name: Verify encrypted output
+        env:
+          HUB_KEY: ${{ secrets.HUB_KEY }}
+        run: node --test tests/automation-refresh.test.mjs
+
+      - name: Commit encrypted pages when changed
+        run: |
+          if git diff --quiet -- hub/index.html plan/index.html; then
+            echo "No encrypted page changes to publish." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "Life Hub Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add hub/index.html plan/index.html
+          git commit -m "automated calendar and reminders refresh"
+          git push
+          echo "Encrypted Life Hub pages refreshed successfully." >> "$GITHUB_STEP_SUMMARY"

@@ -4,6 +4,7 @@ import {readFile, writeFile, unlink} from 'node:fs/promises';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import vm from 'node:vm';
 import {decryptPage, decryptPayload, replaceBetween} from './refresh-crypto.mjs';
 
@@ -54,6 +55,36 @@ export function mergeReminderSnapshot(hub,plan,snapshot,now=new Date()){
   return {hub,plan,count:prepared.reminders.length,capturedAt:prepared.capturedAt};
 }
 
+function parseCopilotFeed(source){
+  const startMarker='/*COPILOT_FEED_START*/';
+  const endMarker='/*COPILOT_FEED_END*/';
+  const start=source.indexOf(startMarker),end=source.indexOf(endMarker,start+startMarker.length);
+  if(start<0||end<0)throw new Error('Co-Pilot feed markers are missing; previous pages were not replaced.');
+  const declaration=source.slice(start+startMarker.length,end).trim();
+  const match=declaration.match(/^const\s+COPILOT_FEED\s*=\s*(\{[\s\S]*\})\s*;?$/);
+  if(!match)throw new Error('Co-Pilot feed declaration is invalid; previous pages were not replaced.');
+  return {start,end,startMarker,endMarker,feed:JSON.parse(match[1])};
+}
+
+/** Pure transformation: merge public feed data without logging reminder content. */
+export function mergeCopilotFeed(copilotHtml,prepared,planFeed){
+  const parsed=parseCopilotFeed(copilotHtml);
+  const reminders=prepared.reminders.map(reminder=>{
+    const basis=`${reminder.list}|${reminder.title}|${reminder.due||''}`;
+    const key=createHash('sha1').update(basis,'utf8').digest('hex').slice(0,16);
+    return {key,title:reminder.title,list:reminder.list,due:reminder.due||null,priority:reminder.priority===1?1:0};
+  });
+  const feed={
+    ...parsed.feed,
+    reminders,
+    events:Array.isArray(planFeed?.events)?planFeed.events.map(event=>({...event})):[],
+    remindersUpdatedISO:prepared.capturedAt||null,
+    eventsUpdatedISO:planFeed?.updatedISO||planFeed?.eventsUpdatedISO||null,
+  };
+  const replacement=`${parsed.startMarker}\nconst COPILOT_FEED=${JSON.stringify(feed)};\n${parsed.endMarker}`;
+  return copilotHtml.slice(0,parsed.start)+replacement+copilotHtml.slice(parsed.end+parsed.endMarker.length);
+}
+
 async function refreshReminders(){
   let passphrase=process.env.HUB_KEY;
   if(!passphrase){try{passphrase=(await readFile(join(root,'.hub-key'),'utf8')).trim();}catch{throw new Error('Missing required secret: HUB_KEY');}}
@@ -69,22 +100,34 @@ async function refreshReminders(){
     encrypted=await raw.text();
   }
   const snapshot=decryptPayload(encrypted,passphrase);
-  const hubPath=join(root,'hub/index.html'),planPath=join(root,'plan/index.html');
+  const hubPath=join(root,'hub/index.html'),planPath=join(root,'plan/index.html'),copilotPath=join(root,'copilot/index.html');
   const currentHub=decryptPage(await readFile(hubPath,'utf8'),passphrase),currentPlan=decryptPage(await readFile(planPath,'utf8'),passphrase);
   const result=mergeReminderSnapshot(currentHub,currentPlan,snapshot);
-  if(result.hub===currentHub && result.plan===currentPlan){
+  let currentCopilot=null,nextCopilot=null;
+  try{
+    currentCopilot=decryptPage(await readFile(copilotPath,'utf8'),passphrase);
+    const plannerFeed=parseAssigned(result.plan,'/*PLAN_FEED_START*/\nconst PLAN_FEED=','\n/*PLAN_FEED_END*/');
+    nextCopilot=mergeCopilotFeed(currentCopilot,prepareReminderSnapshot(snapshot),plannerFeed);
+  }catch(error){
+    if(error?.code!=='ENOENT')throw error;
+  }
+  if(result.hub===currentHub && result.plan===currentPlan && nextCopilot===currentCopilot){
     console.log('Reminder snapshot is unchanged; no rebuild needed.');
     return;
   }
-  const tempHub=join(root,'.refresh-hub-source.html'),tempPlan=join(root,'.refresh-plan-source.html');
+  const tempHub=join(root,'.refresh-hub-source.html'),tempPlan=join(root,'.refresh-plan-source.html'),tempCopilot=join(root,'.refresh-copilot-source.html');
   try{
     await writeFile(tempHub,result.hub,{mode:0o600});await writeFile(tempPlan,result.plan,{mode:0o600});
     execFileSync(process.execPath,[join(root,'tools/build-hub.mjs'),tempHub,hubPath],{cwd:root,stdio:'ignore',env:{...process.env,HUB_KEY:passphrase}});
     execFileSync(process.execPath,[join(root,'tools/build-hub.mjs'),tempPlan,planPath],{cwd:root,stdio:'ignore',env:{...process.env,HUB_KEY:passphrase}});
+    if(nextCopilot!==null){
+      await writeFile(tempCopilot,nextCopilot,{mode:0o600});
+      execFileSync(process.execPath,[join(root,'tools/build-hub.mjs'),tempCopilot,copilotPath],{cwd:root,stdio:'ignore',env:{...process.env,HUB_KEY:passphrase}});
+    }
   } finally {
-    await Promise.all([unlink(tempHub).catch(()=>{}),unlink(tempPlan).catch(()=>{})]);
+    await Promise.all([unlink(tempHub).catch(()=>{}),unlink(tempPlan).catch(()=>{}),unlink(tempCopilot).catch(()=>{})]);
   }
-  console.log(`Merged ${result.count} encrypted reminders captured at ${result.capturedAt}.`);
+  console.log(`Merged ${result.count} encrypted reminders captured at ${result.capturedAt}${nextCopilot!==null?' (including Co-Pilot feed).':'.'}`);
 }
 
 // Importing the transformations for tests must never read credentials, fetch or deploy.

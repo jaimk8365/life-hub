@@ -12,14 +12,15 @@ Core Life Hub sections:
 
 | Section | What it is | Source of truth |
 |---|---|---|
+| 🎯 **Co-Pilot** | Daily front door — one next task, timer, capture, plan, ideas, Etsy and notes | `src/copilot.html` (gitignored), encrypted into `copilot/index.html` |
 | 🏡 **Life Hub** | Daily HQ — calendar, tasks, email triage, Life OS | `/Users/jaimikyte/Desktop/jaimi-hq.html`, encrypted into `hub/index.html` |
 | 🌙 **Quests** | Night Court Questkeeper | built from `~/NightCourtQuestkeeper` (`npm run build` → copy `dist/` into `quest/`) |
 | 🌱 **Course** | "Steady" — 6-week ADHD course | `src/course.html` (gitignored), encrypted into `course/index.html` |
 
 ## Privacy
 
-This repo is public (GitHub Pages requires it on the free plan), so the two personal sections —
-the Life Hub dashboard (calendar/email data) and the Steady course (personalised content) — are
+This repo is public (GitHub Pages requires it on the free plan), so the personal sections —
+the Life Hub dashboard (calendar/email data), Co-Pilot and the Steady course (personalised content) — are
 **AES-256-GCM encrypted** behind a passcode before they ever reach GitHub. The passcode lives in
 `.hub-key` (gitignored, never committed); unlocking once covers both sections on that device.
 Questkeeper contains no personal data. Anything typed into any section stays in the browser's
@@ -27,10 +28,12 @@ localStorage on each device.
 
 To rebuild the course after editing its source: `node tools/build-hub.mjs src/course.html course/index.html`
 
+Build Co-Pilot with `node tools/build-copilot.mjs`. Its `.mjs` engine, step library and store are public code with no personal content; the page source remains ignored and the generated `copilot/index.html` is encrypted. Co-Pilot uses the existing `hq_task_engine_v1` task store and the synced `cp_*` keys. The scheduled reminder refresh also updates Co-Pilot's encrypted Reminders and Planner feed; it does not write back to Apple Reminders.
+
 ## Device sync
 
-`sync.js` (loaded by the shell) mirrors three localStorage keys — `steady_*` (course),
-`nightcourt-*` (Questkeeper), `hq_*` (hub cleaning edits) — into ONE secret GitHub Gist
+`sync.js` (loaded by the shell) mirrors localStorage keys including `cp_*` (Co-Pilot),
+`steady_*` (course), `nightcourt-*` (Questkeeper), and `hq_*` (hub cleaning edits) into ONE secret GitHub Gist
 (`lifehub-sync.enc.json`), **encrypted on-device with the hub passcode** (PBKDF2 300k +
 AES-256-GCM) so GitHub only stores ciphertext. Setup per device via the Sync button: paste a
 classic PAT with only the `gist` scope (create at
@@ -66,7 +69,8 @@ shared snapshot.
 
 1. Update `/Users/jaimikyte/Desktop/jaimi-hq.html` as usual (LIVE snapshot + both synced-at consts).
 2. `cd ~/LifeHub && node tools/build-hub.mjs` — re-encrypts the fresh copy into `hub/index.html`.
-3. Test the updated encrypted output, pull and preserve newer remote work, then stage only
+3. Optionally create a short brief JSON without participant names and run `node tools/update-copilot-brief.mjs <brief.json>` to update the encrypted Co-Pilot morning note. Calendar and reminders may be referenced, but never work participant names.
+4. Test the updated encrypted output, pull and preserve newer remote work, then stage only
    `hub/index.html`, commit and push. Verify the GitHub Pages run and live result; do not
    assume a push means deployment has completed. Never use blanket staging for this repository.
 
