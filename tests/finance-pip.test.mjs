@@ -1,10 +1,11 @@
+import './finance-test-config.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const P=createRequire(import.meta.url)('../finance/pip.js');
 const facts=(o={})=>({today:'2026-10-18',week:{daysLeft:2,dayNum:5},safe:{trusted:true,safe:340},
  categories:[{name:'Eating out',actual:210,budget:150,status:'over',remaining:-60},{name:'Groceries',actual:300,budget:500,status:'on_track',remaining:200},{name:'Fuel',actual:120,budget:130,status:'tracking_high',remaining:10},{name:'Fees',actual:0,budget:0,status:'unbudgeted',remaining:0}],
- bills:[{name:'Energex',amount:312.45,dueLabel:'Fri 23 Oct'}],goals:[{name:'Bali',saved:410,target:0,pct:0},{name:'Couch',saved:600,target:900,pct:67}],
+ bills:[{name:'Energex',amount:312.45,dueLabel:'Fri 23 Oct'}],goals:[{name:'Trip',saved:410,target:0,pct:0},{name:'Couch',saved:600,target:900,pct:67}],
  funds:{status:'ok',diff:0,balance:500},fees:{month:12,count:2},recurring:[{label:'Afterpay',perMo:40,bnpl:true},{label:'Netflix',perMo:20},{label:'Gym',perMo:60},{label:'Phone',perMo:80}],wealth:null,moveAlert:null,...o});
 test('checks come from the numbers: over budget, fees, pay later, and a small win',()=>{
  const c=P.buildChecks(facts());
@@ -33,7 +34,7 @@ test('daily spend, week, bills, goals, spending and fees answers use the app num
  assert.match(P.answer('How much can I spend today?',facts()).text,/About \$113 a day.*\$340.*3 days/);
  assert.match(P.answer('Am I on track this week?',facts()).text,/Eating out is over budget/);
  assert.match(P.answer('What bills are coming up?',facts()).text,/Energex \$312 on Fri 23 Oct/);
- assert.match(P.answer('How are my goals going?',facts()).text,/Bali: \$410 saved so far.*Couch: \$600 of \$900 \(67%\)/);
+ assert.match(P.answer('How are my goals going?',facts()).text,/Trip: \$410 saved so far.*Couch: \$600 of \$900 \(67%\)/);
  assert.match(P.answer('Where is my money going?',facts()).text,/Groceries \$300, Eating out \$210/);
  assert.match(P.answer('any fees?',facts()).text,/\$12 this month in 2 charges/);
  assert.match(P.answer('hello?',facts()).text,/I can answer things like/);

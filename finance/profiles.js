@@ -1,22 +1,25 @@
-/* Finance profiles (Jaimi and Matt): who owns what, passcode checks, and an encrypted private vault.
-   Ownership is the single source of truth for what each profile may see. Anything not clearly shared is treated as Jaimi's. */
+/* Finance profiles (the owner and the partner): who owns what, passcode checks, and an encrypted private vault.
+   Ownership is the single source of truth for what each profile may see. Anything not clearly shared is treated as the owner's. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.FinProfiles=api;})(typeof globalThis==='object'?globalThis:this,function(){
  'use strict';
- const PROFILES={jaimi:{id:'jaimi',name:'Jaimi',initial:'J',colour:'#FF9C8F'},matt:{id:'matt',name:'Matt',initial:'M',colour:'#8FCDF5'}};
- /* Shared accounts (same list the partner snapshot already uses). */
- const SHARED_ACCOUNTS=['everyday','bills','loanrepay','savings','goals','house','land','car','thea','levi'];
- const OWNERS={jspend:'jaimi',ubank:'jaimi',zip:'jaimi',latitude:'jaimi',etsy:'jaimi',mspend:'matt',matt:'matt'};
- /* Words that mark something as Jaimi-only (pay later, her spending, wishlist, her business). */
- const PRIVATE_RE=/zip\b|zippay|latitude|pay-?in-?4|payin4|afterpay|j\s?spending|jspend|ubank|wishlist|etsy|design\s?mum/i;
+ /* Who is who, which accounts are shared and which words mark something private all come from FIN_CONFIG,
+    which lives inside the encrypted page. Nothing personal is kept in this public file. With no config, everything is private to the owner (the safe default). */
+ const cfg=()=>(globalThis.FIN_CONFIG)||{};
+ const DEFAULT_PROFILES={jaimi:{id:'jaimi',name:'Owner',initial:'O',colour:'#FF9C8F'},matt:{id:'matt',name:'Partner',initial:'P',colour:'#8FCDF5'}};
+ const profiles=()=>{const c=cfg().profiles||{};return{jaimi:Object.assign({},DEFAULT_PROFILES.jaimi,c.jaimi,{id:'jaimi'}),matt:Object.assign({},DEFAULT_PROFILES.matt,c.matt,{id:'matt'})};};
+ const sharedAccounts=()=>cfg().sharedAccounts||[];
+ const owners=()=>cfg().owners||{};
+ let _reSrc=null,_re=/(?!)/;
+ const privateRe=()=>{const src=cfg().privateWords||'';if(src!==_reSrc){_reSrc=src;_re=src?new RegExp(src,'i'):/(?!)/;}return _re;};
  const other=p=>p==='matt'?'jaimi':'matt';
 
- function ownerOfAccount(id){if(SHARED_ACCOUNTS.includes(id))return 'shared';return OWNERS[id]||'jaimi';}
+ function ownerOfAccount(id){if(sharedAccounts().includes(id))return 'shared';return owners()[id]||'jaimi';}
  /* An item may carry its own owner ('shared' | 'jaimi' | 'matt'); otherwise its account decides; text can force private. */
  function ownerOf(item){
   if(!item)return 'jaimi';
   if(item.owner==='matt')return 'matt';
-  // Zip, Latitude Pay, Etsy and the like are Jaimi's even if something was marked shared by mistake.
-  if(PRIVATE_RE.test([item.name,item.note,item.platform,item.label].filter(Boolean).join(' ')))return 'jaimi';
+  // Words the owner listed as private win over a shared mark made by mistake.
+  if(privateRe().test([item.name,item.note,item.platform,item.label].filter(Boolean).join(' ')))return 'jaimi';
   if(item.owner==='shared'||item.owner==='jaimi')return item.owner;
   const acct=item.acct||item.accountId||item.fromAcct;
   if(acct)return ownerOfAccount(acct);
@@ -25,7 +28,7 @@
  function canSee(profile,item){const o=ownerOf(item);return o==='shared'||o===profile;}
  function filter(profile,list){return (list||[]).filter(x=>canSee(profile,x));}
  function filterAccounts(profile,accts){return (accts||[]).filter(a=>{const o=ownerOfAccount(a.id);return o==='shared'||o===profile;});}
- function isPrivateText(text){return PRIVATE_RE.test(String(text||''));}
+ function isPrivateText(text){return privateRe().test(String(text||''));}
  /* Text visible to a profile: private lines are dropped for anyone but the owner. */
  function cleanLines(profile,lines){return profile==='jaimi'?(lines||[]):(lines||[]).filter(x=>!isPrivateText(x));}
 
@@ -55,5 +58,5 @@
  const vaultKey=p=>'finp_vault_'+p;
  async function vaultSave(storage,profile,key,data){storage.setItem(vaultKey(profile),JSON.stringify(await seal(key,data)));}
  async function vaultLoad(storage,profile,key){const raw=storage.getItem(vaultKey(profile));if(!raw)return{};return open(key,JSON.parse(raw));}
- return{PROFILES,SHARED_ACCOUNTS,OWNERS,PRIVATE_RE,other,ownerOfAccount,ownerOf,canSee,filter,filterAccounts,isPrivateText,cleanLines,deriveKey,seal,open,makeVerifier,unlock,vaultSave,vaultLoad,vaultKey};
+ return{get PROFILES(){return profiles();},sharedAccounts,owners,other,ownerOfAccount,ownerOf,canSee,filter,filterAccounts,isPrivateText,cleanLines,deriveKey,seal,open,makeVerifier,unlock,vaultSave,vaultLoad,vaultKey};
 });

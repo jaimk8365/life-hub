@@ -6,6 +6,7 @@
 /* ================= Phase 3: profiles ================= */
 var FIN_PROFILE='jaimi';
 var FIN_KEYS={};
+function finName(id){try{return FinProfiles.PROFILES[id].name;}catch(e){return id==='matt'?'Partner':'Owner';}}
 try{var _p=sessionStorage.getItem('fin_profile_v1');if(_p==='matt')FIN_PROFILE='matt';}catch(e){}
 var K_PROFILE_VERIFIERS='fin_profile_verifiers_v1';
 function finVerifiers(){return load(K_PROFILE_VERIFIERS,{});}
@@ -14,21 +15,21 @@ function finIsMatt(){return FIN_PROFILE==='matt';}
 /* What each profile's Home is allowed to show. */
 function finProfileData(d){
   const p=FIN_PROFILE,P=FinProfiles;
-  const out=Object.assign({},d);
+  const out=Object.assign({},d);out.names={owner:finName('jaimi'),partner:finName('matt')};
   out.jars=(d.jars||[]).filter(j=>P.canSee(p,{acct:j.id,name:j.name}));
-  const sharedAcct=a=>P.SHARED_ACCOUNTS.includes(a);
+  const sharedAcct=a=>P.sharedAccounts().includes(a);
   out.goals=(d.goals||[]).filter(g=>P.canSee(p,{name:g.name,owner:g.owner})&&(p==='jaimi'||!g.personal||sharedAcct(g.acct))).slice(0,4);
   out.funds=(d.funds||[]).filter(f=>P.canSee(p,{name:f.name,owner:f.owner})&&(p==='jaimi'||sharedAcct(f.acct||'savings'))).slice(0,4);
   if(p!=='jaimi'){
     out.safe={hidden:true};
-    const items=attentionChecklist().filter(i=>!i.doneNow&&!P.isPrivateText(i.text)&&!/^(buf|bal)_(jspend|zip|latitude|etsy|ubank)/.test(i.id)&&!/^(bnpl|goal)_/.test(i.id));
+    const items=attentionChecklist().filter(i=>!i.doneNow&&!P.isPrivateText(i.text)&&(!/^(buf|bal)_/.test(i.id)||P.ownerOfAccount(String(i.id).replace(/^(buf|bal)_/,''))==='shared')&&!/^(bnpl|goal)_/.test(i.id));
     out.alert=items.length?{count:items.length,text:items[0].text}:{count:0};
     out.account='Shared';
-    out.etsy=null;
+    out.shop=null;
     out.files=null;out.game=null;
   }else{
     out.files={waiting:finFilesWaiting()};
-    out.game=finGameHome();out.etsy=finEtsySummary();
+    out.game=finGameHome();out.shop=finShopSummary();
     const ma=finMoveAlert();
     if(ma)out.alert={count:(d.alert.count||0)+1,text:ma.text};
   }
@@ -45,7 +46,7 @@ function finProfileStyle(){
 }
 function finGuardView(v){return finIsMatt()&&v!=='today'&&v!=='save'?'today':v;}
 function finGuardSave(sv){return finIsMatt()&&sv!=='funds'&&sv!=='sharedgoals'?'sharedgoals':sv;}
-/* Matt's goals and funds screens: simple and filtered. Nothing from Jaimi's private lists is drawn. */
+/* The partner's goals and funds screens: simple and filtered. Nothing from the owner's private lists is drawn. */
 function finMattSaveHtml(which){
   const P=FinProfiles;
   if(which==='funds'){
@@ -71,28 +72,28 @@ function finPassSheet(title,sub,fields,onOk){
 }
 function openProfilePicker(){
   const v=finVerifiers(),card=id=>{const pr=FinProfiles.PROFILES[id];return '<button type="button" class="fn-item" style="min-height:76px;font-size:18px;margin-top:12px'+(FIN_PROFILE===id?';border-color:var(--sea)':'')+'" onclick="finChooseProfile(\''+id+'\')"><span class="fn-e" style="width:48px;height:48px;border-radius:50%;background:'+pr.colour+';display:grid;place-items:center;font:700 22px Fredoka,sans-serif;color:#0E2A3A">'+pr.initial+'</span><span>'+pr.name+'<br><span class="tiny" style="text-transform:none;font-weight:600">'+(v[id]?'passcode set':'no passcode yet')+(FIN_PROFILE===id?' · you are here':'')+'</span></span></button>';};
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>Who is using Money?</h2><div class="sub">Each profile has its own passcode. Matt sees shared money, his own things and shared goals. He never sees Jaimi\'s private items.</div>'+card('jaimi')+card('matt')+'<p class="f" style="margin-top:14px">Matt\'s own phone keeps using his current app until you are happy with this one.</p>';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>Who is using Money?</h2><div class="sub">Each profile has its own passcode. '+esc(finName('matt'))+' sees shared money, their own things and shared goals, never '+esc(finName('jaimi'))+'\'s private items.</div>'+card('jaimi')+card('matt')+'<p class="f" style="margin-top:14px">'+esc(finName('matt'))+'\'s own phone keeps using the current partner app until you are happy with this one.</p>';
   openSheet();
 }
 async function finChooseProfile(id){
   const v=finVerifiers();
   if(id===FIN_PROFILE){closeSheet();return;}
   if(id==='matt'&&!v.jaimi){
-    // Jaimi must have a passcode first, otherwise Matt could simply switch back.
-    finPassSheet('Set a passcode for Jaimi','Do this first, so only you can switch back from Matt\'s profile.',['New passcode (4+ characters)','Type it again'],async vals=>{
+    // The owner must have a passcode first, otherwise the partner could simply switch back.
+    finPassSheet('Set a passcode for '+finName('jaimi'),'Do this first, so only you can switch back from '+finName('matt')+'\'s profile.',['New passcode (4+ characters)','Type it again'],async vals=>{
       if(vals[0]!==vals[1])throw Error('The two passcodes do not match.');
       const nv=Object.assign({},finVerifiers(),{jaimi:await FinProfiles.makeVerifier(vals[0])});save(K_PROFILE_VERIFIERS,nv);
       FIN_KEYS.jaimi=await FinProfiles.unlock(vals[0],nv.jaimi);await finPrivUnlock('jaimi',FIN_KEYS.jaimi);finChooseProfile('matt');
     });return;
   }
   if(!v[id]){
-    finPassSheet('Set '+FinProfiles.PROFILES[id].name+'\'s passcode','Choose a passcode for this profile.',['New passcode (4+ characters)','Type it again'],async vals=>{
+    finPassSheet('Set '+finName(id)+'\'s passcode','Choose a passcode for this profile.',['New passcode (4+ characters)','Type it again'],async vals=>{
       if(vals[0]!==vals[1])throw Error('The two passcodes do not match.');
       const nv=Object.assign({},finVerifiers(),{[id]:await FinProfiles.makeVerifier(vals[0])});save(K_PROFILE_VERIFIERS,nv);
       const k=await FinProfiles.unlock(vals[0],nv[id]);await finPrivUnlock(id,k);finEnterProfile(id);
     });return;
   }
-  finPassSheet('Enter '+FinProfiles.PROFILES[id].name+'\'s passcode','',['Passcode'],async vals=>{
+  finPassSheet('Enter '+finName(id)+'\'s passcode','',['Passcode'],async vals=>{
     const key=await FinProfiles.unlock(vals[0],finVerifiers()[id]);
     if(!key)throw Error('That passcode is not right.');
     await finPrivUnlock(id,key);finEnterProfile(id);
@@ -109,10 +110,10 @@ function finEnterProfile(id){
 /* ================= Private store (goals and business data that only one profile may see) ================= */
 /* Kept out of every shared or partner sync key. Sealed with the owner's passcode once they have set one. */
 var K_PRIV='fin_private_v1';
-var PRIV={jaimi:{goals:[],etsy:null},matt:{goals:[],etsy:null},locked:{}};
+var PRIV={jaimi:{goals:[],shop:null},matt:{goals:[],shop:null},locked:{}};
 function finPrivLoadPlain(){
   const all=load(K_PRIV,{});
-  ['jaimi','matt'].forEach(p=>{PRIV[p]=Object.assign({goals:[],etsy:null},all[p]||{});});
+  ['jaimi','matt'].forEach(p=>{PRIV[p]=Object.assign({goals:[],shop:null},all[p]||{});});
   PRIV.locked={};
   ['jaimi','matt'].forEach(p=>{try{if(localStorage.getItem(FinProfiles.vaultKey(p)))PRIV.locked[p]=true;}catch(e){}});
 }
@@ -120,7 +121,7 @@ var _privQ=Promise.resolve();
 function finPrivSave(p){
   if(FIN_KEYS[p]){
     // sealed: saved in order, and the plain copy is only removed once the sealed copy is written
-    const snap=JSON.stringify({goals:PRIV[p].goals,etsy:PRIV[p].etsy});
+    const snap=JSON.stringify({goals:PRIV[p].goals,shop:PRIV[p].shop});
     _privQ=_privQ.then(async()=>{
       await FinProfiles.vaultSave(localStorage,p,FIN_KEYS[p],JSON.parse(snap));
       const all=load(K_PRIV,{});if(all[p]){delete all[p];save(K_PRIV,all);}
@@ -132,8 +133,8 @@ function finPrivSave(p){
 }
 async function finPrivUnlock(p,key){
   FIN_KEYS[p]=key;
-  if(PRIV.locked[p]){const d=await FinProfiles.vaultLoad(localStorage,p,key);PRIV[p]=Object.assign({goals:[],etsy:null},d);delete PRIV.locked[p];}
-  else if(PRIV[p].goals.length||PRIV[p].etsy)finPrivSave(p);   // move any plain items into the sealed vault
+  if(PRIV.locked[p]){const d=await FinProfiles.vaultLoad(localStorage,p,key);PRIV[p]=Object.assign({goals:[],shop:null},d);delete PRIV.locked[p];}
+  else if(PRIV[p].goals.length||PRIV[p].shop)finPrivSave(p);   // move any plain items into the sealed vault
   if(p==='jaimi')finFilesSealAll().catch(()=>{});
 }
 
@@ -143,7 +144,8 @@ function finSeedGoalsFunds(){
   if(_finSeeded||finIsMatt())return;_finSeeded=true;
   try{
     if(!load('fin_phase4_seeded_v1',false)){
-      if(!SHARED_GOALS.some(g=>/bali/i.test(g.name||''))){SHARED_GOALS.push(FinGoals.baliGoal(uid));save(K_SHARED_GOALS,SHARED_GOALS);markSharedDirty();}
+      const seed=FinGoals.seedGoal(uid);
+      if(seed&&!SHARED_GOALS.some(g=>g.id===seed.id||String(g.name||'').toLowerCase()===seed.name.toLowerCase())){SHARED_GOALS.push(seed);save(K_SHARED_GOALS,SHARED_GOALS);markSharedDirty();}
       FinGoals.ensureBuckets(FUNDS,uid);save(K_FUNDS,FUNDS);
       save('fin_phase4_seeded_v1',true);
     }
@@ -169,15 +171,15 @@ function finGoalsExtra(){
   html+=SHARED_GOALS.filter(g=>g.status!=='archived'&&g.type==='holiday').map(finTripCard).join('');
   if(!finIsMatt()){
     if(PRIV.locked.jaimi)html+='<div class="card"><h2>🔒 Private goals</h2><p class="f">Sealed with your passcode.</p><button class="btn dark" onclick="finUnlockPrivate(\'jaimi\')">Unlock</button></div>';
-    else if(PRIV.jaimi.goals.length)html+='<div class="card" style="background:var(--t-bad2)"><h2 style="margin:0 0 6px">🔒 Only me</h2><p class="f" style="margin:0">Matt never sees these.</p></div>'+PRIV.jaimi.goals.map(finPrivGoalCard).join('');
+    else if(PRIV.jaimi.goals.length)html+='<div class="card" style="background:var(--t-bad2)"><h2 style="margin:0 0 6px">🔒 Only me</h2><p class="f" style="margin:0">'+esc(finName('matt'))+' never sees these.</p></div>'+PRIV.jaimi.goals.map(finPrivGoalCard).join('');
   }
   host.insertAdjacentHTML('afterbegin',html);
 }
 function finNewGoal(type){
   const t=FinGoals.TYPES[type],me=finIsMatt()?'matt':'jaimi',meName=FinProfiles.PROFILES[me].name;
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>'+t.emoji+' New '+esc(t.label.toLowerCase())+' goal</h2><div class="sub">'+esc(t.blurb)+'</div>'
-   +'<div class="row2"><div class="field"><label>Emoji</label><input id="ng_em" value="'+t.emoji+'" maxlength="3"></div><div class="field"><label>Name</label><input id="ng_name" placeholder="e.g. Bali"></div></div>'
-   +'<div class="field"><label>Who is it for?</label><select id="ng_owner"><option value="shared">Shared with '+(me==='matt'?'Jaimi':'Matt')+'</option><option value="'+me+'">Just me ('+esc(meName)+')</option></select></div>'
+   +'<div class="row2"><div class="field"><label>Emoji</label><input id="ng_em" value="'+t.emoji+'" maxlength="3"></div><div class="field"><label>Name</label><input id="ng_name" placeholder="e.g. Summer trip"></div></div>'
+   +'<div class="field"><label>Who is it for?</label><select id="ng_owner"><option value="shared">Shared with '+esc(finName(me==='matt'?'jaimi':'matt'))+'</option><option value="'+me+'">Just me ('+esc(meName)+')</option></select></div>'
    +'<div class="row2"><div class="field"><label>Total (optional)</label><input id="ng_target" inputmode="decimal" placeholder="set later"></div><div class="field"><label>Date (optional)</label><input id="ng_due" type="date"></div></div>'
    +'<div class="field"><label>Add money automatically? (optional)</label><div class="row2"><input id="ng_amt" inputmode="decimal" placeholder="$ amount"><select id="ng_freq"><option value="weekly">every week</option><option value="fortnightly">every fortnight</option><option value="monthly">every month</option></select></div></div>'
    +'<div id="ng_err" class="tiny" role="alert" style="color:var(--bad);min-height:18px"></div><button class="btn dark" onclick="finSaveGoal(\''+type+'\')">Save goal</button>';
@@ -230,7 +232,7 @@ function finFundsTop(){
 function finTakeSheet(){
   const list=FUNDS.filter(f=>(f.saved||0)>0);
   if(!list.length){toastMsg('No bucket has money in it yet.');return;}
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>💳 Spend from a bucket</h2><div class="sub">For example a vet bill from Luna emergency. Pay it from the account as usual, this keeps the bucket honest.</div><div class="field"><label>Bucket</label><select id="tk_f">'+list.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+' ('+AUD0(f.saved)+')</option>').join('')+'</select></div><div class="field"><label>Amount</label><input id="tk_amt" inputmode="decimal"></div><div class="field"><label>What was it?</label><input id="tk_note" placeholder="e.g. Vet bill"></div><div id="tk_err" class="tiny" role="alert" style="color:var(--bad);min-height:18px"></div><button class="btn dark" onclick="finTakeSave()">Take from bucket</button>';openSheet();
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>💳 Spend from a bucket</h2><div class="sub">For example a vet bill from a pet fund. Pay it from the account as usual, this keeps the bucket honest.</div><div class="field"><label>Bucket</label><select id="tk_f">'+list.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+' ('+AUD0(f.saved)+')</option>').join('')+'</select></div><div class="field"><label>Amount</label><input id="tk_amt" inputmode="decimal"></div><div class="field"><label>What was it?</label><input id="tk_note" placeholder="e.g. Vet bill"></div><div id="tk_err" class="tiny" role="alert" style="color:var(--bad);min-height:18px"></div><button class="btn dark" onclick="finTakeSave()">Take from bucket</button>';openSheet();
 }
 function finTakeSave(){
   try{const f=FUNDS.find(x=>x.id===$('tk_f').value);if(!f)throw Error('Choose a bucket.');FinGoals.takeFromBucket(f,parseFloat($('tk_amt').value)||0,$('tk_note').value,todayISO(),uid);save(K_FUNDS,FUNDS);finGameEvent('bucket');closeSheet();render();toastMsg('Taken from '+f.name);}
@@ -240,7 +242,7 @@ function finTakeSave(){
 /* ================= Phase 5: Autopilot ================= */
 var K_AUTOPILOT='fin_autopilot_v1',_apLen=-1;
 function apState(){return Object.assign({rules:[],off:{},applied:[],periods:[],asked:[],log:[],since:null},load(K_AUTOPILOT,{}));}
-function apRules(st){return FinAutopilot.BUILTIN.map(r=>Object.assign({},r,{enabled:!st.off[r.id]})).concat(st.rules);}
+function apRules(st){return FinAutopilot.builtin().map(r=>Object.assign({},r,{enabled:!st.off[r.id]})).concat(st.rules);}
 /* Put a transfer that has already happened where it belongs. Only transfers dated from the first run onward are counted,
    so history you already recorded by hand is never counted twice. */
 function finAutopilotRun(){
@@ -283,7 +285,7 @@ function finOpenAutopilot(){
   openSheet();
 }
 async function finApSync(){const b=document.getElementById('ap_sync'),ps=finPocketSmith();if(!ps||!b)return;b.disabled=true;b.textContent='Syncing…';try{await ps.syncNow(true);_apLen=-1;finAutopilotRun();toastMsg('Synced');}catch(e){toastMsg((e&&e.message)||'Sync needs attention.');}finOpenAutopilot();}
-function finApToggle(id){const st=apState();const b=FinAutopilot.BUILTIN.find(r=>r.id===id);if(b){if(st.off[id])delete st.off[id];else st.off[id]=true;}else{const r=st.rules.find(x=>x.id===id);if(r)r.enabled=r.enabled===false;}save(K_AUTOPILOT,st);_apLen=-1;finOpenAutopilot();}
+function finApToggle(id){const st=apState();const b=FinAutopilot.builtin().find(r=>r.id===id);if(b){if(st.off[id])delete st.off[id];else st.off[id]=true;}else{const r=st.rules.find(x=>x.id===id);if(r)r.enabled=r.enabled===false;}save(K_AUTOPILOT,st);_apLen=-1;finOpenAutopilot();}
 function finApDismiss(key){const st=apState();st.asked.push(key);save(K_AUTOPILOT,st);finOpenAutopilot();}
 function finApAnswer(key){
   try{
@@ -297,7 +299,7 @@ function finApAnswer(key){
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
-  const map={autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',etsy:'finOpenEtsy',swap:'finOpenSwap'};
+  const map={autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
   if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }
@@ -355,7 +357,7 @@ async function finFileData(id){
   if(!FIN_KEYS.jaimi)return null;
   try{return(await FinProfiles.open(FIN_KEYS.jaimi,e)).data;}catch(x){return null;}
 }
-async function finFilesSealAll(){   // called once Jaimi's passcode is unlocked: anything stored plain gets sealed
+async function finFilesSealAll(){   // called once the owner's passcode is unlocked: anything stored plain gets sealed
   const all=load(K_FILES_DATA,{});let changed=false;
   for(const id of Object.keys(all))if(all[id].plain&&FIN_KEYS.jaimi){all[id]=await FinProfiles.seal(FIN_KEYS.jaimi,{data:all[id].plain});changed=true;}
   if(changed)save(K_FILES_DATA,all);
@@ -398,7 +400,7 @@ function finFileCard(f){
    +(m?'<p class="f" style="margin:8px 0 0">🔗 Matches '+esc(m.txn.note||'a purchase')+' on '+esc(FinDates.longDate(m.txn.date))+(m.sure?'':' (one of '+(m.others+1)+' possible)')+'</p>':'')
    +'<p class="f" style="margin:8px 0 4px"><b>Where does it go?</b> '+esc(sg.why)+'</p>'
    +(fl.kind==='bill'||sg.dest==='bill'?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+[['once','Just this once'],['monthly','Every month'],['quarterly','Every quarter'],['yearly','Every year']].map(x=>'<button class="btn '+(x[0]==='once'?'dark':'ghost')+'" style="width:auto;padding:8px 12px" onclick="finFileToBill(\''+esc(f.id)+'\',\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>':'')
-   +'<div style="display:flex;gap:8px;margin-top:8px">'+btn('home','🏠 Home')+btn('tax','🧾 Tax')+btn('etsy','🛍️ Etsy')+'</div>'
+   +'<div style="display:flex;gap:8px;margin-top:8px">'+btn('home','🏠 Home')+btn('tax','🧾 Tax')+btn('shop','🛍️ Shop')+'</div>'
    +'<button class="fh-link" onclick="finFileRemove(\''+esc(f.id)+'\')">Remove from inbox</button></div>';
 }
 function finOpenFiles(){
@@ -431,7 +433,7 @@ async function finFileFile(id,dest){
     const d=await finFileData(id);if(d){const files=load(K_TAX_FILES,{});files[rec.id]={name:f.name,type:f.type,data:d};save(K_TAX_FILES,files);}
     finFileDone(id,'Tax receipts');return;
   }
-  if(dest==='etsy'){PRIV.jaimi.etsy=PRIV.jaimi.etsy||{};PRIV.jaimi.etsy.expenses=PRIV.jaimi.etsy.expenses||[];PRIV.jaimi.etsy.expenses.push({id:uid(),date:fl.date||todayISO(),amount:fl.amount,shop:fl.shop||f.name,fileId:id});finPrivSave('jaimi');finFileDone(id,'Etsy business');return;}
+  if(dest==='shop'){PRIV.jaimi.shop=PRIV.jaimi.shop||{};PRIV.jaimi.shop.expenses=PRIV.jaimi.shop.expenses||[];PRIV.jaimi.shop.expenses.push({id:uid(),date:fl.date||todayISO(),amount:fl.amount,shop:fl.shop||f.name,fileId:id});finPrivSave('jaimi');finFileDone(id,'Shop business');return;}
 }
 function finFileToBill(id,freq){
   const f=finFiles().find(x=>x.id===id);if(!f)return;const fl=f.fields;
@@ -533,7 +535,7 @@ function finOpenCoach(){
   openSheet();
 }
 
-/* ================= Phase 9: game layer and Etsy ================= */
+/* ================= Phase 9: game layer and shop ================= */
 var K_GAME='fin_game_v1',_gameKey='';
 function finGameState(){return Object.assign(FinGame.newState(),load(K_GAME,{}));}
 function finGameLoans(){return ACCTS.filter(a=>a.type==='loan').reduce((s,a)=>s+Math.abs(balance(a.id)),0);}
@@ -571,30 +573,31 @@ function finClaimChest(){
   save(K_GAME,st);toastMsg('🎁 +'+r.gained+' XP'+(r.levelUp?' · level up!':''));finOpenQuests();render();
 }
 
-/* Etsy business: "The ADHD Design Mum". Separate from personal money. Jaimi only, and it stays out of Matt's profile. */
-function finEtsy(){PRIV.jaimi.etsy=PRIV.jaimi.etsy||{};const e=PRIV.jaimi.etsy;e.sales=e.sales||[];e.expenses=e.expenses||[];return e;}
-function finEtsySummary(){
+/* Shop business. Separate from personal money, owner only, and it stays out of the partner's profile. The shop's name comes from FIN_CONFIG. */
+function finShopName(){return (globalThis.FIN_CONFIG&&FIN_CONFIG.shopName)||'My shop';}
+function finShop(){PRIV.jaimi.shop=PRIV.jaimi.shop||{};const e=PRIV.jaimi.shop;e.sales=e.sales||[];e.expenses=e.expenses||[];return e;}
+function finShopSummary(){
   if(finIsMatt())return null;
-  const e=finEtsy(),ym=todayISO().slice(0,7),sum=l=>l.filter(x=>String(x.date||'').slice(0,7)===ym).reduce((s,x)=>s+(+x.amount||0),0);
-  return{connected:!!e.connected||e.sales.length>0||e.expenses.length>0,month:{in:sum(e.sales),out:sum(e.expenses)},locked:!!PRIV.locked.jaimi};
+  const e=finShop(),ym=todayISO().slice(0,7),sum=l=>l.filter(x=>String(x.date||'').slice(0,7)===ym).reduce((s,x)=>s+(+x.amount||0),0);
+  return{name:finShopName(),connected:!!e.connected||e.sales.length>0||e.expenses.length>0,month:{in:sum(e.sales),out:sum(e.expenses)},locked:!!PRIV.locked.jaimi};
 }
-function finOpenEtsy(){
+function finOpenShop(){
   if(finIsMatt())return;
   if(PRIV.locked.jaimi){finUnlockPrivate('jaimi');return;}
-  const e=finEtsy(),sm=finEtsySummary(),ym=todayISO().slice(0,7);
+  const e=finShop(),sm=finShopSummary(),ym=todayISO().slice(0,7);
   const yr=l=>l.filter(x=>String(x.date||'').slice(0,4)===ym.slice(0,4)).reduce((s,x)=>s+(+x.amount||0),0);
   const rows=(l,sign)=>l.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,6).map(x=>'<div style="display:flex;justify-content:space-between;padding:3px 0"><span>'+esc(FinDates.longDate(x.date))+' · '+esc(x.shop||x.note||'')+'</span><b>'+sign+AUD0(x.amount)+'</b></div>').join('')||'<p class="f" style="margin:0">None yet.</p>';
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🛍️ The ADHD Design Mum</h2><div class="sub">Your Etsy shop. Kept separate from personal money. Only you can see this.</div>'
-   +(sm.connected?'':'<div class="card" style="background:var(--t-warn);border-color:var(--t-warn-line)"><b>Not started yet.</b><p class="f" style="margin:6px 0 0">When your Etsy payments account is added, sales and fees will show up here. You can already file shop receipts from the Files inbox, or add sales yourself below.</p></div>')
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🛍️ '+esc(finShopName())+'</h2><div class="sub">Your shop. Kept separate from personal money. Only you can see this.</div>'
+   +(sm.connected?'':'<div class="card" style="background:var(--t-warn);border-color:var(--t-warn-line)"><b>Not started yet.</b><p class="f" style="margin:6px 0 0">When your shop payments account is added, sales and fees will show up here. You can already file shop receipts from the Files inbox, or add sales yourself below.</p></div>')
    +'<div class="card"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="fh-lab">THIS MONTH IN</div><div class="fh-big">'+AUD0(sm.month.in)+'</div></div><div><div class="fh-lab">THIS MONTH OUT</div><div class="fh-big">'+AUD0(sm.month.out)+'</div></div></div><p class="f" style="margin:6px 0 0">Profit this month '+AUD0(sm.month.in-sm.month.out)+' · this year '+AUD0(yr(e.sales)-yr(e.expenses))+'</p></div>'
-   +'<div class="card"><h2 style="margin:0 0 6px">Add</h2><div class="row2"><input id="et_amt" inputmode="decimal" placeholder="$ amount"><input id="et_note" placeholder="note (optional)"></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn dark" style="flex:1" onclick="finEtsyAdd(\'sales\')">＋ Sale</button><button class="btn ghost" style="flex:1" onclick="finEtsyAdd(\'expenses\')">＋ Expense</button></div></div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">Add</h2><div class="row2"><input id="sh_amt" inputmode="decimal" placeholder="$ amount"><input id="sh_note" placeholder="note (optional)"></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn dark" style="flex:1" onclick="finShopAdd(\'sales\')">＋ Sale</button><button class="btn ghost" style="flex:1" onclick="finShopAdd(\'expenses\')">＋ Expense</button></div></div>'
    +'<div class="card"><h2 style="margin:0 0 6px">Recent sales</h2>'+rows(e.sales,'+')+'</div><div class="card"><h2 style="margin:0 0 6px">Recent expenses</h2>'+rows(e.expenses,'-')+'</div>';
   openSheet();
 }
-function finEtsyAdd(kind){
-  const a=parseFloat(document.getElementById('et_amt').value)||0;if(!(a>0)){toastMsg('Enter an amount.');return;}
-  const e=finEtsy();e.connected=true;e[kind].push({id:uid(),date:todayISO(),amount:Math.round(a*100)/100,note:document.getElementById('et_note').value.trim()});
-  finPrivSave('jaimi');finOpenEtsy();render();
+function finShopAdd(kind){
+  const a=parseFloat(document.getElementById('sh_amt').value)||0;if(!(a>0)){toastMsg('Enter an amount.');return;}
+  const e=finShop();e.connected=true;e[kind].push({id:uid(),date:todayISO(),amount:Math.round(a*100)/100,note:document.getElementById('sh_note').value.trim()});
+  finPrivSave('jaimi');finOpenShop();render();
 }
 
 /* ================= Budget swap ================= */

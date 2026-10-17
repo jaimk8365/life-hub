@@ -5,8 +5,8 @@
  const cents=n=>Math.round((+n||0)*100);
  const round=n=>Math.round((+n||0)*100)/100;
  const CASH_RE=/\b(atm|cash\s*(out|withdraw\w*|advance)|withdrawal|cashout)\b/i;
- const CASH_TAGS=['Groceries','Kids','Petrol','Gifts','Market or Etsy','Eating out','Other'];
- const PERSONAL=['jspend','mspend','ubank'];
+ const CASH_TAGS=['Groceries','Kids','Petrol','Gifts','Market or shop','Eating out','Other'];
+ const personalIds=()=>((globalThis.FIN_CONFIG||{}).personalAccounts)||[];
  const live=t=>t&&!t.deleted;
 
  /* Pair a payment out of one account with the matching payment into another (same amount, within two days). */
@@ -28,7 +28,7 @@
  }
  /* A top-up is money sent into a personal spending account from a shared spending account. */
  function isTopUp(move,accts,personal){
-  const by=Object.fromEntries((accts||[]).map(a=>[a.id,a])),p=personal||PERSONAL;
+  const by=Object.fromEntries((accts||[]).map(a=>[a.id,a])),p=personal||personalIds();
   const from=by[move.from],to=by[move.to];
   return!!(from&&to&&from.type==='spend'&&to.type==='spend'&&p.includes(move.to)&&!p.includes(move.from));
  }
@@ -67,5 +67,5 @@
   return fixes.sort((a,b)=>(b.covers-a.covers)||(order[a.kind]-order[b.kind])).slice(0,3);
  }
  function fmt(n){return '$'+Math.round(n).toLocaleString('en-AU');}
- return{CASH_TAGS,PERSONAL,detectMoves,isTopUp,cashWithdrawals,pendingCash,monthlyCounts,topUpImpact,rankFixes};
+ return{CASH_TAGS,personalIds,detectMoves,isTopUp,cashWithdrawals,pendingCash,monthlyCounts,topUpImpact,rankFixes};
 });

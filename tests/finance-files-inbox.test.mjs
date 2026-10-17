@@ -1,3 +1,4 @@
+import './finance-test-config.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import zlib from 'node:zlib';
@@ -41,7 +42,8 @@ test('a receipt is matched to the right bank spend, even with similar ones aroun
 });
 test('Pip suggests where a document belongs, and asks when unclear',()=>{
  assert.equal(F.suggest(F.extractFields(bill),bill).dest,'bill');
- const etsy='Australia Post\nPostage satchels\nTotal $23.00\n12/10/2026';assert.equal(F.suggest(F.extractFields(etsy),etsy).dest,'etsy');
+ const shop='Courier Co\nPostage satchels\nTotal $23.00\n12/10/2026';assert.equal(F.suggest(F.extractFields(shop),shop).dest,'shop');
+ const extra='Stickerco\nTotal $9.00\n12/10/2026';assert.equal(F.suggest(F.extractFields(extra),extra).dest,'shop','words from the private config count');
  const plain='Kmart\nTotal $12.00\n12/10/2026';const s=F.suggest(F.extractFields(plain),plain);assert.equal(s.dest,null);assert.equal(s.ask,true);
  const tax='Officeworks\nStationery\nTotal $12.00\n12/10/2026';assert.equal(F.suggest(F.extractFields(tax),tax).dest,'tax');
 });

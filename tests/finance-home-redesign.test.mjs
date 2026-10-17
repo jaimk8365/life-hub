@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 const require=createRequire(import.meta.url),H=require('../finance/home-redesign.js'),D=require('../finance/fin-dates.js');
 const OLD_TABS=['today','accounts','money-map','budget','income','expenses','save','bills','debts','tax','insights'];
 const data={today:'2026-10-18',account:'Everyday',safe:{trusted:true,safe:340,free:900},alert:{count:2,text:'Bills is below its buffer'},
- jars:[{id:'everyday',name:'Everyday',emoji:'🛒',color:'#7FB79B',balance:700,fill:.5}],goals:[{name:'Bali',emoji:'🏝️',saved:205,target:2000}],funds:[{name:'Christmas',emoji:'🎄',saved:50,target:200}]};
+ jars:[{id:'everyday',name:'Everyday',emoji:'🛒',color:'#7FB79B',balance:700,fill:.5}],goals:[{name:'Trip',emoji:'🏝️',saved:150,target:1500}],funds:[{name:'Christmas',emoji:'🎄',saved:50,target:200}]};
 test('every one of the 11 old tabs is still reachable from More / the sidebar',()=>{
  const html=H.everythingHtml();
  for(const v of OLD_TABS)assert.ok(html.includes("FinHome.open('"+v+"'"),'missing '+v);

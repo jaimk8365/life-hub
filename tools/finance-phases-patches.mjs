@@ -1,3 +1,4 @@
+import {readFileSync,existsSync} from 'node:fs';
 // Finance redesign phases 3 to 9: wires finance/phase-glue.js and the new modules into Jaimi's Finance page.
 // Each phase is its own idempotent step with its own marker. Tests replay the whole chain after the Ocean and redesign patches.
 const V='20261018-phases1';
@@ -63,6 +64,26 @@ function fallbackProfile(s){
   must(s.includes(at),'fallback3 anchor');
   return s.replace(at,marker+"\nif(typeof FIN_PROFILE==='undefined'){var FIN_PROFILE='jaimi';}\n"+at);
 }
+/* Personal settings (names, which accounts are shared, goals and amounts) live in src/finance-redesign/fin-config.json, which is never committed.
+   They are written into the encrypted page only, so none of it is in the public files. */
+const CONFIG_FILE=new URL('../src/finance-redesign/fin-config.json',import.meta.url);
+function injectConfig(s){
+  const start='/* FIN_CONFIG START */',end='/* FIN_CONFIG END */';
+  if(!existsSync(CONFIG_FILE)){
+    must(s.includes(start),'src/finance-redesign/fin-config.json is missing and the page has no config yet');
+    return s;
+  }
+  const json=JSON.stringify(JSON.parse(readFileSync(CONFIG_FILE,'utf8'))).replace(/</g,'\\u003c');
+  const block='<script>'+start+'window.FIN_CONFIG='+json+';'+end+'</script>';
+  if(s.includes(start)){
+    const a=s.lastIndexOf('<script>',s.indexOf(start)),b=s.indexOf('</script>',s.indexOf(end))+'</script>'.length;
+    must(a>=0&&b>a,'config block');
+    return s.slice(0,a)+block+s.slice(b);
+  }
+  const at='<!-- Finance redesign v1 -->';
+  must(s.includes(at),'config anchor');
+  return s.replace(at,block+'\n'+at);
+}
 function phase4(s){
   s=once(s,'<script src="../finance/profiles.js?v='+V+'"></script>','<script src="../finance/profiles.js?v='+V+'"></script>\n<script src="../finance/goals-funds.js?v='+V+'"></script>','p4 head');
   s=once(s,"function renderSharedGoals(){","function renderSharedGoals(){renderSharedGoalsBase();finGoalsExtra();}\nfunction renderSharedGoalsBase(){",'shared goals');
@@ -102,6 +123,7 @@ function phase5(s){
 export function patchPhasesFinance(source){
   let s=source;
   s=phase3(s);
+  s=injectConfig(s);
   s=phase4(s);
   s=fallbacks(s);
   s=fallbackHome(s);

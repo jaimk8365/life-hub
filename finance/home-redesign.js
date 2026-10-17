@@ -12,11 +12,11 @@
   safe:['Safe to spend','What is left in Everyday after your buffer, bills due this week, your usual spending and anything already set aside. The bar shows how much of your spare money is still free. A guide only, not a bank guarantee.'],
   alert:['Pip\'s alert','The most important thing for you to look at right now, picked from your own numbers (low balances, bills, goals that are behind). Tap it to see the whole list. Pip never moves money. You do the transfers.'],
   accounts:['Account jars','Each jar is an account. The more filled it is, the more of its monthly budget is sitting in it. Tap a jar to open the account, its transactions and its direct debits.'],
-  goals:['Goals','Things you are saving toward, yours and shared with Matt. The ring or bar shows how far along each one is. Tap Goals to add or change one.'],
+  goals:['Goals','Things you are saving toward, yours and shared with your partner. The ring or bar shows how far along each one is. Tap Goals to add or change one.'],
   funds:['Sinking funds','Money put aside for bills that come around once in a while, such as rates or car costs, so they never surprise you. Every dollar in them has a job.'],
   files:['Files inbox','Soon you will be able to drop receipts and bills in here and Pip will read them for you. It is not switched on yet.'],
   cycle:['Budget week','Your allowances reset every Wednesday. A fortnightly wage is split equally between the two weeks. Open "View this week\'s budgets" to see each category.'],
-  etsy:['Your Etsy shop','Your shop, kept separate from personal money. Only you can see it. Matt never does.'],
+  shop:['Your shop','Your shop, kept separate from personal money. Only you can see it. Your partner never does.'],
   pip:['Ask Pip','Pip is your built-in money helper. It runs on this device only, with no paid service. Chat is coming in a later step. For now the shortcuts here use the same numbers Pip will use.']
  };
  function helpBtn(key){return '<button type="button" class="fh-q" aria-label="What is this card?" onclick="event.stopPropagation();FinHome.help(\''+esc(key)+'\')"></button>';}
@@ -28,7 +28,7 @@
   {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Money Map',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
   {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'Wishlist',e:'🎁',v:'save',s:'wishlist'},{t:'Autopilot',e:'🤖',a:'autopilot'},{t:'Money moves',e:'🔄',a:'moves'},{t:'Budget swap',e:'🔀',a:'swap'}]},
   {id:'growing',label:'Growing',colour:'mint',items:[{t:'Goals (shared)',e:'🎯',v:'save',s:'sharedgoals',m:1},{t:'Kids\' goals',e:'🧒',v:'save',s:'goals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds',m:1},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
-  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide',m:1},{t:'Search accounts',e:'🔍',a:'search'},{t:'Etsy business',e:'🛍️',a:'etsy'}]}
+  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide',m:1},{t:'Search accounts',e:'🔍',a:'search'},{t:'Shop business',e:'🛍️',a:'shop'}]}
  ];
  const TABS=[
   {k:'home',t:'Home',svg:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'},
@@ -73,7 +73,7 @@
   return '<div class="fh-energy" role="img" aria-label="'+lit+' of 10 segments of spare money left">'+h+'</div>';
  }
  function safeBlock(d,week){
-  if(d.safe&&d.safe.hidden)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">On Jaimi\'s profile</div><p class="fh-note">Ask Jaimi to check this one with you.</p>';
+  if(d.safe&&d.safe.hidden)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">On '+esc((d.names&&d.names.owner)||'the owner')+'\'s profile</div><p class="fh-note">Ask '+esc((d.names&&d.names.owner)||'them')+' to check this one with you.</p>';
   if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">Update your balances so this number can be trusted.</p><button type="button" class="fh-btn" onclick="openMoneyUpdate()">↥ Update Money</button>';
   const s=d.safe.safe,left=week.daysLeft+1,perDay=s>0?Math.floor(s/left):0;
   return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big'+(s<0?' fh-bad':'')+'">'+aud(s)+' <span>'+(s>0?'· '+aud(perDay)+' a day':s<0?'· hold off on extras':'')+'</span></div>'+energy(s,d.safe.free)+(s<0?'<p class="fh-note">What is already spoken for is more than what is in there.</p>':'');
@@ -87,10 +87,10 @@
   if(!list.length)return '<p class="fh-note">'+empty+'</p>';
   return list.map(g=>{const p=g.target>0?clamp(Math.round(g.saved/g.target*100),0,100):0;return '<div class="fh-row"><span class="fh-rn">'+esc(g.emoji||'')+' '+esc(g.name)+'</span><span class="fh-rv">'+(g.target>0?aud(g.saved)+' of '+aud(g.target):aud(g.saved)+' saved')+'</span><span class="fh-bar"><i style="width:'+p+'%"></i></span></div>';}).join('')+'<button type="button" class="fh-link" onclick="'+go+'">See all ›</button>';
  }
-function etsyCard(e){
+function shopCard(e){
   if(!e)return '';
   const body=e.locked?'<p class="fh-note">🔒 Unlock with your passcode.</p>':e.connected?'<p class="fh-note">This month: '+aud(e.month.in)+' in · '+aud(e.month.out)+' out</p>':'<p class="fh-note">Not started yet. It shows up here once your shop is added.</p>';
-  return card('etsy','The ADHD Design Mum',body+'<button type="button" class="fh-btn" onclick="FinHome.act(\'etsy\')">Open shop</button>','fh-etsy');
+  return card('shop',e.name||'Your shop',body+'<button type="button" class="fh-btn" onclick="FinHome.act(\'shop\')">Open shop</button>','fh-shop');
  }
  function homeHtml(d){
   const week=D.budgetWeek(d.today),alert=d.alert||{count:0};
@@ -104,7 +104,7 @@ function etsyCard(e){
    +card('accounts','Accounts',jars(d.jars||[]))
    +card('goals','Goals',bars(d.goals||[],'No goals yet. Add one in Goals.','FinHome.tab(\'goals\')'))
    +card('funds','Sinking funds',bars(d.funds||[],'No sinking funds yet.','FinHome.tab(\'funds\')'))
-   +files+etsyCard(d.etsy)+'</div>';
+   +files+shopCard(d.shop)+'</div>';
  }
 
  /* ---------- actions (wired to the page by the build patch) ---------- */

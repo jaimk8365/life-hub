@@ -57,15 +57,15 @@
   cands.sort((a,b)=>b.score-a.score);
   return{txn:cands[0].txn,others:cands.length-1,sure:cands.length===1||cands[0].score>cands[1].score};
  }
- const ETSY=/etsy|postage|packaging|packing|mailer|sticker|label|australia\s*post|auspost|canva|printify|printful|print\s*shop|cardstock|laminat/i;
+ const shopRe=()=>{const extra=(globalThis.FIN_CONFIG||{}).shopWords;return new RegExp('postage|packaging|packing|mailer|sticker|shipping label|print\\s*shop|cardstock|laminat'+(extra?'|'+extra:''),'i');};
  const TAXY=/stationery|uniform|union|professional|membership|software|subscription|training|course|laptop|work\s*(boots|shirt)|tools?\b|home\s*office|internet|phone/i;
  /* Suggest where a document belongs. If it is unclear Pip should ask (ask:true). */
  function suggest(f,text){
   if(f.kind==='bill')return{dest:'bill',ask:false,why:'It asks for payment.'};
   const s=(f.shop||'')+' '+(text||'');
-  if(ETSY.test(s))return{dest:'etsy',ask:false,why:'Looks like shop supplies.'};
+  if(shopRe().test(s))return{dest:'shop',ask:false,why:'Looks like shop supplies.'};
   if(TAXY.test(s))return{dest:'tax',ask:true,why:'Might be a tax deduction.'};
-  return{dest:null,ask:true,why:'Is this Home, Tax or Etsy?'};
+  return{dest:null,ask:true,why:'Is this Home, Tax or the shop?'};
  }
  /* ---- PDF text, on the device ---- */
  const latin=bytes=>{let s='';const step=0x8000;for(let i=0;i<bytes.length;i+=step)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+step));return s;};

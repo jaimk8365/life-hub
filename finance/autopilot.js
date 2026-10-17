@@ -4,13 +4,8 @@
  'use strict';
  const round=n=>Math.round((+n||0)*100)/100;
  const isTransferIn=t=>t&&t.amount>0&&!t.deleted&&(t.cat==='transfer'||/transfer/i.test(t.note||''));
- /* Built-in rules from the plan. Matching is by account, amount (small tolerance) and timing. */
- const BUILTIN=[
-  {id:'rule_bali',name:'$205 to Savings on Wednesdays → Bali',builtin:true,enabled:true,match:{acct:'savings',amount:205,tol:1,dow:3,dowTol:1,every:'weekly'},action:{kind:'goal',ref:'goal_bali',label:'Bali'}},
-  {id:'rule_christmas',name:'$200 monthly → Christmas',builtin:true,enabled:true,match:{acct:'savings',amount:200,tol:1,every:'monthly'},action:{kind:'fund',re:'christmas|xmas',label:'Christmas'}},
-  {id:'rule_luna',name:'$50 weekly → Luna emergency',builtin:true,enabled:true,match:{acct:'savings',amount:50,tol:0.5,every:'weekly'},action:{kind:'fund',re:'luna.*emergenc|emergenc.*luna',label:'Luna emergency'}},
-  {id:'rule_ratescar',name:'$100 weekly → Rates and car maintenance',builtin:true,enabled:true,match:{acct:'savings',amount:100,tol:0.5,every:'weekly'},action:{kind:'fund',re:'rates\\s*(and|&)\\s*car',label:'Rates and car maintenance'}}
- ];
+ /* Built-in rules (amounts, accounts, where each goes) are described in FIN_CONFIG inside the encrypted page. */
+ const builtin=()=>((globalThis.FIN_CONFIG||{}).rules||[]).map(r=>Object.assign({builtin:true,enabled:true},r));
  function dowGap(a,b){const d=Math.abs(a-b)%7;return Math.min(d,7-d);}
  function matchRule(rule,txn){
   if(!rule||rule.enabled===false||!isTransferIn(txn))return false;
@@ -58,7 +53,7 @@
   }
   return out.sort((a,b)=>b.count-a.count||a.key.localeCompare(b.key));
  }
- /* Turn Pip's question and Jaimi's answer into a rule. */
+ /* Turn Pip's question and the answer into a rule. */
  function ruleFromAnswer(p,answer,uid){
   const label=String(answer&&answer.label||'').trim();
   if(!label)throw Error('Tell Pip what it is for.');
@@ -70,5 +65,5 @@
   const limit=maxDays==null?4:maxDays;
   return accounts.map(a=>{const dates=txns.filter(t=>t.acct===a.id&&!t.deleted).map(t=>t.date);const last=dates.length?dates.reduce((m,d)=>d>m?d:m,dates[0]):null;const age=last?D.diffDays(last,today):null;return{id:a.id,name:a.name,last,age,ok:age!=null&&age<=limit};});
  }
- return{BUILTIN,isTransferIn,matchRule,applyRules,detectPatterns,ruleFromAnswer,feedStatus,periodKey};
+ return{builtin,isTransferIn,matchRule,applyRules,detectPatterns,ruleFromAnswer,feedStatus,periodKey};
 });

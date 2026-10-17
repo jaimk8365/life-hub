@@ -91,7 +91,7 @@
    const b=(f.bills||[]).slice(0,4);if(!b.length)return A('No bills are due in the next 7 days.');
    return A(b.map(x=>x.name+' '+aud(x.amount)+' on '+x.dueLabel).join('; ')+'.',b.map(x=>x.amount));
   }
-  if(/goal|bali|saving|holiday|fund/.test(text)){
+  if(/goal|saving|holiday|trip|fund/.test(text)){
    const g=(f.goals||[]).slice(0,4);if(!g.length)return A('You have no goals yet. Add one in Goals.');
    return A(g.map(x=>x.name+': '+aud(x.saved)+(x.target>0?' of '+aud(x.target)+' ('+x.pct+'%)':' saved so far')).join('. ')+'.',g.flatMap(x=>[x.saved].concat(x.target>0?[x.target,x.pct]:[])));
   }

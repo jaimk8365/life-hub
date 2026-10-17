@@ -45,21 +45,19 @@
  function setMini(g,id,fields){const m=(g.minis||[]).find(x=>x.id===id);if(!m)throw Error('Mini budget not found.');if(fields.name!=null)m.name=String(fields.name).trim()||m.name;if(fields.target!=null)m.target=round(Math.max(0,fields.target));return m;}
  function removeMini(g,id){g.minis=(g.minis||[]).filter(x=>x.id!==id);}
 
- /* The Bali goal Jaimi asked for: a shared holiday, no total yet, $205 every Wednesday into Savings. */
- function baliGoal(uid,now){return newGoal({id:'goal_bali',type:'holiday',name:'Bali',emoji:'🏝️',owner:'shared',target:0,fundRule:{amount:205,freq:'weekly',dow:3,acct:'savings'},now},uid);}
+ /* A starter goal can be described in FIN_CONFIG (inside the encrypted page). Returns null when there is none. */
+ const cfg=()=>(globalThis.FIN_CONFIG)||{};
+ function seedGoal(uid,now){const g=cfg().goalSeed;return g?newGoal(Object.assign({},g,{now}),uid):null;}
 
  /* ---------- sinking funds ---------- */
- const BUCKETS=[
-  {key:'christmas',name:'Christmas',emoji:'🎄',amount:200,freq:'monthly',re:/christmas|xmas/i},
-  {key:'luna',name:'Luna emergency',emoji:'🐾',amount:50,freq:'weekly',re:/luna.*emergenc|emergenc.*luna/i},
-  {key:'ratescar',name:'Rates and car maintenance',emoji:'🏠',amount:100,freq:'weekly',re:/rates\s*(and|&)\s*car/i}
- ];
+ /* Must-pay buckets (name, amount, how often) come from FIN_CONFIG; each has a matching pattern so an existing fund is never duplicated. */
+ const buckets=()=>(cfg().buckets||[]).map(b=>Object.assign({},b,{re:new RegExp(b.re||'^$','i')}));
  const yearly=(amount,freq)=>round(freq==='weekly'?amount*52:freq==='fortnightly'?amount*26:amount*12);
  /* Adds any of the three must-pay buckets that are missing (matched by their own name, so similar older funds are left alone).
     Never changes or deletes a fund that already exists. */
  function ensureBuckets(funds,uid){
   const added=[],marked=[];
-  for(const b of BUCKETS){
+  for(const b of buckets()){
    const hit=funds.find(f=>b.re.test(f.name||''));
    if(hit){if(hit.mapAmount==null&&!hit.mapTbd){hit.mapAmount=b.amount;hit.mapFrequency=b.freq;marked.push(hit.name);}continue;}
    const f={id:uid(),name:b.name,emoji:b.emoji,annual:yearly(b.amount,b.freq),saved:0,due:'',mapAmount:b.amount,mapFrequency:b.freq,acct:'savings',note:'Must-pay bucket'};
@@ -79,5 +77,5 @@
   f.saved=round((f.saved||0)-a);f.log=f.log||[];f.log.push({id:uid(),date,amount:-a,note:String(note||'').trim()||'Spent from this bucket'});
   return f;
  }
- return{TYPES,HOLIDAY_MINIS,DOW,BUCKETS,newGoal,cleanRule,ruleText,nextRuleDate,weeklyEquivalent,goalSaved,miniSaved,goalTarget,goalProgress,addMini,setMini,removeMini,baliGoal,ensureBuckets,reconcile,takeFromBucket,yearly};
+ return{TYPES,HOLIDAY_MINIS,DOW,buckets,newGoal,cleanRule,ruleText,nextRuleDate,weeklyEquivalent,goalSaved,miniSaved,goalTarget,goalProgress,addMini,setMini,removeMini,seedGoal,ensureBuckets,reconcile,takeFromBucket,yearly};
 });
