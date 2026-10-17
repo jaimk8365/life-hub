@@ -6,13 +6,12 @@ Newest at the top. Keep each entry to a few lines.
 - Baton: free (last: Claude chat, 17/10/2026 18:05)
 - What changed last: (1) Finance now really shows Ocean Day/Dusk: Life Hub's shared theme-jaimi.css was forcing cream/pink with !important, so Jaimi's Finance re-asserts its Ocean tokens on body (end of finance/household-dashboard.css, "OCEAN OVERRIDE v2"); big headings now Fredoka not serif. (2) The outer wrapper finance/app.html is Ocean too, follows the saved Day/Dusk choice, and its top bar scrolls instead of overflowing. (3) My Planner and Notes moved under "Your day" in the sidebar and phone More panel. Cache v62.
 - Files touched: finance/app.html, finance/household-dashboard.css, finance/index.html (rebuilt), src/finance.html, sw.js, index.html, tests/copilot-shell.test.mjs, tools/ocean-theme-patches.mjs, AGENTS.md, PROGRESS.md
-- Half-done: nothing. NOT pushed.
+- Half-done: nothing. PUSHED 17/10 19:29 (5ff9a6c); GitHub Pages build green; live finance, wrapper and home files match local; cache v62.
 - Proof it works: tests 372/372. Headless Chrome screenshots of src/finance.html in Day and Dusk and of app.html (saved in src/finance-redesign/shots/) show the aqua/navy palette. Not yet checked on a real phone/iPad. Headings font change was built after the screenshots, so look at it first.
-- Next step: Jaimi checks Finance on her Mac after a push (ask first). Then Finance redesign step 1.2.
+- Next step: Jaimi hard-refreshes and checks Finance (Safari: Cmd+Option+E then Cmd+R). Then Finance redesign step 1.2 and the Your day Today/Planner merge.
 - Back-ups made: .lifehub-backups/ocean-wrapper-20261017-1746/, src/backups/finance-pre-ocean-wrapper-20261017-1746.html, .lifehub-backups/index-pre-nav-*.html
 
 ## Up next
-- [ ] Ask Jaimi to push the Ocean wrapper fix + Planner nav move; after the push check the GitHub Pages run finished, then she hard-refreshes (Safari: Cmd+Option+E then Cmd+R).
 - [ ] Your day: merge Co-Pilot Today with the Planner day timeline (Today currently shows a fixed timeline and does not show Planner blocks; Planner only counts as busy time). Then one shared on-device Pip for Your day. Plan first, back up first.
 - [ ] Budget Swap (Finance): enter a new cost (e.g. phone $140/mo), Pip suggests non-essential categories to swap so the total stays equal; builds on affordabilityTradeoffs(). Add after Phase 4 (goals).
 - [ ] Finance redesign (src/finance-redesign/BRIEF.md): 0.1, 0.2 and 1.1 done. Next is 1.2: one shared date helper (budget week Wed–Tue, day X of 7, countdowns, synced X ago) with tests.
