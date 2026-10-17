@@ -3,10 +3,11 @@
 Newest at the top. Keep each entry to a few lines.
 
 ## Up next
-- [ ] Finance redesign: follow src/finance-redesign/BRIEF.md one step at a time, starting with Phase 0 (step 0.1 is the test failures below). Design mock-ups are in src/finance-redesign/design/.
+- [ ] Finance redesign (src/finance-redesign/BRIEF.md): 0.1, 0.2 and 1.1 done. Next is 1.2: one shared date helper (budget week Wed–Tue, day X of 7, countdowns, synced X ago) with tests.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 17/10/2026 – Finance redesign step 1.1 done: Ocean colours with Day/Dusk (auto from device, override in Insights > Settings & month-end tools > Appearance, saved per device under lifehub_fin_theme). Fonts now Fredoka + Nunito. Layout unchanged. Added tools/ocean-theme-patches.mjs; src/finance.html and finance/index.html rebuilt (backups: src/backups/finance-pre-ocean-2026-10-17.html, .lifehub-backups/ocean-1.1/). Cache v60. Tests 372/372. Matthew's partner app NOT re-themed yet.
 - 17/10/2026 – Finance now opens in the SAME tab (was a new tab): Open Finance link and show('finance') in index.html; tests updated; service worker cache bumped to v59. Tests 372/372. Not committed or pushed yet.
 - 17/10/2026 – Committed Co-Pilot, automation fixes and test updates (22 files, reviewed list). Not pushed yet. Left out on purpose: tools/build_bali_fund_pdf.py, tools/create-lifehub-template.mjs, package-lock.json.
 - 17/10/2026 – Full test suite passes: 372/372. Installed the free dev-only test helper fake-indexeddb (npm install; node_modules is git-ignored). Updated tests/finance-separation.test.mjs: its fake browser now has setInterval, querySelectorAll, URLSearchParams and location, and the 'storage unavailable' case now expects Co-Pilot (the new front door) instead of Hub. package-lock.json only changed its name field.
