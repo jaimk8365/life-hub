@@ -159,12 +159,13 @@
     <span class="nav-label">Your day</span>
     <button id="b-copilot" class="routebtn" onclick="showCopilot('now')"><span class="ico">🎯</span><span>Now</span></button>
     <button class="routebtn" onclick="showCopilot('today')"><span class="ico">📅</span><span>Today</span></button>
+    <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Planner</span></button>
     <button class="routebtn" onclick="showCopilot('inbox')"><span class="ico">📥</span><span>Inbox</span><span class="count-badge" data-inbox-count hidden>0</span></button>
     <button class="routebtn" onclick="showCopilot('ideas')"><span class="ico">💡</span><span>Idea Vault</span></button>
     <button class="routebtn" onclick="showCopilot('etsy')"><span class="ico">🛍️</span><span>Etsy Studio</span></button>
+    <button class="routebtn" onclick="showCopilot('notes')"><span class="ico">🗒️</span><span>Notes</span></button>
     <span class="nav-label">Life</span>
     <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
-    <button id="b-plan" onclick="show('plan')"><span class="ico">📆</span><span>My Planner</span></button>
     <button id="b-tasks" onclick="show('tasks')"><span class="ico">✅</span><span>Tasks</span></button>
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
     <button id="b-recipes" class="sec" onclick="show('recipes')"><span class="ico">📖</span><span>Recipes</span></button>
@@ -173,7 +174,6 @@
     <button id="b-kids" class="sec" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
     <button id="b-family" class="sec" onclick="show('family')"><span class="ico">👨‍👩‍👧‍👦</span><span>Family</span></button>
     <a id="b-finance" class="finance-link" href="./finance/app.html"><span class="ico" aria-hidden="true">💰</span><span>Open Finance</span></a>
-    <button class="routebtn" onclick="showCopilot('notes')"><span class="ico">🗒️</span><span>Notes</span></button>
     <span class="nav-label">Just for me</span>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
@@ -198,6 +198,7 @@
     <h2>Your day</h2>
     <button onclick="showCopilot('now')"><span class="ico">🎯</span>Now</button>
     <button onclick="showCopilot('today')"><span class="ico">📅</span>Today</button>
+    <button onclick="showFromMore('plan')"><span class="ico">📆</span>My Planner</button>
     <button onclick="showCopilot('inbox')"><span class="ico">📥</span>Inbox <span class="count-badge" data-inbox-count hidden>0</span></button>
     <button onclick="showCopilot('ideas')"><span class="ico">💡</span>Idea Vault</button>
     <button onclick="showCopilot('etsy')"><span class="ico">🛍️</span>Etsy Studio</button>
@@ -206,7 +207,6 @@
     <button onclick="showCopilot('settings')"><span class="ico">⚙️</span>Settings</button>
     <h2>Life</h2>
     <button onclick="showFromMore('hub')"><span class="ico">🏡</span>Life Hub</button>
-    <button onclick="showFromMore('plan')"><span class="ico">📆</span>My Planner</button>
     <button onclick="showFromMore('tasks')"><span class="ico">✅</span>Tasks</button>
     <button onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
     <button onclick="showFromMore('recipes')"><span class="ico">📖</span>Recipes</button>

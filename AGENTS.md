@@ -36,8 +36,19 @@
 - ADHD-friendly: big clear buttons, visible cues, minimal clutter, low friction.
 - Match the existing colours and fonts (`theme-jaimi.css`).
 
+## Working with other AIs (hand-off)
+Claude (chat), Claude Code and Codex all work on this same folder, ONE AT A TIME.
+- PROGRESS.md starts with a "Hand-off" block. Read it first. Fill it in again when you finish (use /save-progress or $save-progress).
+- Baton: the Hand-off block says who is working. If it names another AI and isn't "free", stop and ask me before touching anything.
+- Never say a step is done without proof: the test result, and for anything visual a screenshot or the exact tab to open. "It should work" is not proof.
+- Before changing a file in src/ (it has no git history), copy it to src/backups/ with the date and time in the name.
+- Never push. Ask me first. After a push, check the GitHub Pages run finished.
+- If you run out of tokens mid-step, say so plainly and describe what is half-done. The next AI will work it out from git diff.
+
 ## Start of every task
-- Read PROGRESS.md first to see where we're up to.
+- Read AGENTS.md, then the Hand-off block and "Up next" in PROGRESS.md.
+- Check the baton, then run the tests to confirm the starting point is healthy.
 
 ## End of every task
-- Update PROGRESS.md: date, what changed, anything broken, next step.
+- Update PROGRESS.md: Done line (date, what changed, which AI), Up next, Known issues, and refill the Hand-off block with proof and the baton set to "free".
+- Tell me exactly which tab to open and what to click to check it.

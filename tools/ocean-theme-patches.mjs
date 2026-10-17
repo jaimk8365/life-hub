@@ -1,6 +1,6 @@
 // Ocean theme (Day/Dusk) for the Finance page. Idempotent; used by tests to replay the patch chain.
 export function patchOceanFinance(source){
-  const bump=t=>t.replace(/household-dashboard\.css\?v=[^"']+/g,'household-dashboard.css?v=20261017-ocean');
+  const bump=t=>t.replace(/household-dashboard\.css\?v=[^"']+/g,'household-dashboard.css?v=20261017-ocean3');
   let s=source;
   const must=(cond,msg)=>{if(!cond)throw new Error(msg)};
 
