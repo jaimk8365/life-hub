@@ -3,21 +3,23 @@
 Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
-- Baton: free (last: Claude chat, 17/10/2026 18:05)
-- What changed last: (1) Finance now really shows Ocean Day/Dusk: Life Hub's shared theme-jaimi.css was forcing cream/pink with !important, so Jaimi's Finance re-asserts its Ocean tokens on body (end of finance/household-dashboard.css, "OCEAN OVERRIDE v2"); big headings now Fredoka not serif. (2) The outer wrapper finance/app.html is Ocean too, follows the saved Day/Dusk choice, and its top bar scrolls instead of overflowing. (3) My Planner and Notes moved under "Your day" in the sidebar and phone More panel. Cache v62.
-- Files touched: finance/app.html, finance/household-dashboard.css, finance/index.html (rebuilt), src/finance.html, sw.js, index.html, tests/copilot-shell.test.mjs, tools/ocean-theme-patches.mjs, AGENTS.md, PROGRESS.md
-- Half-done: nothing. PUSHED 17/10 19:29 (5ff9a6c); GitHub Pages build green; live finance, wrapper and home files match local; cache v62.
-- Proof it works: tests 372/372. Headless Chrome screenshots of src/finance.html in Day and Dusk and of app.html (saved in src/finance-redesign/shots/) show the aqua/navy palette. Not yet checked on a real phone/iPad. Headings font change was built after the screenshots, so look at it first.
-- Next step: Jaimi hard-refreshes and checks Finance (Safari: Cmd+Option+E then Cmd+R). Then Finance redesign step 1.2 and the Your day Today/Planner merge.
-- Back-ups made: .lifehub-backups/ocean-wrapper-20261017-1746/, src/backups/finance-pre-ocean-wrapper-20261017-1746.html, .lifehub-backups/index-pre-nav-*.html
+- Baton: free (last: Claude Code, 18/10/2026)
+- What changed last: Finance redesign steps 1.2, 1.3, 1.4 and Phase 2 (new Home) built together. (1.2) finance/fin-dates.js: one date helper (budget week Wed to Tue, day X of 7, countdowns, "X ago"). (1.3) New navigation: bottom bar on phone/iPad portrait (Home, Goals, Ask Pip, Funds, More), sidebar on iPad landscape/Mac; the 11 old tabs are hidden and reachable from More in 5 groups. (1.4) "?" on every Home card (new cards have written help; older cards get a generic one). (2.1/2.2) New Home at top of Overview: week run path, Safe to Spend energy bar, Pip alert, account jars, goals strip, sinking funds strip, files inbox placeholder. Old Overview cards are still underneath. Ask Pip is a shortcut sheet only (chat comes in Phase 8).
+- Files touched: finance/fin-dates.js, finance/home-redesign.js, finance/home-redesign.css (new); tools/finance-redesign-patches.mjs (new); src/finance.html (patched); finance/index.html (rebuilt); sw.js (cache v63); tests/fin-dates.test.mjs, tests/finance-home-redesign.test.mjs (new); tests/dashboard-review-flow.test.mjs, tests/copilot-shell.test.mjs (updated); PROGRESS.md
+- Half-done: nothing. NOT committed and NOT pushed.
+- Proof it works: tests 393/393. Checked in the browser on the decrypted source (src/finance.html, demo data, not Jaimi's real numbers) at phone, iPad portrait and Mac width: Home renders, today is the gold dot, all 11 old tabs and 5 sub-tabs open from More with no console errors. Not yet checked on a real phone or iPad, or on Jaimi's real data.
+- Next step: Jaimi checks the new Home on her Mac against the design canvas (Finance > Overview). Then commit the exact files above and, only if she says yes, push and check the Pages run.
+- Back-ups made: src/backups/finance-pre-redesign-20261018-0901.html, .lifehub-backups/finance-index-pre-redesign-*.html
 
 ## Up next
 - [ ] Your day: merge Co-Pilot Today with the Planner day timeline (Today currently shows a fixed timeline and does not show Planner blocks; Planner only counts as busy time). Then one shared on-device Pip for Your day. Plan first, back up first.
 - [ ] Budget Swap (Finance): enter a new cost (e.g. phone $140/mo), Pip suggests non-essential categories to swap so the total stays equal; builds on affordabilityTradeoffs(). Add after Phase 4 (goals).
-- [ ] Finance redesign (src/finance-redesign/BRIEF.md): 0.1, 0.2 and 1.1 done. Next is 1.2: one shared date helper (budget week Wed–Tue, day X of 7, countdowns, synced X ago) with tests.
+- [ ] Finance redesign (src/finance-redesign/BRIEF.md): 0.1, 0.2, 1.1 to 1.4 and Phase 2 done (once Jaimi OKs the look). Next is Phase 3 (two profiles, plan mode first), then goals/sinking funds (Phase 4). Still to polish: Home shows real Safe to Spend only when balances are trusted; Home sinking-fund strip uses the old FUNDS list until Phase 4.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 18/10/2026 – Finance redesign 1.2 to 1.4 + Phase 2 Home: date helper, new navigation (5 tabs / sidebar, old tabs under More), ? help on Home cards, new Home (week path, Safe to Spend bar, jars, goals, sinking funds, files placeholder). Cache v63. Tests 393/393. Not committed or pushed. – Claude Code
+- 18/10/2026 – Handoff pack made: ~/Desktop/App Building/ now holds both guides (moved from ~/AI Projects/_guides) and Life Hub Co-Pilot/ (START HERE handoff, spec, mockup pictures + HTML, shortcuts to these instruction files). Spec copy refreshed in tmp/. No app code changed. – Claude chat
 - 17/10/2026 – Moved My Planner and Notes under "Your day" (sidebar and phone More panel). Tests 372/372. Not pushed. – Claude chat
 - 17/10/2026 – Fixed Finance still looking cream/pink: theme-jaimi.css forced the old palette with !important; added a Finance-only Ocean override, re-themed finance/app.html (colours, Day/Dusk follow, top bar no longer cut off), headings now Fredoka. Cache v62, test updated. Tests 372/372. Not pushed. – Claude chat
 - 17/10/2026 – Set up Claude/Codex hand-off: Hand-off block in PROGRESS.md, rules in AGENTS.md, /carry-on and /save-progress (and $ versions) updated, guide at ~/AI Projects/_guides/5-Claude-and-Codex-Handoff.md. – Claude chat
