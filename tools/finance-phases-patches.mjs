@@ -49,6 +49,20 @@ function fallbackHome(s){
   must(s.includes(at),'fallback2 anchor');
   return s.replace(at,marker+"\nif(typeof FinHome==='undefined'){var FinHome={hooks:{},navHtml:()=>'',everythingHtml:()=>'',homeHtml:()=>'',activeTab:()=>'home',genericHelp:t=>[t,''],help(){},tab(){},open(){},act(){},SECTIONS:[]};}\n"+at);
 }
+/* Home needs to know which account a personal goal or fund sits in, so Matt's profile can apply the partner rule. */
+function homeDataFix(s){
+  s=s.replace("saved:goalSaved(g),target:+g.target||0}));\n  const funds=","saved:goalSaved(g),target:+g.target||0,personal:true,acct:g.acct}));\n  const funds=");
+  s=s.replace("saved:+f.saved||0,target:+f.annual||0})).slice(0,4);","saved:+f.saved||0,target:+f.annual||0,acct:f.acct}));");
+  s=s.replace("goals:shared.concat(own).slice(0,4),funds,","goals:shared.concat(own),funds,");
+  return s;
+}
+function fallbackProfile(s){
+  const marker='/* PHASES FALLBACK 3 */';
+  if(s.includes(marker))return s;
+  const at='/* FINANCE REDESIGN v1 */';
+  must(s.includes(at),'fallback3 anchor');
+  return s.replace(at,marker+"\nif(typeof FIN_PROFILE==='undefined'){var FIN_PROFILE='jaimi';}\n"+at);
+}
 function phase4(s){
   s=once(s,'<script src="../finance/profiles.js?v='+V+'"></script>','<script src="../finance/profiles.js?v='+V+'"></script>\n<script src="../finance/goals-funds.js?v='+V+'"></script>','p4 head');
   s=once(s,"function renderSharedGoals(){","function renderSharedGoals(){renderSharedGoalsBase();finGoalsExtra();}\nfunction renderSharedGoalsBase(){",'shared goals');
@@ -91,6 +105,8 @@ export function patchPhasesFinance(source){
   s=phase4(s);
   s=fallbacks(s);
   s=fallbackHome(s);
+  s=fallbackProfile(s);
+  s=homeDataFix(s);
   s=phase5(s);
   s=phase6(s);
   s=phase7(s);

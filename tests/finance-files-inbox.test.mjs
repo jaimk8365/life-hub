@@ -54,3 +54,13 @@ test('text is read out of a real compressed PDF on the device',async()=>{
  const f=F.extractFields(text);assert.equal(f.amount,89.5);assert.equal(f.date,'2026-10-14');assert.equal(f.shop,'Bunnings Warehouse');
  assert.equal(await F.pdfText(new Uint8Array(Buffer.from('not a pdf'))),'');
 });
+
+test('text is found when the PDF has several streams and the page content is not the first',async()=>{
+ const mk=(dict,body)=>Buffer.concat([Buffer.from('<< '+dict+' >>\nstream\n','latin1'),body,Buffer.from('\nendstream\nendobj\n','latin1')]);
+ const font=mk('/Length 20 /Filter /FlateDecode',zlib.deflateSync(Buffer.from('binary font data \x00\x01 no text ops')));
+ const page=mk('/Length 99 /Filter /FlateDecode',zlib.deflateSync(Buffer.from('BT (Kmart Ipswich) Tj 0 -14 Td (Total $23.00) Tj ET','latin1')));
+ const plain=mk('/Length 30',Buffer.from('BT (Plain text stream) Tj ET','latin1'));
+ const pdf=Buffer.concat([Buffer.from('%PDF-1.4\n1 0 obj\n','latin1'),font,Buffer.from('2 0 obj\n','latin1'),page,Buffer.from('3 0 obj\n','latin1'),plain,Buffer.from('%%EOF')]);
+ const text=await F.pdfText(new Uint8Array(pdf));
+ assert.match(text,/Kmart Ipswich/);assert.match(text,/Total \$23\.00/);assert.match(text,/Plain text stream/);
+});

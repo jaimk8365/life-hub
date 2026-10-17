@@ -37,3 +37,17 @@ test("Matt's goals and funds screens are filtered, and other views are guarded",
  for(const sv of ['wishlist','goals','invest'])assert.equal(c.finGuardSave(sv),'sharedgoals',sv);assert.equal(c.finGuardSave('funds'),'funds');
 });
 test("in Jaimi's profile nothing is hidden",()=>{const c=sandbox(null);assert.equal(c.finGuardView('debts'),'debts');assert.equal(c.finGuardSave('wishlist'),'wishlist');assert.equal(c.finIsMatt(),false);});
+
+test("personal goals and funds only reach Matt when they sit in a shared account (same rule as the partner snapshot)",()=>{
+ const c=sandbox('matt'),d=JSON.parse(JSON.stringify(home));
+ d.goals=[{name:'Couch',personal:true,acct:'jspend'},{name:'Rego',personal:true,acct:'bills'},{name:'Loose',personal:true},{name:'Bali',owner:'shared'}];
+ d.funds=[{name:'Rates',acct:'savings'},{name:'Own stash',acct:'jspend'},{name:'No account'}];
+ const out=c.finProfileData(d);
+ assert.equal(JSON.stringify(out.goals.map(g=>g.name)),'["Rego","Bali"]');assert.equal(JSON.stringify(out.funds.map(f=>f.name)),'["Rates","No account"]');
+ const j=sandbox(null).finProfileData(JSON.parse(JSON.stringify({...d})));assert.equal(j.goals.length,4);
+});
+test('Pip pay-in-4 text is caught by the partner privacy filter',()=>{
+ const P=require('../finance/pip.js'),c=P.buildChecks({categories:[],recurring:[{label:'Afterpay',perMo:40,bnpl:true}],safe:{trusted:true,safe:500},goals:[]});
+ const re=/zip\b|latitude|pay-?in-?4|payin4|j\s?spending|jspend|wishlist/i;
+ assert.ok(c.weekly.leaks.every(l=>re.test(l)||!/afterpay|pay/i.test(l)));assert.ok(c.weekly.actions.every(a=>!/pay/i.test(a)||re.test(a)));
+});

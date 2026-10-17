@@ -22,7 +22,7 @@
   high.slice(0,2).forEach(c=>{checks.push({id:'high_'+c.name,tone:'warn',priority:60,title:c.name+' is on track to go over',detail:'At this pace it will pass '+aud(c.budget)+'.'});improve.push(c.name+' is tracking high.');});
   if(f.fees&&f.fees.month>0){leaks.push('Fees cost '+aud(f.fees.month)+' this month.');actions.push('Ask your bank to waive or switch away from the fees.');checks.push({id:'fees',tone:'warn',priority:70,title:'Fees this month',detail:aud(f.fees.month)+' in '+f.fees.count+' charge'+(f.fees.count===1?'':'s')+'.'});}
   const bnpl=(f.recurring||[]).filter(r=>r.bnpl);
-  if(bnpl.length){leaks.push('Pay later spotted: '+bnpl.slice(0,3).map(b=>b.label).join(', ')+'.');actions.push('Finish one pay-later plan before starting another.');checks.push({id:'bnpl',tone:'warn',priority:65,title:'Pay-later payments spotted',detail:bnpl.length+' repeating.'});}
+  if(bnpl.length){leaks.push('Pay-in-4 style payments spotted: '+bnpl.slice(0,3).map(b=>b.label).join(', ')+'.');actions.push('Finish one pay-in-4 plan before starting another.');checks.push({id:'bnpl',tone:'warn',priority:65,title:'Pay-later payments spotted',detail:bnpl.length+' repeating.'});}
   const regular=(f.recurring||[]).filter(r=>!r.bnpl&&r.perMo>0).sort((a,b)=>b.perMo-a.perMo);
   if(regular.length>=3){const top=regular.slice(0,3),tot=top.reduce((s,r)=>s+r.perMo,0);actions.push('Your 3 biggest regular payments add up to '+aud(tot)+' a month. Worth a look.');}
   if(f.safe&&f.safe.trusted&&f.safe.safe<0){checks.push({id:'safe_neg',tone:'bad',priority:95,title:'More is spoken for than is in Everyday',detail:'Hold off on extras until payday.'});improve.push('Safe to spend is below zero.');}
@@ -48,7 +48,7 @@
   add('Safe to spend',safe==null?15:safe>=200?25:safe>=0?15+safe/200*10:Math.max(0,15+safe/50),25,safe==null?'Needs fresh balances':safe<0?'Below zero':'Healthy');
   add('Fees and pay-later',20-Math.min(10,(f.fees&&f.fees.month||0)/10)-((f.recurring||[]).some(r=>r.bnpl)?6:0),20,(f.fees&&f.fees.month>0)||(f.recurring||[]).some(r=>r.bnpl)?'Some to clear':'Clean');
   const goals=(f.goals||[]).filter(g=>g.target>0),avg=goals.length?goals.reduce((s,g)=>s+Math.min(100,g.pct),0)/goals.length:50;
-  add('Goals and funds',10+avg/100*5+(f.funds&&f.funds.status==='ok'?0:-3)+(f.funds&&f.funds.status==='ok'?0:0),15,f.funds&&f.funds.status==='ok'?'Every dollar has a job':'Check the buckets');
+  add('Goals and funds',10+avg/100*5+(f.funds&&f.funds.status==='ok'?0:-3),15,f.funds&&f.funds.status==='ok'?'Every dollar has a job':'Check the buckets');
   const dataOk=f.safe&&f.safe.trusted;add('Fresh data',dataOk?10:4,10,dataOk?'Balances are current':'Update balances');
   let score=Math.round(parts.reduce((s,p)=>s+p.points,0));
   if(f.wealth&&f.wealth.health!=null)score=Math.round(score*0.7+f.wealth.health*0.3);

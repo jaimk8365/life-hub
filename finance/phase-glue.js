@@ -16,11 +16,12 @@ function finProfileData(d){
   const p=FIN_PROFILE,P=FinProfiles;
   const out=Object.assign({},d);
   out.jars=(d.jars||[]).filter(j=>P.canSee(p,{acct:j.id,name:j.name}));
-  out.goals=(d.goals||[]).filter(g=>P.canSee(p,{name:g.name,owner:g.owner}));
-  out.funds=(d.funds||[]).filter(f=>P.canSee(p,{name:f.name,owner:f.owner}));
+  const sharedAcct=a=>P.SHARED_ACCOUNTS.includes(a);
+  out.goals=(d.goals||[]).filter(g=>P.canSee(p,{name:g.name,owner:g.owner})&&(p==='jaimi'||!g.personal||sharedAcct(g.acct))).slice(0,4);
+  out.funds=(d.funds||[]).filter(f=>P.canSee(p,{name:f.name,owner:f.owner})&&(p==='jaimi'||sharedAcct(f.acct||'savings'))).slice(0,4);
   if(p!=='jaimi'){
     out.safe={hidden:true};
-    const items=attentionChecklist().filter(i=>!i.doneNow&&!P.isPrivateText(i.text)&&!/^(buf|bal)_(jspend|zip|latitude|etsy|ubank)/.test(i.id)&&!/^bnpl_/.test(i.id));
+    const items=attentionChecklist().filter(i=>!i.doneNow&&!P.isPrivateText(i.text)&&!/^(buf|bal)_(jspend|zip|latitude|etsy|ubank)/.test(i.id)&&!/^(bnpl|goal)_/.test(i.id));
     out.alert=items.length?{count:items.length,text:items[0].text}:{count:0};
     out.account='Shared';
     out.etsy=null;
@@ -33,7 +34,9 @@ function finProfileData(d){
   }
   return out;
 }
+var _privLoaded=false;
 function finProfileStyle(){
+  if(!_privLoaded){_privLoaded=true;try{finPrivLoadPlain();}catch(e){}}
   document.body.classList.toggle('fin-matt',finIsMatt());
   const b=document.getElementById('finProfileBtn');
   if(b){const pr=FinProfiles.PROFILES[FIN_PROFILE];b.textContent=pr.initial;b.style.background=pr.colour;b.style.color='#0E2A3A';b.title=pr.name+' · tap to switch profile';}
@@ -113,11 +116,15 @@ function finPrivLoadPlain(){
   PRIV.locked={};
   ['jaimi','matt'].forEach(p=>{try{if(localStorage.getItem(FinProfiles.vaultKey(p)))PRIV.locked[p]=true;}catch(e){}});
 }
+var _privQ=Promise.resolve();
 function finPrivSave(p){
   if(FIN_KEYS[p]){
-    // sealed: the plain copy is removed so the data is only readable with this profile's passcode
-    FinProfiles.vaultSave(localStorage,p,FIN_KEYS[p],{goals:PRIV[p].goals,etsy:PRIV[p].etsy}).catch(()=>toastMsg('Could not save private items.'));
-    const all=load(K_PRIV,{});delete all[p];save(K_PRIV,all);
+    // sealed: saved in order, and the plain copy is only removed once the sealed copy is written
+    const snap=JSON.stringify({goals:PRIV[p].goals,etsy:PRIV[p].etsy});
+    _privQ=_privQ.then(async()=>{
+      await FinProfiles.vaultSave(localStorage,p,FIN_KEYS[p],JSON.parse(snap));
+      const all=load(K_PRIV,{});if(all[p]){delete all[p];save(K_PRIV,all);}
+    }).catch(()=>toastMsg('Could not save private items. They are still on screen, please try again.'));
   }else{
     if(PRIV.locked[p])return;
     const all=load(K_PRIV,{});all[p]=PRIV[p];save(K_PRIV,all);
@@ -135,7 +142,6 @@ var _finSeeded=false;
 function finSeedGoalsFunds(){
   if(_finSeeded||finIsMatt())return;_finSeeded=true;
   try{
-    finPrivLoadPlain();
     if(!load('fin_phase4_seeded_v1',false)){
       if(!SHARED_GOALS.some(g=>/bali/i.test(g.name||''))){SHARED_GOALS.push(FinGoals.baliGoal(uid));save(K_SHARED_GOALS,SHARED_GOALS);markSharedDirty();}
       FinGoals.ensureBuckets(FUNDS,uid);save(K_FUNDS,FUNDS);
@@ -304,7 +310,12 @@ function finMovesData(){
   const cash=FinMoves.cashWithdrawals(recent,accts),tags=load(K_CASH_TAGS,{});
   return{today,accts,moves,tops,cash,tags,pending:FinMoves.pendingCash(recent,accts,tags,today),counts:FinMoves.monthlyCounts(moves,cash,accts,today.slice(0,7))};
 }
+var _maKey='',_maVal=null;
 function finMoveAlert(){
+  const key=todayISO()+'|'+TXNS.length+'|'+balance('everyday');if(key===_maKey)return _maVal;
+  _maVal=finMoveAlertNow();_maKey=key;return _maVal;
+}
+function finMoveAlertNow(){
   try{
     const d=finMovesData();if(!d.tops.length)return null;
     const c=everydayCommitments(),days=FinDates.budgetWeek(d.today).daysLeft+1;
@@ -363,6 +374,8 @@ async function finAddFiles(list){
       if(file.size>12*1024*1024)throw Error(file.name+' is too big (over 12 MB).');
       const dataUrl=isImg?await finShrinkImage(file):await finReadAsDataUrl(file);
       if(dataUrl.length*0.75>FILE_MAX)throw Error(file.name+' is over 2 MB after shrinking. Try a smaller copy.');
+      const used=Object.values(load(K_FILES_DATA,{})).reduce((n,e)=>n+((e.plain||e.ct||'').length),0);
+      if(used+dataUrl.length>4200000)throw Error('The inbox is full (about 4 MB). File or remove some items first.');
       const item={id:uid(),name:file.name||'Photo',type:isPdf?'application/pdf':'image/jpeg',added:new Date().toISOString(),status:'new',fields:{shop:'',amount:0,date:'',dueDate:'',kind:'unknown'},text:'',owner:'jaimi'};
       if(isPdf){try{item.text=await FinInbox.pdfText(new Uint8Array(await file.arrayBuffer()));}catch(e){item.text='';}item.fields=Object.assign(item.fields,FinInbox.extractFields(item.text));}
       await finFileStore(item.id,dataUrl);
@@ -432,7 +445,7 @@ async function finOcr(id){
   if(!confirm('Pip needs to download its photo reader once (about 15 MB). It then reads photos on this device. Download it now?'))return;
   try{
     toastMsg('Downloading the reader…');
-    if(!window.Tesseract)await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>no(new Error('Could not download the reader. You can still type the details in.'));document.head.appendChild(s);});
+    if(!window.Tesseract)await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';s.integrity='sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F';s.crossOrigin='anonymous';s.onload=ok;s.onerror=()=>no(new Error('Could not download the reader. You can still type the details in.'));document.head.appendChild(s);});
     const d=await finFileData(id);if(!d)throw Error('Unlock with your passcode first.');
     const r=await window.Tesseract.recognize(d,'eng');
     const all=finFiles(),f=all.find(x=>x.id===id);f.text=r.data.text||'';f.fields=Object.assign(f.fields,FinInbox.extractFields(f.text));save(K_FILES,all);finOpenFiles();
@@ -455,10 +468,14 @@ function finPipFacts(){
   return{today,week:{range:wk.range,dayNum:wk.dayNum,daysLeft:wk.daysLeft},safe,categories,bills,goals,funds,fees:{month:feeRows.reduce((s,t)=>s-t.amount,0),count:feeRows.length},recurring,wealth,moveAlert:ma?ma.text.replace(/&amp;|&#39;/g,'').replace(/<[^>]+>/g,''):null};
 }
 /* Replace the old scheduled "Claude brief" with Pip's own local checks. */
-var _pipKey='';
+var _pipKey='',_pipTimer=null;
 function finPipRefresh(){
-  if(finIsMatt())return;
+  if(finIsMatt()||_pipTimer)return;
   const key=todayISO()+'|'+TXNS.length;if(key===_pipKey)return;_pipKey=key;
+  // run a moment later so opening the app is never held up by the checks
+  _pipTimer=setTimeout(()=>{_pipTimer=null;finPipRefreshNow();},400);
+}
+function finPipRefreshNow(){
   try{
     const c=FinPip.buildChecks(finPipFacts()),e=x=>(x||[]).map(esc),label='Pip · '+FinDates.longDate(todayISO());
     CLAUDE_MONEY.weekly={updatedAt:label,smallWin:esc(c.weekly.smallWin),focus:esc(c.weekly.focus),leaks:e(c.weekly.leaks),actions:e(c.weekly.actions)};
@@ -499,7 +516,7 @@ function finOpenPip(){
 function finPipSend(){const i=document.getElementById('pip_in');const q=i.value;i.value='';finPipAsk(q);}
 async function finPipBrain(){
   const b=document.getElementById('pip_brain');
-  if(!localStorage.getItem(K_BRAIN)&&!confirm('Download Pip\'s brain? It is '+BRAIN_SIZE+' and downloads once. It then runs only on this device.'))return;
+  if(!localStorage.getItem(K_BRAIN)&&!confirm('Download Pip\'s brain? It is '+BRAIN_SIZE+' and downloads once from a public code library (jsDelivr). It then runs only on this device.'))return;
   try{
     b.disabled=true;b.textContent='Getting ready…';
     const webllm=await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm');

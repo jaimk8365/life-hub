@@ -85,15 +85,15 @@
   return out.join('').replace(/[ \t]*\n[ \t]*/g,'\n').replace(/\n{3,}/g,'\n\n');
  }
  async function pdfText(bytes){
-  const src=latin(bytes);let text='';const re=/stream\r?\n/g;let m;
+  const src=latin(bytes);let text='';const re=/(?<![a-z])stream\r?\n/g;let m;
   while((m=re.exec(src))){
    const start=m.index+m[0].length,end=src.indexOf('endstream',start);if(end<0)break;
-   const head=src.slice(Math.max(0,m.index-400),m.index),isFlate=/FlateDecode/.test(head.slice(head.lastIndexOf('<<')));
+   const head=src.slice(Math.max(0,m.index-400),m.index),isFlate=/FlateDecode/.test(head.slice(Math.max(0,head.lastIndexOf('<<'))));
    let stop=end;while(stop>start&&(src.charCodeAt(stop-1)===10||src.charCodeAt(stop-1)===13))stop--;   // the line break before endstream is not data
    let body=bytes.subarray(start,stop);
    try{if(isFlate)body=await inflate(body);}catch(e){continue;}
    const c=latin(body);if(/\bBT\b/.test(c)&&/T[jJ]/.test(c))text+=textFromContent(c)+'\n';
-   re.lastIndex=end;
+   re.lastIndex=end+9;   // skip past the word endstream so its tail is not mistaken for a new stream
   }
   return text.trim();
  }
