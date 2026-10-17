@@ -3,7 +3,7 @@
 const V='20261018-phases1';
 const must=(cond,msg)=>{if(!cond)throw new Error('Phases patch: '+msg)};
 const once=(s,a,b,label)=>{if(s.includes(b))return s;must(s.includes(a),label+' anchor');return s.replace(a,b);};
-const bump=t=>t.replace(/(profiles|goals-funds|autopilot|money-moves|files-inbox|phase-glue|autopilot|money-moves|goals-funds|files-inbox|pip|game|swap)\.(js|css)\?v=[^"']+/g,'$1.$2?v='+V);
+const bump=t=>t.replace(/(profiles|goals-funds|autopilot|money-moves|files-inbox|pip|game|swap|phase-glue|autopilot|money-moves|goals-funds|files-inbox|pip|game|swap)\.(js|css)\?v=[^"']+/g,'$1.$2?v='+V);
 
 function phase3(s){
   const head='<script src="../finance/home-redesign.js?v=20261018-redesign1"></script>';
@@ -20,8 +20,34 @@ function phase3(s){
   s=once(s,"function finNavSync(){\n  try{finNavInit();","function finNavSync(){\n  try{finNavInit();if(typeof finProfileStyle==='function')finProfileStyle();",'navSync');
   s=once(s,"document.body.insertAdjacentHTML('afterbegin',FinHome.navHtml());","document.body.insertAdjacentHTML('afterbegin',FinHome.navHtml(FIN_PROFILE).replace('<nav ','<nav data-profile=\"'+FIN_PROFILE+'\" '));",'navInit');
   s=once(s,"FinHome.everythingHtml()","FinHome.everythingHtml(FIN_PROFILE)",'more');
-  s=once(s,"  else if(k==='pip'){\n","  else if(k==='pip'&&finIsMatt()){\n    $('sheet').innerHTML='<button class=\"close\" onclick=\"closeSheet()\">✕</button><h2>🍊 Ask Pip</h2><div class=\"sub\">Pip\\'s chat is coming soon.</div><button class=\"btn ghost\" style=\"margin-top:12px\" onclick=\"closeSheet();openFinanceHelp()\">📖 Money guide</button>';openSheet();\n  }\n  else if(k==='pip'){\n",'pip');
+  if(!s.includes("else if(k==='pip'&&finIsMatt()){"))s=once(s,"  else if(k==='pip'){\n","  else if(k==='pip'&&finIsMatt()){\n    $('sheet').innerHTML='<button class=\"close\" onclick=\"closeSheet()\">✕</button><h2>🍊 Ask Pip</h2><div class=\"sub\">Pip\\'s chat is coming soon.</div><button class=\"btn ghost\" style=\"margin-top:12px\" onclick=\"closeSheet();openFinanceHelp()\">📖 Money guide</button>';openSheet();\n  }\n  else if(k==='pip'){\n",'pip');
   return s;
+}
+/* If finance/phase-glue.js ever fails to load (a dropped connection), the page must still work like the old Overview. */
+function fallbacks(s){
+  const marker='/* PHASES FALLBACK */';
+  if(s.includes(marker))return s;
+  const stub=marker+`
+if(typeof finIsMatt!=='function'){var finIsMatt=()=>false;}
+if(typeof finGuardView!=='function'){var finGuardView=v=>v;}
+if(typeof finGuardSave!=='function'){var finGuardSave=v=>v;}
+if(typeof finProfileData!=='function'){var finProfileData=d=>d;}
+if(typeof finMattSaveHtml!=='function'){var finMattSaveHtml=()=>'';}
+if(typeof finFundsTop!=='function'){var finFundsTop=()=>'';}
+if(typeof finGoalsExtra!=='function'){var finGoalsExtra=()=>{};}
+if(typeof finAct!=='function'){var finAct=()=>{};}
+if(typeof openProfilePicker!=='function'){var openProfilePicker=()=>{try{toastMsg('Reload the page to switch profile.');}catch(e){}};}
+`;
+  const at='function openWealthSettings()';
+  must(s.includes(at),'fallback anchor');
+  return s.replace(at,stub+at);
+}
+function fallbackHome(s){
+  const marker='/* PHASES FALLBACK 2 */';
+  if(s.includes(marker))return s;
+  const at='/* FINANCE REDESIGN v1 */';
+  must(s.includes(at),'fallback2 anchor');
+  return s.replace(at,marker+"\nif(typeof FinHome==='undefined'){var FinHome={hooks:{},navHtml:()=>'',everythingHtml:()=>'',homeHtml:()=>'',activeTab:()=>'home',genericHelp:t=>[t,''],help(){},tab(){},open(){},act(){},SECTIONS:[]};}\n"+at);
 }
 function phase4(s){
   s=once(s,'<script src="../finance/profiles.js?v='+V+'"></script>','<script src="../finance/profiles.js?v='+V+'"></script>\n<script src="../finance/goals-funds.js?v='+V+'"></script>','p4 head');
@@ -38,6 +64,21 @@ function phase7(s){
   s=once(s,'<script src="../finance/money-moves.js?v='+V+'"></script>','<script src="../finance/money-moves.js?v='+V+'"></script>\n<script src="../finance/files-inbox.js?v='+V+'"></script>','p7 head');
   return s;
 }
+function phase8(s){
+  s=once(s,'<script src="../finance/files-inbox.js?v='+V+'"></script>','<script src="../finance/files-inbox.js?v='+V+'"></script>\n<script src="../finance/pip.js?v='+V+'"></script>','p8 head');
+  s=once(s,"  else if(k==='pip'){\n","  else if(k==='pip'&&typeof finOpenPip==='function'){finOpenPip();}\n  else if(k==='pip'){\n",'pip tab');
+  s=once(s,"if(typeof finAutopilotRun==='function')finAutopilotRun();","if(typeof finAutopilotRun==='function')finAutopilotRun();if(typeof finPipRefresh==='function')finPipRefresh();",'pip refresh');
+  return s;
+}
+function phase9(s){
+  s=once(s,'<script src="../finance/pip.js?v='+V+'"></script>','<script src="../finance/pip.js?v='+V+'"></script>\n<script src="../finance/game.js?v='+V+'"></script>','p9 head');
+  s=once(s,"if(typeof finPipRefresh==='function')finPipRefresh();","if(typeof finPipRefresh==='function')finPipRefresh();if(typeof finGameTick==='function')finGameTick();",'game tick');
+  return s;
+}
+function phase10(s){
+  s=once(s,'<script src="../finance/game.js?v='+V+'"></script>','<script src="../finance/game.js?v='+V+'"></script>\n<script src="../finance/swap.js?v='+V+'"></script>','swap head');
+  return s;
+}
 function phase5(s){
   s=once(s,'<script src="../finance/goals-funds.js?v='+V+'"></script>','<script src="../finance/goals-funds.js?v='+V+'"></script>\n<script src="../finance/autopilot.js?v='+V+'"></script>','p5 head');
   s=once(s,"if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();","if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();if(typeof finAutopilotRun==='function')finAutopilotRun();",'ap run');
@@ -48,8 +89,13 @@ export function patchPhasesFinance(source){
   let s=source;
   s=phase3(s);
   s=phase4(s);
+  s=fallbacks(s);
+  s=fallbackHome(s);
   s=phase5(s);
   s=phase6(s);
   s=phase7(s);
+  s=phase8(s);
+  s=phase9(s);
+  s=phase10(s);
   return bump(s);
 }

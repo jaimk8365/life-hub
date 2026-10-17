@@ -14,8 +14,10 @@
  /* An item may carry its own owner ('shared' | 'jaimi' | 'matt'); otherwise its account decides; text can force private. */
  function ownerOf(item){
   if(!item)return 'jaimi';
-  if(item.owner==='shared'||item.owner==='jaimi'||item.owner==='matt')return item.owner;
+  if(item.owner==='matt')return 'matt';
+  // Zip, Latitude Pay, Etsy and the like are Jaimi's even if something was marked shared by mistake.
   if(PRIVATE_RE.test([item.name,item.note,item.platform,item.label].filter(Boolean).join(' ')))return 'jaimi';
+  if(item.owner==='shared'||item.owner==='jaimi')return item.owner;
   const acct=item.acct||item.accountId||item.fromAcct;
   if(acct)return ownerOfAccount(acct);
   return 'shared';

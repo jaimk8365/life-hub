@@ -92,7 +92,7 @@ FinHome.hooks.tab=k=>{
 // Keep the lit bottom tab right when only the Save sub-tab changes (Goals / Funds).
 function fixSaveSync(s){
   const a='function goSave(sv,btn){ route.saveTab=sv;';
-  if(s.includes(a+'finNavSync();'))return s;
+  if(s.includes('route.saveTab=sv;finNavSync();'))return s;
   if(!s.includes(a))throw new Error('Redesign patch: goSave anchor');
   return s.replace(a,a+'finNavSync();');
 }

@@ -24,9 +24,10 @@ function finProfileData(d){
     out.alert=items.length?{count:items.length,text:items[0].text}:{count:0};
     out.account='Shared';
     out.etsy=null;
-    out.files=null;
+    out.files=null;out.game=null;
   }else{
     out.files={waiting:finFilesWaiting()};
+    out.game=finGameHome();out.etsy=finEtsySummary();
     const ma=finMoveAlert();
     if(ma)out.alert={count:(d.alert.count||0)+1,text:ma.text};
   }
@@ -188,7 +189,7 @@ function finSaveGoal(type){
 function finPrivAddMoney(id){
   const g=PRIV.jaimi.goals.find(x=>x.id===id);if(!g)return;
   const v=prompt('How much to add to '+g.name+'? ($)');const n=parseFloat(v);if(!(n>0))return;
-  g.payments.push({id:uid(),amount:n,date:todayISO(),note:''});finPrivSave('jaimi');render();
+  g.payments.push({id:uid(),amount:n,date:todayISO(),note:''});finPrivSave('jaimi');finGameEvent('goal');render();
 }
 function finUnlockPrivate(p){
   finPassSheet('Unlock private items','Enter '+FinProfiles.PROFILES[p].name+'\'s passcode.',['Passcode'],async vals=>{
@@ -226,7 +227,7 @@ function finTakeSheet(){
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>💳 Spend from a bucket</h2><div class="sub">For example a vet bill from Luna emergency. Pay it from the account as usual, this keeps the bucket honest.</div><div class="field"><label>Bucket</label><select id="tk_f">'+list.map(f=>'<option value="'+esc(f.id)+'">'+esc(f.name)+' ('+AUD0(f.saved)+')</option>').join('')+'</select></div><div class="field"><label>Amount</label><input id="tk_amt" inputmode="decimal"></div><div class="field"><label>What was it?</label><input id="tk_note" placeholder="e.g. Vet bill"></div><div id="tk_err" class="tiny" role="alert" style="color:var(--bad);min-height:18px"></div><button class="btn dark" onclick="finTakeSave()">Take from bucket</button>';openSheet();
 }
 function finTakeSave(){
-  try{const f=FUNDS.find(x=>x.id===$('tk_f').value);if(!f)throw Error('Choose a bucket.');FinGoals.takeFromBucket(f,parseFloat($('tk_amt').value)||0,$('tk_note').value,todayISO(),uid);save(K_FUNDS,FUNDS);closeSheet();render();toastMsg('Taken from '+f.name);}
+  try{const f=FUNDS.find(x=>x.id===$('tk_f').value);if(!f)throw Error('Choose a bucket.');FinGoals.takeFromBucket(f,parseFloat($('tk_amt').value)||0,$('tk_note').value,todayISO(),uid);save(K_FUNDS,FUNDS);finGameEvent('bucket');closeSheet();render();toastMsg('Taken from '+f.name);}
   catch(e){const el=$('tk_err');if(el)el.textContent=e.message;}
 }
 
@@ -240,7 +241,7 @@ function finAutopilotRun(){
   if(finIsMatt()||_apLen===TXNS.length)return;_apLen=TXNS.length;
   try{
     const st=apState();
-    if(!st.since){st.since=FinDates.shift(todayISO(),-7);save(K_AUTOPILOT,st);}
+    if(!st.since){st.since=todayISO();save(K_AUTOPILOT,st);}
     const fresh=TXNS.filter(t=>t.date>=st.since);
     const res=FinAutopilot.applyRules(fresh,apRules(st),st.applied,st.periods);
     let changed=false,goalsDirty=false,fundsDirty=false;
@@ -284,13 +285,14 @@ function finApAnswer(key){
     const sel=document.getElementById('apq_sel_'+key).value,ans={label:document.getElementById('apq_label_'+key).value};
     if(sel.startsWith('g:'))ans.goal=sel.slice(2);else if(sel.startsWith('f:'))ans.fund=sel.slice(2);
     if(!ans.label&&(ans.goal||ans.fund)){const t=ans.goal?SHARED_GOALS.find(g=>g.id===ans.goal):FUNDS.find(f=>f.id===ans.fund);ans.label=t?t.name:'';}
-    const st=apState();st.rules.push(FinAutopilot.ruleFromAnswer(p,ans,uid));st.asked.push(key);save(K_AUTOPILOT,st);_apLen=-1;finOpenAutopilot();toastMsg('Rule saved');
+    const st=apState();st.rules.push(FinAutopilot.ruleFromAnswer(p,ans,uid));st.asked.push(key);save(K_AUTOPILOT,st);finGameEvent('rule');_apLen=-1;finOpenAutopilot();toastMsg('Rule saved');
   }catch(e){const el=document.getElementById('apq_err_'+key);if(el)el.textContent=e.message;}
 }
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
   const map={autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',etsy:'finOpenEtsy',swap:'finOpenSwap'};
+  if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }
 
@@ -325,7 +327,7 @@ function finOpenMoves(){
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔄 Money moves</h2><div class="sub">Transfers between your own accounts</div>'+alertCard+counts+'<div class="card"><h2 style="margin:0 0 6px">Top-ups</h2>'+tops+'</div>'+cashCard;
   openSheet();
 }
-function finCashTag(id,tag){const t=load(K_CASH_TAGS,{});t[id]=tag;save(K_CASH_TAGS,t);finOpenMoves();}
+function finCashTag(id,tag){const t=load(K_CASH_TAGS,{});t[id]=tag;save(K_CASH_TAGS,t);finGameEvent('cash');finOpenMoves();}
 
 /* ================= Phase 7: Files inbox ================= */
 var K_FILES='fin_files_inbox_v1',K_FILES_DATA='fin_files_inbox_data_v1',FILE_MAX=2*1024*1024;
@@ -405,7 +407,7 @@ async function finFileView(id){
   const d=await finFileData(id);if(!d){toastMsg('Unlock with your passcode to open this file.');return;}
   const a=document.createElement('a');a.href=d;a.target='_blank';a.rel='noopener';a.download=(finFiles().find(x=>x.id===id)||{}).name||'file';document.body.appendChild(a);a.click();a.remove();
 }
-function finFileDone(id,where){const all=finFiles(),f=all.find(x=>x.id===id);if(!f)return;f.status='filed';f.filedTo=where;f.filedAt=new Date().toISOString();save(K_FILES,all);finOpenFiles();render();toastMsg('Filed to '+where);}
+function finFileDone(id,where){finGameEvent('file');const all=finFiles(),f=all.find(x=>x.id===id);if(!f)return;f.status='filed';f.filedTo=where;f.filedAt=new Date().toISOString();save(K_FILES,all);finOpenFiles();render();toastMsg('Filed to '+where);}
 async function finFileFile(id,dest){
   const f=finFiles().find(x=>x.id===id);if(!f)return;const fl=f.fields;
   if(!(fl.amount>0)){toastMsg('Add the amount first.');return;}
@@ -435,4 +437,184 @@ async function finOcr(id){
     const r=await window.Tesseract.recognize(d,'eng');
     const all=finFiles(),f=all.find(x=>x.id===id);f.text=r.data.text||'';f.fields=Object.assign(f.fields,FinInbox.extractFields(f.text));save(K_FILES,all);finOpenFiles();
   }catch(e){toastMsg(e.message||'Could not read that photo.');}
+}
+
+/* ================= Phase 8: Pip (built in, on this device) ================= */
+function finPipFacts(){
+  const today=todayISO(),wk=FinDates.budgetWeek(today);let safe={trusted:false};
+  try{if(financeEvidence().trusted){const s=safeSpend();safe={trusted:true,safe:s.safe};}}catch(e){}
+  let categories=[];try{categories=transactionInsights().map(i=>({name:i.name||i.category,actual:i.actual,budget:i.budget,status:i.status,remaining:i.remaining}));}catch(e){}
+  const bills=[];try{BILLS.filter(b=>b.active!==false).forEach(b=>{const due=billNextDue(b);if(due&&FinDates.diffDays(today,due)>=0&&FinDates.diffDays(today,due)<=7)bills.push({name:b.name,amount:+b.amount||0,due,dueLabel:FinDates.short(due)});});bills.sort((a,b)=>a.due<b.due?-1:1);}catch(e){}
+  const goals=SHARED_GOALS.filter(g=>g.status!=='archived').map(g=>{const p=FinGoals.goalProgress(Object.assign({},g,{payments:g.payments}));return{name:g.name,saved:p.saved,target:p.target,pct:p.pct};})
+    .concat(GOALS.filter(g=>g.status!=='archived').map(g=>({name:g.name,saved:goalSaved(g),target:+g.target||0,pct:goalPct(g)})));
+  let funds=null;try{funds=FinGoals.reconcile(balance('savings'),FUNDS);}catch(e){}
+  const feeRows=TXNS.filter(t=>t.cat==='fees'&&t.amount<0&&t.date.slice(0,7)===today.slice(0,7)&&!t.deleted);
+  let recurring=[];try{recurring=recurringScan().map(r=>({label:r.label,perMo:r.perMo,cadence:r.cadence,bnpl:!!r.bnpl}));}catch(e){}
+  let wealth=null;try{if(safe.trusted&&window.WealthCoach){const r=WealthCoach.analyze(wealthReviewInput(),WEALTH_SETTINGS,WEALTH_REVIEWS);wealth={health:r.scores.health.value,priorities:r.priorities};}}catch(e){}
+  const ma=finMoveAlert();
+  return{today,week:{range:wk.range,dayNum:wk.dayNum,daysLeft:wk.daysLeft},safe,categories,bills,goals,funds,fees:{month:feeRows.reduce((s,t)=>s-t.amount,0),count:feeRows.length},recurring,wealth,moveAlert:ma?ma.text.replace(/&amp;|&#39;/g,'').replace(/<[^>]+>/g,''):null};
+}
+/* Replace the old scheduled "Claude brief" with Pip's own local checks. */
+var _pipKey='';
+function finPipRefresh(){
+  if(finIsMatt())return;
+  const key=todayISO()+'|'+TXNS.length;if(key===_pipKey)return;_pipKey=key;
+  try{
+    const c=FinPip.buildChecks(finPipFacts()),e=x=>(x||[]).map(esc),label='Pip · '+FinDates.longDate(todayISO());
+    CLAUDE_MONEY.weekly={updatedAt:label,smallWin:esc(c.weekly.smallWin),focus:esc(c.weekly.focus),leaks:e(c.weekly.leaks),actions:e(c.weekly.actions)};
+    CLAUDE_MONEY.dailyReview={wins:e(c.dailyReview.wins),improve:e(c.dailyReview.improve)};
+    CLAUDE_MONEY.updatedAt=label;CLAUDE_MONEY.updatedISO=new Date().toISOString();
+  }catch(err){}
+}
+var FIN_LLM=null,K_BRAIN='fin_pip_brain_v1',BRAIN_MODEL='Qwen2.5-0.5B-Instruct-q4f16_1-MLC',BRAIN_SIZE='about 300 MB';
+function finPipChat(who,text,extra){
+  const box=document.getElementById('pip_msgs');if(!box)return;
+  const d=document.createElement('div');d.style.cssText='margin:8px 0;padding:10px 12px;border-radius:16px;max-width:92%;line-height:1.5;'+(who==='me'?'background:var(--sea);color:#fff;margin-left:auto':'background:var(--card2)');
+  d.textContent=text;if(extra){const s=document.createElement('div');s.className='tiny';s.style.cssText='text-transform:none;margin-top:4px;opacity:.7';s.textContent=extra;d.appendChild(s);}
+  box.appendChild(d);box.scrollTop=box.scrollHeight;return d;
+}
+async function finPipAsk(q){
+  q=String(q||'').trim();if(!q)return;finGameEvent('pip');finPipChat('me',q);
+  const facts=finPipFacts(),ans=FinPip.answer(q,facts);let shown=ans.text,note='';
+  if(FIN_LLM){
+    try{
+      const r=await FIN_LLM.chat.completions.create({messages:FinPip.promptFor(q,ans),temperature:0.2,max_tokens:90});
+      const out=(r.choices&&r.choices[0]&&r.choices[0].message&&r.choices[0].message.content||'').trim();
+      if(out&&FinPip.numbersOk(out,ans.facts.concat(FinPip.numbersIn(ans.text)))){shown=out;note='worded by Pip\'s brain';}
+    }catch(e){}
+  }
+  finPipChat('pip',shown,note);
+}
+function finOpenPip(){
+  const gpu=!!navigator.gpu,ready=(()=>{try{return localStorage.getItem(K_BRAIN)==='ready';}catch(e){return false;}})();
+  const brain=FIN_LLM?'<p class="tiny" style="text-transform:none">🧠 Pip\'s brain is awake. It only words answers, the numbers always come from your app.</p>'
+   :gpu?'<button class="btn ghost" id="pip_brain" onclick="finPipBrain()">🧠 '+(ready?'Wake Pip\'s brain':'Download Pip\'s brain ('+BRAIN_SIZE+', one time)')+'</button><p class="tiny" style="text-transform:none">Optional. It runs only on this device, works offline once downloaded, and Pip answers fine without it.</p>'
+   :'<p class="tiny" style="text-transform:none">This device cannot run Pip\'s optional brain, so Pip uses its built-in answers. They use the same numbers.</p>';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🍊 Ask Pip</h2><div class="sub">Answers come from your own numbers, on this device.</div><div id="pip_msgs" style="max-height:38vh;overflow:auto"></div>'
+   +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">'+FinPip.SUGGESTED.map(q=>'<button class="btn ghost" style="width:auto;padding:7px 11px;font-size:13px" onclick="finPipAsk(this.textContent)">'+esc(q)+'</button>').join('')+'</div>'
+   +'<div style="display:flex;gap:8px"><input id="pip_in" style="flex:1" placeholder="Ask about your money" onkeydown="if(event.key===\'Enter\')finPipSend()"><button class="btn dark" style="width:auto" onclick="finPipSend()">Ask</button></div>'+brain
+   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn soft" style="flex:1" onclick="finOpenCoach()">❤️ My money health</button><button class="btn soft" style="flex:1" onclick="finOpenSwap()">🔀 Budget swap</button></div>';
+  openSheet();finPipChat('pip','Hi! Ask me something, or tap a question.');
+}
+function finPipSend(){const i=document.getElementById('pip_in');const q=i.value;i.value='';finPipAsk(q);}
+async function finPipBrain(){
+  const b=document.getElementById('pip_brain');
+  if(!localStorage.getItem(K_BRAIN)&&!confirm('Download Pip\'s brain? It is '+BRAIN_SIZE+' and downloads once. It then runs only on this device.'))return;
+  try{
+    b.disabled=true;b.textContent='Getting ready…';
+    const webllm=await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm');
+    FIN_LLM=await webllm.CreateMLCEngine(BRAIN_MODEL,{initProgressCallback:p=>{b.textContent='Downloading… '+Math.round((p.progress||0)*100)+'%';}});
+    localStorage.setItem(K_BRAIN,'ready');finOpenPip();
+  }catch(e){FIN_LLM=null;if(b){b.disabled=false;b.textContent='Could not start the brain. Pip still works without it.';}}
+}
+function finOpenCoach(){
+  const f=finPipFacts(),h=FinPip.healthScore(f),c=FinPip.buildChecks(f),mv=FinPip.suggestedMoves(f,c.checks),col=h.score>=75?'var(--good)':h.score>=50?'var(--warn)':'var(--bad)';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>❤️ My money health</h2><div class="card" style="text-align:center"><div style="font:700 56px/1 Fredoka,sans-serif;color:'+col+'">'+h.score+'</div><div class="fh-lab">OUT OF 100 · '+esc(h.label.toUpperCase())+'</div></div>'
+   +'<div class="card">'+h.parts.map(p=>'<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><b>'+esc(p.name)+'</b><span class="tiny" style="text-transform:none">'+esc(p.note)+'</span></div><div class="fh-bar" style="margin-top:4px"><i style="width:'+Math.round(p.points/p.max*100)+'%"></i></div></div>').join('')+'</div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">Suggested moves</h2>'+(mv.length?mv.map((m,i)=>'<div style="padding:6px 0"><b>'+(i+1)+'.</b> '+esc(m)+'</div>').join(''):'<p class="f" style="margin:0">Nothing to fix. Keep going.</p>')+'</div>'
+   +'<button class="btn ghost" onclick="closeSheet();openWealthReview()">📈 Full wealth review</button>';
+  openSheet();
+}
+
+/* ================= Phase 9: game layer and Etsy ================= */
+var K_GAME='fin_game_v1',_gameKey='';
+function finGameState(){return Object.assign(FinGame.newState(),load(K_GAME,{}));}
+function finGameLoans(){return ACCTS.filter(a=>a.type==='loan').reduce((s,a)=>s+Math.abs(balance(a.id)),0);}
+function finGameTick(){
+  if(finIsMatt())return;
+  const today=todayISO(),done=Object.values(dailyState().done||{}).filter(Boolean).length,needs=TXNS.filter(t=>t.needsReview&&!t.deleted).length,key=today+'|'+done+'|'+needs;
+  if(key===_gameKey)return;_gameKey=key;
+  try{
+    const st=finGameState(),ctx={today,checkinDone:done>0};
+    let up=FinGame.openDay(st,today).levelUp;
+    FinGame.tidy(st,needs,today);up=FinGame.questXp(st,ctx).levelUp||up;FinGame.boss(st,finGameLoans());
+    save(K_GAME,st);if(up)toastMsg('🎉 Level up! You are level '+FinGame.level(st).level);
+  }catch(e){}
+}
+function finGameEvent(ev){
+  if(finIsMatt())return;
+  try{const st=finGameState(),r=FinGame.record(st,ev,todayISO());save(K_GAME,st);if(r.levelUp)toastMsg('🎉 Level up! You are level '+FinGame.level(st).level);}catch(e){}
+}
+function finGameHome(){try{const st=finGameState(),l=FinGame.level(st);return{level:l.level,pct:l.pct,streak:st.streak};}catch(e){return null;}}
+function finOpenQuests(){
+  const st=finGameState(),today=todayISO(),ctx={today,checkinDone:Object.values(dailyState().done||{}).some(Boolean)},l=FinGame.level(st),qs=FinGame.quests(st,ctx),all=qs.every(q=>q.done);
+  const bs=FinGame.boss(st,finGameLoans()),needs=TXNS.filter(t=>t.needsReview&&!t.deleted).length;
+  const chest=st.day.chest?'<button class="btn ghost" disabled>🎁 Chest opened today</button>':'<button class="btn '+(all?'dark':'ghost')+'" '+(all?'':'aria-disabled="true"')+' onclick="finClaimChest()">🎁 '+(all?'Open today\'s chest':'Finish all 3 to open the chest')+'</button>';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🏆 Quests</h2>'
+   +'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font:700 28px Fredoka,sans-serif">Level '+l.level+'</div><div style="font:700 20px Fredoka,sans-serif">🔥 '+st.streak+' day'+(st.streak===1?'':'s')+'</div></div><div class="fh-bar" style="margin-top:8px;height:14px"><i style="width:'+l.pct+'%;background:var(--sunshine)"></i></div><div class="tiny" style="text-transform:none;margin-top:4px">'+l.into+' of '+l.span+' XP to the next level · best streak '+st.best+'</div></div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">Today</h2>'+qs.map(q=>'<div style="display:flex;gap:10px;align-items:center;padding:6px 0">'+dchk(q.done)+'<span style="'+(q.done?'text-decoration:line-through;opacity:.6':'')+'">'+esc(q.label)+'</span></div>').join('')+'<div style="margin-top:10px">'+chest+'</div></div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">🧹 Tidy-up sprint</h2><p class="f" style="margin:0 0 8px">'+(needs?needs+' record'+(needs===1?'':'s')+' still need a check. Do 5 and earn XP for each one.':'Everything is checked. Nice work.')+'</p>'+(needs?'<button class="btn dark" onclick="closeSheet();openDataReview()">Start the sprint</button>':'')+'</div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">🐉 Loan boss</h2><div class="fh-bar" style="height:16px"><i style="width:'+bs.pct+'%;background:var(--coral)"></i></div><p class="f" style="margin:6px 0 0">'+bs.pct+'% health left · '+AUD0(bs.damage)+' of damage dealt so far'+(bs.damage===0?'. Every extra repayment hits it.':'.')+'</p></div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">Badges</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px">'+FinGame.badges(st).map(b=>'<div style="text-align:center;padding:8px;border-radius:16px;background:var(--card2);'+(b.earned?'':'opacity:.4;filter:grayscale(1)')+'"><div style="font-size:26px">'+b.emoji+'</div><div class="tiny" style="text-transform:none">'+esc(b.label)+'</div></div>').join('')+'</div></div>';
+  openSheet();
+}
+function finClaimChest(){
+  const st=finGameState(),ctx={today:todayISO(),checkinDone:Object.values(dailyState().done||{}).some(Boolean)},r=FinGame.claimChest(st,ctx);
+  if(!r.ok){toastMsg(r.why);return;}
+  save(K_GAME,st);toastMsg('🎁 +'+r.gained+' XP'+(r.levelUp?' · level up!':''));finOpenQuests();render();
+}
+
+/* Etsy business: "The ADHD Design Mum". Separate from personal money. Jaimi only, and it stays out of Matt's profile. */
+function finEtsy(){PRIV.jaimi.etsy=PRIV.jaimi.etsy||{};const e=PRIV.jaimi.etsy;e.sales=e.sales||[];e.expenses=e.expenses||[];return e;}
+function finEtsySummary(){
+  if(finIsMatt())return null;
+  const e=finEtsy(),ym=todayISO().slice(0,7),sum=l=>l.filter(x=>String(x.date||'').slice(0,7)===ym).reduce((s,x)=>s+(+x.amount||0),0);
+  return{connected:!!e.connected||e.sales.length>0||e.expenses.length>0,month:{in:sum(e.sales),out:sum(e.expenses)},locked:!!PRIV.locked.jaimi};
+}
+function finOpenEtsy(){
+  if(finIsMatt())return;
+  if(PRIV.locked.jaimi){finUnlockPrivate('jaimi');return;}
+  const e=finEtsy(),sm=finEtsySummary(),ym=todayISO().slice(0,7);
+  const yr=l=>l.filter(x=>String(x.date||'').slice(0,4)===ym.slice(0,4)).reduce((s,x)=>s+(+x.amount||0),0);
+  const rows=(l,sign)=>l.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,6).map(x=>'<div style="display:flex;justify-content:space-between;padding:3px 0"><span>'+esc(FinDates.longDate(x.date))+' · '+esc(x.shop||x.note||'')+'</span><b>'+sign+AUD0(x.amount)+'</b></div>').join('')||'<p class="f" style="margin:0">None yet.</p>';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🛍️ The ADHD Design Mum</h2><div class="sub">Your Etsy shop. Kept separate from personal money. Only you can see this.</div>'
+   +(sm.connected?'':'<div class="card" style="background:var(--t-warn);border-color:var(--t-warn-line)"><b>Not started yet.</b><p class="f" style="margin:6px 0 0">When your Etsy payments account is added, sales and fees will show up here. You can already file shop receipts from the Files inbox, or add sales yourself below.</p></div>')
+   +'<div class="card"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="fh-lab">THIS MONTH IN</div><div class="fh-big">'+AUD0(sm.month.in)+'</div></div><div><div class="fh-lab">THIS MONTH OUT</div><div class="fh-big">'+AUD0(sm.month.out)+'</div></div></div><p class="f" style="margin:6px 0 0">Profit this month '+AUD0(sm.month.in-sm.month.out)+' · this year '+AUD0(yr(e.sales)-yr(e.expenses))+'</p></div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">Add</h2><div class="row2"><input id="et_amt" inputmode="decimal" placeholder="$ amount"><input id="et_note" placeholder="note (optional)"></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn dark" style="flex:1" onclick="finEtsyAdd(\'sales\')">＋ Sale</button><button class="btn ghost" style="flex:1" onclick="finEtsyAdd(\'expenses\')">＋ Expense</button></div></div>'
+   +'<div class="card"><h2 style="margin:0 0 6px">Recent sales</h2>'+rows(e.sales,'+')+'</div><div class="card"><h2 style="margin:0 0 6px">Recent expenses</h2>'+rows(e.expenses,'-')+'</div>';
+  openSheet();
+}
+function finEtsyAdd(kind){
+  const a=parseFloat(document.getElementById('et_amt').value)||0;if(!(a>0)){toastMsg('Enter an amount.');return;}
+  const e=finEtsy();e.connected=true;e[kind].push({id:uid(),date:todayISO(),amount:Math.round(a*100)/100,note:document.getElementById('et_note').value.trim()});
+  finPrivSave('jaimi');finOpenEtsy();render();
+}
+
+/* ================= Budget swap ================= */
+var K_SWAP_UNDO='fin_swap_undo_v1',_swapPlan=null,_swapLine=null;
+function finSwapCategories(){
+  return CATS.concat(CUSTOM_CATS||[]).map(c=>({id:c.id,name:c.n,budget:+CAT_BUDGET[c.id]||0,spent:catSpend(c.id,thisYM)})).filter(c=>c.budget>0);
+}
+function finOpenSwap(){
+  if(finIsMatt())return;
+  const undo=load(K_SWAP_UNDO,null),secs=BUDGET.map(g=>g.sec);
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔀 Budget swap</h2><div class="sub">A new regular cost is coming. Pip finds things to trim so your budget total stays the same.</div>'
+   +'<div class="field"><label>What is the new cost?</label><input id="sw_name" placeholder="e.g. New phone plan"></div><div class="row2"><div class="field"><label>Amount</label><input id="sw_amt" inputmode="decimal" placeholder="$140"></div><div class="field"><label>How often</label><select id="sw_freq"><option value="monthly">every month</option><option value="fortnightly">every fortnight</option><option value="weekly">every week</option><option value="yearly">every year</option></select></div></div>'
+   +'<div class="field"><label>Add it to this part of the budget</label><select id="sw_sec">'+secs.map(s=>'<option>'+esc(s)+'</option>').join('')+'</select></div>'
+   +'<div id="sw_err" class="tiny" role="alert" style="color:var(--bad);min-height:18px"></div><button class="btn dark" onclick="finSwapPreview()">Show me the swaps</button><div id="sw_out"></div>'
+   +(undo?'<button class="btn ghost" style="margin-top:10px" onclick="finSwapUndo()">↩ Undo the last swap</button>':'');
+  openSheet();
+}
+function finSwapPreview(){
+  const name=document.getElementById('sw_name').value.trim(),amt=parseFloat(document.getElementById('sw_amt').value)||0,err=document.getElementById('sw_err');
+  if(!name||!(amt>0)){err.textContent='Add a name and an amount.';return;}err.textContent='';
+  const freq=document.getElementById('sw_freq').value,plan=FinSwap.swapPlan({cost:amt,freq,categories:finSwapCategories()});
+  _swapPlan=plan;_swapLine={name,mo:plan.need,sec:document.getElementById('sw_sec').value,category:categoryForBudgetName(name)};
+  const rows=plan.cuts.map(c=>'<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line-soft)"><span>'+esc(c.name)+'<div class="tiny" style="text-transform:none">'+AUD0(c.from)+' → '+AUD0(c.to)+' a month</div></span><b>-'+AUD0(c.cut)+'</b></div>').join('');
+  document.getElementById('sw_out').innerHTML='<div class="card" style="margin-top:12px"><h2 style="margin:0 0 6px">'+esc(name)+': '+AUD0(plan.need)+' a month</h2>'+(plan.cuts.length?rows:'<p class="f" style="margin:0">No room to trim in the flexible categories.</p>')
+   +'<p class="f" style="margin:10px 0 0;font-weight:700;color:'+(plan.equal?'var(--good)':'var(--warn)')+'">'+(plan.equal?'✅ Your budget total stays exactly the same.':'⚠️ These swaps cover '+AUD0(plan.covered)+'. '+AUD0(plan.shortfall)+' a month is still not covered.')+'</p>'
+   +(plan.cuts.length?'<button class="btn dark" style="margin-top:10px" onclick="finSwapApply()">Apply to my budget</button>':'')+'</div>';
+}
+function finSwapApply(){
+  if(!_swapPlan||!_swapLine)return;
+  if(!confirm('Change your budget now? You can undo the last swap.'))return;
+  const before=JSON.parse(JSON.stringify(BUDGET)),res=FinSwap.applyToBudget(BUDGET,_swapPlan,_swapLine);
+  BUDGET=res.budget;save(K_BUDGET,BUDGET);recalcBudgetTotals();syncCategoryBudgets();
+  save(K_SWAP_UNDO,{before,at:new Date().toISOString(),name:_swapLine.name});
+  closeSheet();render();toastMsg('Swap applied');
+}
+function finSwapUndo(){
+  const u=load(K_SWAP_UNDO,null);if(!u||!u.before)return;
+  if(!confirm('Put your budget back how it was before “'+u.name+'”?'))return;
+  BUDGET=u.before;save(K_BUDGET,BUDGET);recalcBudgetTotals();syncCategoryBudgets();save(K_SWAP_UNDO,null);closeSheet();render();toastMsg('Swap undone');
 }

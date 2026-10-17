@@ -9,7 +9,7 @@ test('shared accounts are visible to both, private ones only to their owner',()=
  assert.deepEqual(P.filterAccounts('jaimi',accts).map(a=>a.id),['everyday','bills','jspend','zip','latitude','etsy','unknownthing']);
 });
 test('Zip, Latitude Pay and Etsy items are never visible to Matt, whatever account they sit in',()=>{
- const items=[{name:'Zip Pay plan',acct:'everyday'},{name:'Latitude Pay – shoes'},{name:'Etsy shop fees',acct:'bills'},{name:'Wishlist: lamp'},{name:'Bali',owner:'shared'},{name:'Rates',acct:'bills'},{name:'My secret',owner:'jaimi'},{name:'Matt gear',owner:'matt'}];
+ const items=[{name:'Zip Pay plan',acct:'everyday'},{name:'Latitude Pay – shoes'},{name:'Etsy shop fees',acct:'bills'},{name:'Wishlist: lamp'},{name:'Bali',owner:'shared'},{name:'Etsy stock',owner:'shared'},{name:'Rates',acct:'bills'},{name:'My secret',owner:'jaimi'},{name:'Matt gear',owner:'matt'}];
  assert.deepEqual(P.filter('matt',items).map(x=>x.name),['Bali','Rates','Matt gear']);
  assert.ok(P.filter('jaimi',items).every(x=>x.owner!=='matt'));
 });

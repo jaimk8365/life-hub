@@ -16,6 +16,7 @@
   funds:['Sinking funds','Money put aside for bills that come around once in a while, such as rates or car costs, so they never surprise you. Every dollar in them has a job.'],
   files:['Files inbox','Soon you will be able to drop receipts and bills in here and Pip will read them for you. It is not switched on yet.'],
   cycle:['Budget week','Your allowances reset every Wednesday. A fortnightly wage is split equally between the two weeks. Open "View this week\'s budgets" to see each category.'],
+  etsy:['Your Etsy shop','Your shop, kept separate from personal money. Only you can see it. Matt never does.'],
   pip:['Ask Pip','Pip is your built-in money helper. It runs on this device only, with no paid service. Chat is coming in a later step. For now the shortcuts here use the same numbers Pip will use.']
  };
  function helpBtn(key){return '<button type="button" class="fh-q" aria-label="What is this card?" onclick="event.stopPropagation();FinHome.help(\''+esc(key)+'\')"></button>';}
@@ -86,6 +87,11 @@
   if(!list.length)return '<p class="fh-note">'+empty+'</p>';
   return list.map(g=>{const p=g.target>0?clamp(Math.round(g.saved/g.target*100),0,100):0;return '<div class="fh-row"><span class="fh-rn">'+esc(g.emoji||'')+' '+esc(g.name)+'</span><span class="fh-rv">'+(g.target>0?aud(g.saved)+' of '+aud(g.target):aud(g.saved)+' saved')+'</span><span class="fh-bar"><i style="width:'+p+'%"></i></span></div>';}).join('')+'<button type="button" class="fh-link" onclick="'+go+'">See all ›</button>';
  }
+function etsyCard(e){
+  if(!e)return '';
+  const body=e.locked?'<p class="fh-note">🔒 Unlock with your passcode.</p>':e.connected?'<p class="fh-note">This month: '+aud(e.month.in)+' in · '+aud(e.month.out)+' out</p>':'<p class="fh-note">Not started yet. It shows up here once your shop is added.</p>';
+  return card('etsy','The ADHD Design Mum',body+'<button type="button" class="fh-btn" onclick="FinHome.act(\'etsy\')">Open shop</button>','fh-etsy');
+ }
  function homeHtml(d){
   const week=D.budgetWeek(d.today),alert=d.alert||{count:0};
   const hero=card('week',(d.account||'Everyday').toUpperCase()+' · '+week.range,'<div class="fh-days">'+daysText(week.daysLeft)+'</div>'+weekPath(week)+safeBlock(d,week),'fh-hero');
@@ -93,12 +99,12 @@
    ? '<section class="fh-alert" aria-label="Pip\'s alert"><div class="fh-pip" aria-hidden="true">🍊</div><div class="fh-at"><div class="fh-tag">PIP · '+alert.count+(alert.count===1?' THING TO LOOK AT':' THINGS TO LOOK AT')+'</div><div>'+alert.text+'</div></div><button type="button" class="fh-open" onclick="go(\'insights\',null)" aria-label="See everything that needs attention">›</button>'+helpBtn('alert')+'</section>'
    : '<section class="fh-alert fh-ok" aria-label="Pip\'s alert"><div class="fh-pip" aria-hidden="true">🍊</div><div class="fh-at"><div class="fh-tag">PIP</div><div>All clear. Nothing needs your attention right now.</div></div>'+helpBtn('alert')+'</section>';
   const fw=d.files&&d.files.waiting>0,files=d.files===null?'':card('files','Files inbox','<p class="fh-note">'+(fw?'📥 '+d.files.waiting+(d.files.waiting===1?' file is':' files are')+' waiting for you.':'📥 Drop in receipts and bills. Pip reads them for you.')+'</p><button type="button" class="fh-btn" onclick="FinHome.act(\'files\')">'+(fw?'Open inbox':'Add a file')+'</button>','fh-files');
-  return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div><div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div></div>'
+  return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div><div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div>'+(d.game?'<button type="button" class="fh-lv" onclick="FinHome.act(\'quests\')" aria-label="Level '+d.game.level+', '+d.game.streak+' day streak. Open quests"><b>Lv '+d.game.level+'</b><span class="fh-lvbar"><i style="width:'+d.game.pct+'%"></i></span><span>🔥 '+d.game.streak+'</span></button>':'')+'</div>'
    +hero+al
    +card('accounts','Accounts',jars(d.jars||[]))
    +card('goals','Goals',bars(d.goals||[],'No goals yet. Add one in Goals.','FinHome.tab(\'goals\')'))
    +card('funds','Sinking funds',bars(d.funds||[],'No sinking funds yet.','FinHome.tab(\'funds\')'))
-   +files+'</div>';
+   +files+etsyCard(d.etsy)+'</div>';
  }
 
  /* ---------- actions (wired to the page by the build patch) ---------- */

@@ -96,3 +96,20 @@ body.fin-redesign .fab{bottom:calc(92px + var(--sab))}
 /* Matt's profile: no update button, search or bell (they would open Jaimi's lists) */
 body.fin-matt .fab,body.fin-matt .util-row .util-btn{display:none!important}
 body.fin-matt #save .pills.sub{display:none!important}
+
+/* Level chip on Home */
+.fh-lv{appearance:none;border:0;display:flex;align-items:center;gap:8px;background:var(--card);border-radius:999px;padding:6px 12px;min-height:44px;font:800 13px 'Nunito',sans-serif;color:var(--ink);cursor:pointer}
+.fh-lvbar{width:54px;height:8px;border-radius:4px;background:var(--track);overflow:hidden;display:block}
+.fh-lvbar i{display:block;height:100%;background:var(--sunshine)}
+
+/* ---------- Ocean re-skin for the older sections (Accounts, Budget, Income, Expenses, Bills, Debts, Tax, Insights...) ---------- */
+body.fin-redesign .view .card,body.fin-redesign .subview .card{border-radius:24px;box-shadow:0 5px 0 var(--shadow);border:1px solid var(--line-soft)}
+body.fin-redesign .btn{border-radius:18px;min-height:46px;box-shadow:0 4px 0 var(--shadow);font-family:'Nunito',system-ui,sans-serif;font-weight:800}
+body.fin-redesign .btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--shadow)}
+body.fin-redesign h1,body.fin-redesign h2,body.fin-redesign .sheet h2{font-family:'Fredoka',system-ui,sans-serif}
+body.fin-redesign .sheet{border-radius:28px 28px 0 0}
+/* fuel gauges: budget bars read like a tank with ten ticks */
+body.fin-redesign .bar{position:relative;height:12px;border-radius:8px;background:var(--track);overflow:hidden}
+body.fin-redesign .bar>i{border-radius:8px}
+body.fin-redesign .bar::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 2px),var(--card) calc(10% - 2px),var(--card) 10%)}
+body.fin-redesign .info-btn{min-width:32px;min-height:32px}
