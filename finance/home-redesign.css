@@ -92,3 +92,7 @@ body.fin-redesign .fab{bottom:calc(92px + var(--sab))}
 
 /* "?" on existing cards */
 .fh-q.fh-abs{position:absolute;top:2px;right:2px;margin:0;z-index:2}
+
+/* Matt's profile: no update button, search or bell (they would open Jaimi's lists) */
+body.fin-matt .fab,body.fin-matt .util-row .util-btn{display:none!important}
+body.fin-matt #save .pills.sub{display:none!important}

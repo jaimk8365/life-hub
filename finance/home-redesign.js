@@ -23,11 +23,11 @@
 
  /* ---------- navigation ---------- */
  const SECTIONS=[
-  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today'},{t:'Needs attention',e:'🔔',v:'insights'}]},
+  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Needs attention',e:'🔔',v:'insights'},{t:'Files inbox',e:'📥',a:'files'},{t:'Pip coach',e:'🍊',a:'coach'},{t:'Quests',e:'🏆',a:'quests'}]},
   {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Money Map',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
-  {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'Wishlist',e:'🎁',v:'save',s:'wishlist'}]},
-  {id:'growing',label:'Growing',colour:'mint',items:[{t:'Goals (shared)',e:'🎯',v:'save',s:'sharedgoals'},{t:'Kids\' goals',e:'🧒',v:'save',s:'goals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds'},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
-  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide'},{t:'Search accounts',e:'🔍',a:'search'}]}
+  {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'Wishlist',e:'🎁',v:'save',s:'wishlist'},{t:'Autopilot',e:'🤖',a:'autopilot'},{t:'Money moves',e:'🔄',a:'moves'},{t:'Budget swap',e:'🔀',a:'swap'}]},
+  {id:'growing',label:'Growing',colour:'mint',items:[{t:'Goals (shared)',e:'🎯',v:'save',s:'sharedgoals',m:1},{t:'Kids\' goals',e:'🧒',v:'save',s:'goals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds',m:1},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
+  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide',m:1},{t:'Search accounts',e:'🔍',a:'search'},{t:'Etsy business',e:'🛍️',a:'etsy'}]}
  ];
  const TABS=[
   {k:'home',t:'Home',svg:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'},
@@ -37,13 +37,14 @@
   {k:'more',t:'More',svg:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'}
  ];
  function itemBtn(i){return '<button type="button" class="fn-item" onclick="'+(i.a?'FinHome.act(\''+i.a+'\')':'FinHome.open(\''+i.v+'\','+(i.s?'\''+i.s+'\'':'null')+')')+'"><span class="fn-e" aria-hidden="true">'+i.e+'</span>'+esc(i.t)+'</button>';}
- function navHtml(){
+ function sectionsFor(profile){return profile==='matt'?SECTIONS.map(s=>({...s,items:s.items.filter(i=>i.m)})).filter(s=>s.items.length):SECTIONS;}
+ function navHtml(profile){
   const bar=TABS.map(t=>'<button type="button" class="fn-tab'+(t.raised?' fn-raised':'')+'" data-fn="'+t.k+'" onclick="FinHome.tab(\''+t.k+'\')"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+t.svg+'</svg><span>'+t.t+'</span></button>').join('');
-  const side=SECTIONS.map(s=>'<div class="fn-sec fn-'+s.colour+'"><div class="fn-sech">'+esc(s.label)+'</div>'+s.items.map(itemBtn).join('')+'</div>').join('');
+  const side=sectionsFor(profile).map(s=>'<div class="fn-sec fn-'+s.colour+'"><div class="fn-sech">'+esc(s.label)+'</div>'+s.items.map(itemBtn).join('')+'</div>').join('');
   return '<nav class="fn" id="finNav" aria-label="Main"><div class="fn-brand">💰 Money</div><div class="fn-bar">'+bar+'</div><div class="fn-side">'+side+'</div></nav>';
  }
- function everythingHtml(){
-  return '<div class="fn-all">'+SECTIONS.map(s=>'<section class="fn-sec fn-'+s.colour+'"><div class="fn-sech">'+esc(s.label)+'</div><div class="fn-grid">'+s.items.map(itemBtn).join('')+'</div></section>').join('')+'</div>';
+ function everythingHtml(profile){
+  return '<div class="fn-all">'+sectionsFor(profile).map(s=>'<section class="fn-sec fn-'+s.colour+'"><div class="fn-sech">'+esc(s.label)+'</div><div class="fn-grid">'+s.items.map(itemBtn).join('')+'</div></section>').join('')+'</div>';
  }
  /* Which bottom tab is lit for the current page */
  function activeTab(route){
@@ -71,6 +72,7 @@
   return '<div class="fh-energy" role="img" aria-label="'+lit+' of 10 segments of spare money left">'+h+'</div>';
  }
  function safeBlock(d,week){
+  if(d.safe&&d.safe.hidden)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">On Jaimi\'s profile</div><p class="fh-note">Ask Jaimi to check this one with you.</p>';
   if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">Update your balances so this number can be trusted.</p><button type="button" class="fh-btn" onclick="openMoneyUpdate()">↥ Update Money</button>';
   const s=d.safe.safe,left=week.daysLeft+1,perDay=s>0?Math.floor(s/left):0;
   return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big'+(s<0?' fh-bad':'')+'">'+aud(s)+' <span>'+(s>0?'· '+aud(perDay)+' a day':s<0?'· hold off on extras':'')+'</span></div>'+energy(s,d.safe.free)+(s<0?'<p class="fh-note">What is already spoken for is more than what is in there.</p>':'');
@@ -90,7 +92,7 @@
   const al=alert.count>0
    ? '<section class="fh-alert" aria-label="Pip\'s alert"><div class="fh-pip" aria-hidden="true">🍊</div><div class="fh-at"><div class="fh-tag">PIP · '+alert.count+(alert.count===1?' THING TO LOOK AT':' THINGS TO LOOK AT')+'</div><div>'+alert.text+'</div></div><button type="button" class="fh-open" onclick="go(\'insights\',null)" aria-label="See everything that needs attention">›</button>'+helpBtn('alert')+'</section>'
    : '<section class="fh-alert fh-ok" aria-label="Pip\'s alert"><div class="fh-pip" aria-hidden="true">🍊</div><div class="fh-at"><div class="fh-tag">PIP</div><div>All clear. Nothing needs your attention right now.</div></div>'+helpBtn('alert')+'</section>';
-  const files=card('files','Files inbox','<p class="fh-note">📥 Drop in receipts and bills here. Not switched on yet, coming in a later step.</p>','fh-files');
+  const fw=d.files&&d.files.waiting>0,files=d.files===null?'':card('files','Files inbox','<p class="fh-note">'+(fw?'📥 '+d.files.waiting+(d.files.waiting===1?' file is':' files are')+' waiting for you.':'📥 Drop in receipts and bills. Pip reads them for you.')+'</p><button type="button" class="fh-btn" onclick="FinHome.act(\'files\')">'+(fw?'Open inbox':'Add a file')+'</button>','fh-files');
   return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div><div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div></div>'
    +hero+al
    +card('accounts','Accounts',jars(d.jars||[]))
@@ -105,5 +107,5 @@
  function tab(k){if(hooks.tab)hooks.tab(k);}
  function open(v,s){if(hooks.open)hooks.open(v,s);}
  function act(a){if(hooks.act)hooks.act(a);}
- return{HELP,SECTIONS,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
+ return{HELP,SECTIONS,sectionsFor,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
 });

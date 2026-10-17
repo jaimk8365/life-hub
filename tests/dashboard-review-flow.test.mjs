@@ -11,6 +11,7 @@ import {patchPayFinance,patchPayPartner} from '../tools/pay-cycle-patches.mjs';
 import {patchStatementFinance,patchStatementPartner} from '../tools/statement-review-patches.mjs';
 import {patchOceanFinance} from '../tools/ocean-theme-patches.mjs';
 import {patchRedesignFinance} from '../tools/finance-redesign-patches.mjs';
+import {patchPhasesFinance} from '../tools/finance-phases-patches.mjs';
 const require=createRequire(import.meta.url),H=require('../finance/household-dashboard.js'),G=require('../finance/interactive-guide.js'),P=require('../finance/pocketsmith-import.js');
 test('every overview tile is a keyboard-accessible link to a relevant detail',()=>{
  const html=H.renderOverview({});
@@ -20,7 +21,7 @@ test('every overview tile is a keyboard-accessible link to a relevant detail',()
 test('encrypted rebuild preserves private defaults and is idempotent for both profiles',()=>{
  for(const [page,key,patch]of [['finance/index.html','.hub-key',patchDashboardFinance],['partner/index.html','.partner-key',patchDashboardPartner]]){
   const pass=readFileSync(key,'utf8').trim(),before=decryptPage(execFileSync('git',['show','191d935:'+page],{encoding:'utf8'}),pass),after=decryptPage(readFileSync(page,'utf8'),pass);
-  const overview=page.startsWith('finance/')?patchOverviewFinance:patchOverviewPartner,statement=page.startsWith('finance/')?patchStatementFinance:patchStatementPartner;const pay=page.startsWith('finance/')?patchPayFinance:patchPayPartner,plan=page.startsWith('finance/')?JSON.parse(after.match(/const CONFIRMED_WAGE_PLAN=(.*);/)[1]):undefined;const theme=page.startsWith('finance/')?patchOceanFinance:(x=>x);const redesign=page.startsWith('finance/')?patchRedesignFinance:(x=>x);const layout=s=>redesign(theme(pay(statement(overview(s)),plan)));
+  const overview=page.startsWith('finance/')?patchOverviewFinance:patchOverviewPartner,statement=page.startsWith('finance/')?patchStatementFinance:patchStatementPartner;const pay=page.startsWith('finance/')?patchPayFinance:patchPayPartner,plan=page.startsWith('finance/')?JSON.parse(after.match(/const CONFIRMED_WAGE_PLAN=(.*);/)[1]):undefined;const theme=page.startsWith('finance/')?patchOceanFinance:(x=>x);const redesign=page.startsWith('finance/')?patchRedesignFinance:(x=>x);const phases=page.startsWith('finance/')?patchPhasesFinance:(x=>x);const layout=s=>phases(redesign(theme(pay(statement(overview(s)),plan))));
   assert.ok(layout(patch(before))===after,'Encrypted output matches both reviewed source patches');assert.ok(layout(patch(after))===after,'Patching again does not change the source');
   for(const name of ['SEED_ACCTS','SEED_INCOME','SEED_BUDGET']){const re=new RegExp('const '+name+'=\\[[\\s\\S]*?\\n\\];'),a=before.match(re)?.[0],b=after.match(re)?.[0];assert.ok(a===b,'Existing defaults preserved');}
  }
