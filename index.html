@@ -172,7 +172,7 @@
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
     <button id="b-kids" class="sec" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
     <button id="b-family" class="sec" onclick="show('family')"><span class="ico">👨‍👩‍👧‍👦</span><span>Family</span></button>
-    <a id="b-finance" class="finance-link" href="./finance/app.html" target="_blank" rel="noopener"><span class="ico" aria-hidden="true">💰</span><span>Open Finance ↗</span></a>
+    <a id="b-finance" class="finance-link" href="./finance/app.html"><span class="ico" aria-hidden="true">💰</span><span>Open Finance</span></a>
     <button class="routebtn" onclick="showCopilot('notes')"><span class="ico">🗒️</span><span>Notes</span></button>
     <span class="nav-label">Just for me</span>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
@@ -252,7 +252,7 @@
   }
   function show(which){
     // Keep old user-click navigation calls working without embedding Finance again.
-    if (which === 'finance'){ window.open('./finance/app.html', '_blank', 'noopener'); return; }
+    if (which === 'finance'){ window.location.assign('./finance/app.html'); return; }
     if (!Object.prototype.hasOwnProperty.call(SRC, which)) which = 'hub';
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById(BUTTONS[k]||'b-'+k);
