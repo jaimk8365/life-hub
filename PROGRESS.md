@@ -7,6 +7,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 17/10/2026 – Ocean 1.1 fix: first release still looked cream because finance/household-dashboard.css and interactive-guide.css forced old cream/pink/green colours. Both now follow Ocean for Jaimi (Matthew keeps old colours via fallbacks). Verified by rendering Day and Dusk screenshots locally. Cache v61. Backups of the old CSS: .lifehub-backups/ocean-1.1/.
 - 17/10/2026 – Finance redesign step 1.1 done: Ocean colours with Day/Dusk (auto from device, override in Insights > Settings & month-end tools > Appearance, saved per device under lifehub_fin_theme). Fonts now Fredoka + Nunito. Layout unchanged. Added tools/ocean-theme-patches.mjs; src/finance.html and finance/index.html rebuilt (backups: src/backups/finance-pre-ocean-2026-10-17.html, .lifehub-backups/ocean-1.1/). Cache v60. Tests 372/372. Matthew's partner app NOT re-themed yet.
 - 17/10/2026 – Finance now opens in the SAME tab (was a new tab): Open Finance link and show('finance') in index.html; tests updated; service worker cache bumped to v59. Tests 372/372. Not committed or pushed yet.
 - 17/10/2026 – Committed Co-Pilot, automation fixes and test updates (22 files, reviewed list). Not pushed yet. Left out on purpose: tools/build_bali_fund_pdf.py, tools/create-lifehub-template.mjs, package-lock.json.
