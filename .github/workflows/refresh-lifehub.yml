@@ -2,6 +2,8 @@ name: Refresh Life Hub
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 8,20 * * *'   # 6am & 6pm Brisbane (UTC+10) — free auto calendar refresh
 
 concurrency:
   group: lifehub-refresh

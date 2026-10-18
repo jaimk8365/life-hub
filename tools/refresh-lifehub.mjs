@@ -3,6 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { decryptPage, decryptPayload, replaceBetween } from './refresh-crypto.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -116,7 +117,19 @@ const encryptedHub = await readFile(hubPath, 'utf8');
 const encryptedPlan = await readFile(planPath, 'utf8');
 let hub = decryptPage(encryptedHub, passphrase);
 let plan = decryptPage(encryptedPlan, passphrase);
-const hubBlock = `const LIVE_SYNCED_AT = ${JSON.stringify(displayTime(now))};\nconst LIVE_SYNCED_ISO = ${JSON.stringify(localIso(now))};\nconst LIVE = ${JSON.stringify({calendar:gathered, reminders, emails:[], starred:[]}, null, 2)};`;
+// Preserve the existing email + starred data — this pipeline only refreshes calendar + reminders,
+// so it must NOT blank the Email Triage section (which is refreshed on-demand, not here).
+const stateMarker = '\n\n\n/* ============================================================\n   STATE';
+let keepEmails = [], keepStarred = [];
+try {
+  const a = hub.indexOf('const LIVE ='), b = hub.indexOf(stateMarker, a);
+  if (a >= 0 && b >= 0) {
+    const prev = vm.runInNewContext(`(${hub.slice(a + 'const LIVE ='.length, b).trim().replace(/;$/, '')})`, Object.create(null), {timeout:1000});
+    if (Array.isArray(prev.emails)) keepEmails = prev.emails;
+    if (Array.isArray(prev.starred)) keepStarred = prev.starred;
+  }
+} catch { /* first run / unparsable: fall back to empty, no worse than before */ }
+const hubBlock = `const LIVE_SYNCED_AT = ${JSON.stringify(displayTime(now))};\nconst LIVE_SYNCED_ISO = ${JSON.stringify(localIso(now))};\nconst LIVE = ${JSON.stringify({calendar:gathered, reminders, emails:keepEmails, starred:keepStarred}, null, 2)};`;
 hub = replaceBetween(hub, 'const LIVE_SYNCED_AT', '\n\n\n/* ============================================================\n   STATE', `${hubBlock}\n\n\n/* ============================================================\n   STATE`);
 
 const feed = {
