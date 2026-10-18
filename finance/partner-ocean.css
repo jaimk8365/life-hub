@@ -1,0 +1,22 @@
+/* Ocean theme for the partner (Matthew's) Finance page. Same palette as the main Finance page.
+   Day and Dusk follow the device, or the saved override on <html data-theme>. Public file: colours only. */
+body.finance-matthew{--t-good:#DDF5EE;--t-good-line:#A9E0D2;--t-bad:#FFE6E2;--t-bad-line:#FFC4BC;--t-bad2:#FFF0ED;--t-warn:#FFF4DC;--t-warn-line:#F6DCA0;--t-paper2:#F3FAFD;--t-yellow:#FFF2C2;--t-plum:#F1EDF8;--t-plum-line:#D6CDEB;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="day"]) body.finance-matthew{--t-good:#2B5F66;--t-good-line:#3F8579;--t-bad:#5B4B63;--t-bad-line:#8A6475;--t-bad2:#4F4A66;--t-warn:#5A5668;--t-warn-line:#8A7F6A;--t-paper2:#2E4D6C;--t-yellow:#5C5A62;--t-plum:#3F4F7A;--t-plum-line:#62679A;}}
+:root[data-theme="dusk"] body.finance-matthew{--t-good:#2B5F66;--t-good-line:#3F8579;--t-bad:#5B4B63;--t-bad-line:#8A6475;--t-bad2:#4F4A66;--t-warn:#5A5668;--t-warn-line:#8A7F6A;--t-paper2:#2E4D6C;--t-yellow:#5C5A62;--t-plum:#3F4F7A;--t-plum-line:#62679A;}
+body.finance-matthew{--paper:#EAF6FB;--paper-2:#F3FAFD;--card:#FFFFFF;--card2:#DCEFF7;--ink:#0E2A3A;--ink-soft:#4B6676;--ink-faint:#5A7586;--line:#BFDDEA;--line-soft:#D5EAF3;--track:#CDE6F0;--shadow:#B9D7E4;--glass:rgba(255,255,255,.8);--sea:#0B6E99;--coral:#FF7A6B;--mint:#14A88B;--sunshine:#FFC857;--sky:#1D8FD1;--plum:#B79BC7;--good:#14A88B;--warn:#E07A16;--bad:#D6453A;--joy-ink:#0E2A3A;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="day"]) body.finance-matthew{--paper:#26435C;--paper-2:#2E4D6C;--card:#305474;--card2:#3A5F81;--ink:#F1F8FC;--ink-soft:#C2D7E5;--ink-faint:#A9C3D4;--line:#527597;--line-soft:#3F6485;--track:#476A8B;--shadow:#1C3448;--glass:rgba(48,84,116,.8);--sea:#1F7FAE;--coral:#FF9C8F;--mint:#72E5C7;--sunshine:#FFD27A;--sky:#8FCDF5;--plum:#CDB5DA;--good:#72E5C7;--warn:#FFB273;--bad:#FF9C8F;--joy-ink:#F1F8FC;}}
+:root[data-theme="dusk"] body.finance-matthew{--paper:#26435C;--paper-2:#2E4D6C;--card:#305474;--card2:#3A5F81;--ink:#F1F8FC;--ink-soft:#C2D7E5;--ink-faint:#A9C3D4;--line:#527597;--line-soft:#3F6485;--track:#476A8B;--shadow:#1C3448;--glass:rgba(48,84,116,.8);--sea:#1F7FAE;--coral:#FF9C8F;--mint:#72E5C7;--sunshine:#FFD27A;--sky:#8FCDF5;--plum:#CDB5DA;--good:#72E5C7;--warn:#FFB273;--bad:#FF9C8F;--joy-ink:#F1F8FC;}
+body.finance-matthew{background:var(--paper)!important;color:var(--ink)!important;font-family:'Nunito',system-ui,sans-serif}
+body.finance-matthew .pills button.on,body.finance-matthew .tab.active{background:var(--card)!important;color:var(--ink)!important}
+body.finance-matthew .btn.dark{background:var(--sea)!important;color:#fff!important}
+body.finance-matthew .btn.ghost,body.finance-matthew .btn.soft{background:var(--card)!important;border-color:var(--line)!important;color:var(--ink)!important}
+body.finance-matthew button:focus-visible{outline-color:var(--sea)!important}
+body.finance-matthew .card,body.finance-matthew .acct,body.finance-matthew .bsec,body.finance-matthew .stat,body.finance-matthew .sheet{background:var(--card);color:var(--ink);box-shadow:0 5px 0 var(--shadow)!important;border-color:var(--line-soft)!important}
+body.finance-matthew h1,body.finance-matthew h2,body.finance-matthew .card h2,body.finance-matthew .val{font-family:'Fredoka',system-ui,sans-serif!important;color:var(--ink)}
+body.finance-matthew .tiny,body.finance-matthew .f,body.finance-matthew .sub,body.finance-matthew .muted{color:var(--ink-soft)}
+body.fin-partner .wrap>.pills{display:none!important}
+body.fin-partner .wrap{padding-bottom:calc(120px + var(--sab))}
+@media(min-width:1024px){body.fin-partner .wrap{padding-bottom:40px}}
+/* a pale-yellow notice written inline by an older safety patch */
+body.finance-matthew [style*="#FFF7CF"]{background:var(--t-yellow)!important;color:var(--ink)!important}
+body.finance-matthew [style*="#FCFAF5" i]{background:var(--t-paper2)!important;color:var(--ink)!important}

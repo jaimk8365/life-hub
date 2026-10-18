@@ -113,3 +113,7 @@ body.fin-redesign .bar{position:relative;height:12px;border-radius:8px;backgroun
 body.fin-redesign .bar>i{border-radius:8px}
 body.fin-redesign .bar::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 2px),var(--card) calc(10% - 2px),var(--card) 10%)}
 body.fin-redesign .info-btn{min-width:32px;min-height:32px}
+
+/* Dusk: links and the lit tab need a lighter blue to stay readable on the navy cards */
+@media (prefers-color-scheme: dark){:root:not([data-theme="day"]) .fn-tab.on,:root:not([data-theme="day"]) .fh-link{color:var(--sky)}}
+:root[data-theme="dusk"] .fn-tab.on,:root[data-theme="dusk"] .fh-link{color:var(--sky)}

@@ -38,7 +38,9 @@
   {k:'more',t:'More',svg:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'}
  ];
  function itemBtn(i){return '<button type="button" class="fn-item" onclick="'+(i.a?'FinHome.act(\''+i.a+'\')':'FinHome.open(\''+i.v+'\','+(i.s?'\''+i.s+'\'':'null')+')')+'"><span class="fn-e" aria-hidden="true">'+i.e+'</span>'+esc(i.t)+'</button>';}
- function sectionsFor(profile){return profile==='matt'?SECTIONS.map(s=>({...s,items:s.items.filter(i=>i.m)})).filter(s=>s.items.length):SECTIONS;}
+ let override=null;
+ function setSections(a){override=a;}
+ function sectionsFor(profile){if(override)return override;return profile==='matt'?SECTIONS.map(s=>({...s,items:s.items.filter(i=>i.m)})).filter(s=>s.items.length):SECTIONS;}
  function navHtml(profile){
   const bar=TABS.map(t=>'<button type="button" class="fn-tab'+(t.raised?' fn-raised':'')+'" data-fn="'+t.k+'" onclick="FinHome.tab(\''+t.k+'\')"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+t.svg+'</svg><span>'+t.t+'</span></button>').join('');
   const side=sectionsFor(profile).map(s=>'<div class="fn-sec fn-'+s.colour+'"><div class="fn-sech">'+esc(s.label)+'</div>'+s.items.map(itemBtn).join('')+'</div>').join('');
@@ -74,7 +76,7 @@
  }
  function safeBlock(d,week){
   if(d.safe&&d.safe.hidden)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">On '+esc((d.names&&d.names.owner)||'the owner')+'\'s profile</div><p class="fh-note">Ask '+esc((d.names&&d.names.owner)||'them')+' to check this one with you.</p>';
-  if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">Update your balances so this number can be trusted.</p><button type="button" class="fh-btn" onclick="openMoneyUpdate()">↥ Update Money</button>';
+  if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">'+esc((d.safe&&d.safe.note)||'Update your balances so this number can be trusted.')+'</p>'+(d.safe&&d.safe.canUpdate===false?'':'<button type="button" class="fh-btn" onclick="openMoneyUpdate()">↥ Update Money</button>');
   const s=d.safe.safe,left=week.daysLeft+1,perDay=s>0?Math.floor(s/left):0;
   return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big'+(s<0?' fh-bad':'')+'">'+aud(s)+' <span>'+(s>0?'· '+aud(perDay)+' a day':s<0?'· hold off on extras':'')+'</span></div>'+energy(s,d.safe.free)+(s<0?'<p class="fh-note">What is already spoken for is more than what is in there.</p>':'');
  }
@@ -113,5 +115,5 @@ function shopCard(e){
  function tab(k){if(hooks.tab)hooks.tab(k);}
  function open(v,s){if(hooks.open)hooks.open(v,s);}
  function act(a){if(hooks.act)hooks.act(a);}
- return{HELP,SECTIONS,sectionsFor,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
+ return{HELP,SECTIONS,setSections,sectionsFor,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
 });
