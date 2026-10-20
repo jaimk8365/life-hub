@@ -29,6 +29,7 @@ function finProfileData(d){
     out.files=null;out.game=null;
   }else{
     out.files={waiting:finFilesWaiting()};
+    out.feed=finFeedData();
     out.game=finGameHome();out.shop=finShopSummary();
     const ma=finMoveAlert();
     if(ma)out.alert={count:(d.alert.count||0)+1,text:ma.text};
@@ -299,7 +300,7 @@ function finApAnswer(key){
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
-  const map={autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
+  const map={sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
   if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }
@@ -637,4 +638,41 @@ function finSwapUndo(){
   const u=load(K_SWAP_UNDO,null);if(!u||!u.before)return;
   if(!confirm('Put your budget back how it was before “'+u.name+'”?'))return;
   BUDGET=u.before;save(K_BUDGET,BUDGET);recalcBudgetTotals();syncCategoryBudgets();save(K_SWAP_UNDO,null);closeSheet();render();toastMsg('Swap undone');
+}
+
+/* ================= Bank feed status, Sync now and automatic re-sync ================= */
+var _feedBusy=false,_feedTimer=null;
+function finFeedData(){
+  let token=false,last=null;
+  try{token=!!localStorage.getItem('finance_pocketsmith_app_token');last=localStorage.getItem('finance_pocketsmith_last_sync');}catch(e){}
+  const ps=finPocketSmith(),st=ps&&ps.state?ps.state():null;
+  if(!token)return{state:'off',title:'Bank feed is not connected on this device',sub:'Tap the 🏦 Bank feed button at the top of My Finance to connect it. Each device needs its own connection.',canSync:false};
+  if(_feedBusy||(st&&st.status==='busy'))return{state:'busy',title:'Syncing your bank feed…',sub:'',canSync:true,busy:true};
+  if(st&&st.status==='err')return{state:'err',title:'The bank feed needs attention',sub:st.detail||'Tap Sync now to try again.',canSync:true};
+  if(!last)return{state:'old',title:'Not synced yet on this device',sub:'Tap Sync now.',canSync:true};
+  const t=Date.parse(last),ms=Date.now()-t,ago=FinDates.ago(t,Date.now());
+  if(ms<6*3600000)return{state:'ok',title:'Bank feed synced '+ago,sub:'Your balances are up to date.',canSync:true};
+  return{state:'old',title:'Last synced '+ago,sub:ms>86400000?'That was a while ago. Tap Sync now to update your balances.':'Tap Sync now to update your balances.',canSync:true};
+}
+async function finSyncNow(){
+  const ps=finPocketSmith();
+  if(!ps){toastMsg('Open My Finance on its own page to sync.');return;}
+  if(_feedBusy)return;
+  _feedBusy=true;finRefreshFeedLine();
+  try{await ps.syncNow(true);_apLen=-1;toastMsg('Synced');}catch(e){toastMsg((e&&e.message)||'Sync needs attention.');}
+  _feedBusy=false;try{render();}catch(e){}
+}
+function finRefreshFeedLine(){
+  const el=document.querySelector('.fh-feed');if(!el)return;
+  const html=FinHome.feedHtml(finFeedData()),box=document.createElement('div');box.innerHTML=html;if(box.firstElementChild)el.replaceWith(box.firstElementChild);
+}
+/* While the app is open: keep the status line honest every minute, and re-sync about every 15 minutes. */
+function finStartAutoSync(){
+  if(_feedTimer||finIsMatt())return;
+  let n=0;
+  _feedTimer=setInterval(()=>{
+    if(document.hidden)return;
+    finRefreshFeedLine();
+    if(++n%15===0){const ps=finPocketSmith();if(ps&&ps.state&&ps.state().connected&&!_feedBusy)ps.syncNow(false).then(()=>{_apLen=-1;try{render();}catch(e){}}).catch(()=>{});}
+  },60000);
 }

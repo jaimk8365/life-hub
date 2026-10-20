@@ -26,7 +26,9 @@ function pfHomeData(){
   const hot=(S.insights||[]).filter(i=>i.status==='over'||i.status==='tracking_high'),first=hot[0];
   const alert=first?{count:hot.length,text:esc(first.name||first.category||'A category')+(first.status==='over'?' is over budget this month.':' is on track to go over.')}:{count:0};
   const last=typeof partnerTransactionDate==='function'?partnerTransactionDate():null;
-  return{today,account:'Shared',safe,alert,jars,goals,funds,files:null,syncText:last?'Last transaction '+FinDates.countdownLabel(last,today):'Waiting for numbers'};
+  let feed=null;
+  if(S.updatedAt){const t=Date.parse(S.updatedAt),ms=Date.now()-t,ago=FinDates.ago(t,Date.now());feed=ms<12*3600000?{state:'ok',title:'Shared numbers updated '+ago,sub:'These come from the main app.',canSync:false}:{state:'old',title:'Shared numbers last updated '+ago,sub:'They update when the main app is opened. Ask them to open it.',canSync:false};}
+  return{today,account:'Shared',safe,alert,jars,goals,funds,files:null,feed,syncText:last?'Last transaction '+FinDates.countdownLabel(last,today):'Waiting for numbers'};
 }
 function pfHome(){try{return FinHome.homeHtml(pfHomeData());}catch(e){return '';}}
 function pfOpenHelp(title,body){$('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>? '+esc(title)+'</h2><div class="card" style="margin-top:14px"><div style="line-height:1.65;color:var(--ink-soft)">'+esc(body)+'</div></div><button class="btn ghost" style="margin-top:10px" onclick="closeSheet();openPartnerHelp()">📖 Open the full Money guide</button>';openSheet();}

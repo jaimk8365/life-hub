@@ -38,7 +38,15 @@ test('negative safe-to-spend is flagged, bar is empty',()=>{const h=H.homeHtml({
 test('text is escaped',()=>{const h=H.homeHtml({...data,goals:[{name:'<img onerror=x>',saved:1,target:2}]});assert.ok(!h.includes('<img onerror'));});
 test('the Finance page is wired to the redesign and old pills are hidden by CSS',()=>{
  const src=readFileSync(new URL('../src/finance.html',import.meta.url),'utf8'),css=readFileSync(new URL('../finance/home-redesign.css',import.meta.url),'utf8');
- assert.ok(src.includes('finHome()+cycleHeader()'));assert.ok(src.includes('finNavSync();syncCategoryBudgets'));assert.ok(src.includes('fin-dates.js'));
+ assert.ok(src.includes('finHome()+cycleAlertsCard()'));assert.ok(src.includes('finNavSync();syncCategoryBudgets'));assert.ok(src.includes('fin-dates.js'));
  assert.match(css,/\.wrap>\.pills\.main\{display:none!important\}/);assert.match(css,/min-width:1024px/);
  assert.equal(D.budgetWeek('2026-10-18').dayNum,5);
+});
+test('Home shows one clear bank-feed line with a Sync now button, and no big Update Money button',()=>{
+ const base={today:'2026-10-18',account:'Everyday',safe:{trusted:false},alert:{count:0},jars:[],goals:[],funds:[]};
+ const ok=H.homeHtml({...base,feed:{state:'ok',title:'Bank feed synced 2 h ago',sub:'Your balances are up to date.',canSync:true}});
+ assert.ok(ok.includes('Bank feed synced 2 h ago'));assert.ok(ok.includes("FinHome.act('sync')"));assert.ok(!ok.includes('openMoneyUpdate'));assert.ok(ok.includes("FinHome.act('manual')"),'manual options are one small link');
+ const off=H.homeHtml({...base,feed:{state:'off',title:'Bank feed is not connected on this device',canSync:false}});assert.ok(off.includes('fh-feed-off'));assert.ok(!off.includes("act('sync')"));
+ assert.ok(H.homeHtml({...base,feed:{state:'busy',title:'Syncing…',canSync:true,busy:true}}).includes('disabled'));
+ assert.ok(!H.homeHtml(base).includes('fh-feed'),'no feed line when there is no feed');
 });

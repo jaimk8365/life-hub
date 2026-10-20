@@ -114,6 +114,13 @@ function phase10(s){
   s=once(s,'<script src="../finance/game.js?v='+V+'"></script>','<script src="../finance/game.js?v='+V+'"></script>\n<script src="../finance/swap.js?v='+V+'"></script>','swap head');
   return s;
 }
+/* Simpler Home: the old overview cards sit under one heading, and the feed keeps itself fresh while the app is open. */
+function simplify(s){
+  s=once(s,"if(typeof finGameTick==='function')finGameTick();","if(typeof finGameTick==='function')finGameTick();if(typeof finStartAutoSync==='function')finStartAutoSync();",'auto sync');
+  const a="$('today').innerHTML=finHome()+cycleHeader()+cycleAlertsCard()+householdDashboard()+sharingStatusFooter()+`<details class=\"bsec\"><summary>All balances and planning details</summary>";
+  const b="$('today').innerHTML=finHome()+cycleAlertsCard()+`<details class=\"bsec\"><summary>More overview details</summary><div class=\"body\">`+cycleHeader()+householdDashboard()+sharingStatusFooter()+`</div></details><details class=\"bsec\"><summary>All balances and planning details</summary>";
+  return once(s,a,b,'fold');
+}
 function phase5(s){
   s=once(s,'<script src="../finance/goals-funds.js?v='+V+'"></script>','<script src="../finance/goals-funds.js?v='+V+'"></script>\n<script src="../finance/autopilot.js?v='+V+'"></script>','p5 head');
   s=once(s,"if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();","if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();if(typeof finAutopilotRun==='function')finAutopilotRun();",'ap run');
@@ -135,5 +142,6 @@ export function patchPhasesFinance(source){
   s=phase8(s);
   s=phase9(s);
   s=phase10(s);
+  s=simplify(s);
   return bump(s);
 }

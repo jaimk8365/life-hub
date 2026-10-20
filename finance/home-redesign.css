@@ -117,3 +117,17 @@ body.fin-redesign .info-btn{min-width:32px;min-height:32px}
 /* Dusk: links and the lit tab need a lighter blue to stay readable on the navy cards */
 @media (prefers-color-scheme: dark){:root:not([data-theme="day"]) .fn-tab.on,:root:not([data-theme="day"]) .fh-link{color:var(--sky)}}
 :root[data-theme="dusk"] .fn-tab.on,:root[data-theme="dusk"] .fh-link{color:var(--sky)}
+
+/* Bank feed status line on Home */
+.fh-feed{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-radius:22px;padding:14px 16px;background:var(--t-good);border:1px solid var(--t-good-line);box-shadow:0 5px 0 var(--shadow)}
+.fh-feed-old,.fh-feed-busy{background:var(--t-warn);border-color:var(--t-warn-line)}
+.fh-feed-off,.fh-feed-err{background:var(--t-bad);border-color:var(--t-bad-line)}
+.fh-feed-t{display:flex;align-items:center;gap:12px;min-width:0;flex:1 1 220px}
+.fh-feed-i{font-size:26px;flex:none}
+.fh-feed-h{font:600 18px/1.25 'Fredoka',system-ui,sans-serif}
+.fh-feed-s{font:700 13px/1.4 'Nunito',sans-serif;color:var(--ink-soft);margin-top:2px}
+.fh-feed-b{margin-top:0;flex:none}
+.fh-feed-b:disabled{opacity:.6}
+@media(min-width:700px){.fh-feed{grid-column:1/-1}}
+/* the floating update button is replaced by Sync now on Home (manual options live under More) */
+body.fin-redesign:not(.fin-partner) .fab{display:none!important}

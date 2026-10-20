@@ -28,7 +28,7 @@
   {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Money Map',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
   {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'Wishlist',e:'🎁',v:'save',s:'wishlist'},{t:'Autopilot',e:'🤖',a:'autopilot'},{t:'Money moves',e:'🔄',a:'moves'},{t:'Budget swap',e:'🔀',a:'swap'}]},
   {id:'growing',label:'Growing',colour:'mint',items:[{t:'Goals (shared)',e:'🎯',v:'save',s:'sharedgoals',m:1},{t:'Kids\' goals',e:'🧒',v:'save',s:'goals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds',m:1},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
-  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide',m:1},{t:'Search accounts',e:'🔍',a:'search'},{t:'Shop business',e:'🛍️',a:'shop'}]}
+  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide',m:1},{t:'Search accounts',e:'🔍',a:'search'},{t:'Update by hand',e:'📸',a:'manual'},{t:'Shop business',e:'🛍️',a:'shop'}]}
  ];
  const TABS=[
   {k:'home',t:'Home',svg:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'},
@@ -76,7 +76,7 @@
  }
  function safeBlock(d,week){
   if(d.safe&&d.safe.hidden)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">On '+esc((d.names&&d.names.owner)||'the owner')+'\'s profile</div><p class="fh-note">Ask '+esc((d.names&&d.names.owner)||'them')+' to check this one with you.</p>';
-  if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">'+esc((d.safe&&d.safe.note)||'Update your balances so this number can be trusted.')+'</p>'+(d.safe&&d.safe.canUpdate===false?'':'<button type="button" class="fh-btn" onclick="openMoneyUpdate()">↥ Update Money</button>');
+  if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">'+esc((d.safe&&d.safe.note)||'It shows once your balances are confirmed up to date. Tap Sync now above.')+'</p>'+(d.safe&&d.safe.canUpdate===false?'':'<button type="button" class="fh-link" onclick="FinHome.act(\'manual\')">Other ways to update by hand ›</button>');
   const s=d.safe.safe,left=week.daysLeft+1,perDay=s>0?Math.floor(s/left):0;
   return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big'+(s<0?' fh-bad':'')+'">'+aud(s)+' <span>'+(s>0?'· '+aud(perDay)+' a day':s<0?'· hold off on extras':'')+'</span></div>'+energy(s,d.safe.free)+(s<0?'<p class="fh-note">What is already spoken for is more than what is in there.</p>':'');
  }
@@ -94,6 +94,12 @@ function shopCard(e){
   const body=e.locked?'<p class="fh-note">🔒 Unlock with your passcode.</p>':e.connected?'<p class="fh-note">This month: '+aud(e.month.in)+' in · '+aud(e.month.out)+' out</p>':'<p class="fh-note">Not started yet. It shows up here once your shop is added.</p>';
   return card('shop',e.name||'Your shop',body+'<button type="button" class="fh-btn" onclick="FinHome.act(\'shop\')">Open shop</button>','fh-shop');
  }
+function feedHtml(f){
+  if(!f)return '';
+  const icon={ok:'✅',old:'⚠️',off:'🔌',err:'⚠️',busy:'⏳'}[f.state]||'⚠️';
+  return '<section class="fh-feed fh-feed-'+esc(f.state||'old')+'" aria-label="Bank feed status" role="status"><div class="fh-feed-t"><span class="fh-feed-i" aria-hidden="true">'+icon+'</span><div><div class="fh-feed-h">'+esc(f.title)+'</div>'+(f.sub?'<div class="fh-feed-s">'+esc(f.sub)+'</div>':'')+'</div></div>'
+   +(f.canSync?'<button type="button" class="fh-btn fh-feed-b" onclick="FinHome.act(\'sync\')"'+(f.busy?' disabled':'')+'>'+(f.busy?'Syncing…':'Sync now')+'</button>':'')+'</section>';
+ }
  function homeHtml(d){
   const week=D.budgetWeek(d.today),alert=d.alert||{count:0};
   const hero=card('week',(d.account||'Everyday').toUpperCase()+' · '+week.range,'<div class="fh-days">'+daysText(week.daysLeft)+'</div>'+weekPath(week)+safeBlock(d,week),'fh-hero');
@@ -102,7 +108,7 @@ function shopCard(e){
    : '<section class="fh-alert fh-ok" aria-label="Pip\'s alert"><div class="fh-pip" aria-hidden="true">🍊</div><div class="fh-at"><div class="fh-tag">PIP</div><div>All clear. Nothing needs your attention right now.</div></div>'+helpBtn('alert')+'</section>';
   const fw=d.files&&d.files.waiting>0,files=d.files===null?'':card('files','Files inbox','<p class="fh-note">'+(fw?'📥 '+d.files.waiting+(d.files.waiting===1?' file is':' files are')+' waiting for you.':'📥 Drop in receipts and bills. Pip reads them for you.')+'</p><button type="button" class="fh-btn" onclick="FinHome.act(\'files\')">'+(fw?'Open inbox':'Add a file')+'</button>','fh-files');
   return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div><div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div>'+(d.game?'<button type="button" class="fh-lv" onclick="FinHome.act(\'quests\')" aria-label="Level '+d.game.level+', '+d.game.streak+' day streak. Open quests"><b>Lv '+d.game.level+'</b><span class="fh-lvbar"><i style="width:'+d.game.pct+'%"></i></span><span>🔥 '+d.game.streak+'</span></button>':'')+'</div>'
-   +hero+al
+   +feedHtml(d.feed)+hero+al
    +card('accounts','Accounts',jars(d.jars||[]))
    +card('goals','Goals',bars(d.goals||[],'No goals yet. Add one in Goals.','FinHome.tab(\'goals\')'))
    +card('funds','Sinking funds',bars(d.funds||[],'No sinking funds yet.','FinHome.tab(\'funds\')'))
@@ -115,5 +121,5 @@ function shopCard(e){
  function tab(k){if(hooks.tab)hooks.tab(k);}
  function open(v,s){if(hooks.open)hooks.open(v,s);}
  function act(a){if(hooks.act)hooks.act(a);}
- return{HELP,SECTIONS,setSections,sectionsFor,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
+ return{feedHtml,HELP,SECTIONS,setSections,sectionsFor,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
 });

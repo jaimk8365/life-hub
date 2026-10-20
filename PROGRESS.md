@@ -3,7 +3,7 @@
 Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
-- Baton: free (last: Claude Code, 19/10/2026)
+- Baton: free (last: Claude Code, 21/10/2026). Local, NOT pushed: Home sync line + Sync now + auto re-sync (see Done).
 - What changed last: Matt's app (partner/index.html) now matches the main Finance app. Ocean look with Day/Dusk (follows his device, override under More > Appearance), same fonts, bottom tab bar on phone/iPad and a sidebar on Mac/iPad landscape (Home, Goals, Ask Pip, Funds, More), and the new Home (week path, account jars, goals, sinking funds, Pip alert, Safe to Spend only when the shared plan is trusted). All his old tabs and "My spending" are reachable from More in 5 groups. Everything on his Home comes from the shared snapshot he already receives, so nothing private can appear. Ask Pip is a shortcut sheet (chat is not in his app). His separate passcode and sync are unchanged.
 - Files touched: finance/partner-ocean.css, finance/partner-glue.js (new); finance/home-redesign.js and .css (shared, small additions); tools/partner-redesign-patches.mjs (new); src/partner-finance.html (patched); partner/index.html (rebuilt); sw.js (cache v64); tests/partner-redesign.test.mjs (new), tests/dashboard-review-flow.test.mjs, tests/copilot-shell.test.mjs (updated); PROGRESS.md
 - Half-done: nothing. COMMITTED LOCALLY, NOT PUSHED (Jaimi asked to hold the push).
@@ -18,6 +18,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 21/10/2026 – Simpler Home: one bank-feed status line (✅ synced X ago / ⚠️ old / 🔌 not connected here) with a Sync now button, floating Update Money button removed (manual options under More > Update by hand), auto re-sync about every 15 minutes while the app is open, old overview cards folded under "More overview details". Matt's Home shows when shared numbers were last published. Tests 460/460. Not pushed. – Claude Code
 - 20/10/2026 – Fixed iPhone bug: on My Finance (finance/app.html) the fixed "Available for Bali" card sat on top of the new bottom tab bar and swallowed every tap, so only the dashboard worked. Card now sits above the tab bar on phone/iPad; sidebar layouts unchanged. Reproduced and verified with a test copy of the wrapper. Cache v65. Tests 459/459. Not pushed. – Claude Code
 - 19/10/2026 – Matt's app updated to match Jaimi's (Ocean Day/Dusk, new navigation, new Home, More menu). Built and tested, not pushed. Cache v64. Tests 459/459. – Claude Code
 - 18/10/2026 – Refreshed Hub data (fresh Google Calendar + Gmail) via Desktop/jaimi-hq.html → build-hub.mjs → hub/index.html. Merged the 2 cloud "automated reminders refresh" commits (favoured my hub with -X ours; plan/copilot taken from remote). Tests 453/453. Pushed (bec08f1 + merge 076a538). NOTE: Apple Reminders osascript bridge flaked again — only P&C + Work lists pulled (Life Admin/Weekly/Kids/Luna failed). Hourly Claude hub-refresh NOT restored (launchd job dead since 24 Aug) — Jaimi doesn't want it, wastes tokens. Sync now: calendar+email = on-demand only; reminders = 30-min free Action (re-stamps snapshot, NOT reading live Apple Reminders). – Claude Code
