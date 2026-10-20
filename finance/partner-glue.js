@@ -3,11 +3,11 @@
    Only touches page globals inside functions, because the page script loads after this file. */
 'use strict';
 var PF_SECTIONS=[
-  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Needs attention',e:'🔔',v:'insights',m:1}]},
-  {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Money Map',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
+  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Needs a look',e:'🔔',v:'insights',m:1}]},
+  {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Where money goes',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
   {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'My spending',e:'👛',v:'mine'}]},
-  {id:'growing',label:'Growing',colour:'mint',items:[{t:'Goals (shared)',e:'🎯',v:'save',s:'sharedgoals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds'},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
-  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Insights',e:'💡',v:'insights'},{t:'Money guide',e:'📖',a:'guide'},{t:'Search accounts',e:'🔍',a:'search'}]}
+  {id:'growing',label:'Growing',colour:'mint',items:[{t:'Shared goals',e:'🎯',v:'save',s:'sharedgoals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds'},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
+  {id:'admin',label:'Admin',colour:'sky',items:[{t:'Tax',e:'🧮',v:'tax'},{t:'Money guide',e:'📖',a:'guide'},{t:'Search accounts',e:'🔍',a:'search'}]}
 ];
 try{FinHome.setSections(PF_SECTIONS);}catch(e){}
 function pfToday(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
@@ -76,11 +76,20 @@ FinHome.hooks.tab=k=>{
   else if(k==='goals'){window._pfSavePart='goals';pfOpen('save','sharedgoals');}
   else if(k==='funds'){window._pfSavePart='funds';pfOpen('save','funds');}
   else if(k==='pip'){
-    $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🍊 Ask Pip</h2><div class="sub">Pip\'s chat is coming soon. These shortcuts help in the meantime.</div>'
-      +'<button class="btn dark" style="margin-top:12px" onclick="closeSheet();go(\'insights\',document.querySelector(\'[data-v=insights]\'))">🔔 What needs attention</button>'
+    $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🍊 Ask Pip</h2><div class="sub">The chat is coming soon. These shortcuts help in the meantime.</div>'
+      +'<button class="btn dark" style="margin-top:12px" onclick="closeSheet();go(\'insights\',document.querySelector(\'[data-v=insights]\'))">🔔 What needs a look</button>'
       +'<button class="btn ghost" style="margin-top:10px" onclick="closeSheet();openPartnerHelp()">📖 Money guide</button>'
       +'<button class="btn ghost" style="margin-top:10px" onclick="closeSheet();openPartnerSearch()">🔍 Find an account</button>';
     openSheet();
   }
   else if(k==='more')pfOpenMore();
 };
+
+/* One plain sentence at the top of every screen */
+function pfExplain(){
+  try{
+    const v=route.view,host=document.getElementById(v);if(!host)return;
+    host.querySelectorAll(':scope > .fh-explain').forEach(x=>x.remove());
+    host.insertAdjacentHTML('afterbegin',FinHome.explainHtml(v));
+  }catch(e){}
+}

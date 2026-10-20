@@ -41,6 +41,9 @@ export function patchPartnerRedesign(source){
       must(t.includes(a),'fallback anchor');
       t=t.replace(a,a+"\n/* PARTNER FALLBACK */\nif(typeof pfNavSync!=='function'){var pfNavSync=()=>{};}\nif(typeof pfHome!=='function'){var pfHome=()=>'';}\nif(typeof pfAddHelp!=='function'){var pfAddHelp=()=>{};}");
     }
+    // one plain sentence at the top of every screen
+    if(!t.includes("renderReview();pfExplain();")){const e="else if(route.view==='insights') renderReview();";must(t.includes(e),'explain anchor');t=t.replace(e,e+"pfExplain();");}
+    if(!t.includes('var pfExplain')){const f="var pfAddHelp=()=>{};}";must(t.includes(f),'explain fallback anchor');t=t.replace(f,f+"\nif(typeof pfExplain!=='function'){var pfExplain=()=>{};}");}
     return bump(t);
   }
 }

@@ -282,7 +282,7 @@ function finOpenAutopilot(){
     return '<div class="card" style="background:var(--t-warn);border-color:var(--t-warn-line)"><h2 style="margin:0 0 6px">🍊 Pip noticed something</h2><p class="f" style="margin:0 0 8px">'+AUD0(p.amount)+' goes into '+esc(acct.name)+' '+esc(p.cadence)+' ('+p.count+' times, last '+esc(FinDates.longDate(p.last))+'). What is it for?</p><div class="field"><input id="apq_label_'+esc(p.key)+'" placeholder="e.g. Swim lessons"></div><div class="field"><select id="apq_sel_'+esc(p.key)+'">'+opts+'</select></div><div style="display:flex;gap:8px"><button class="btn dark" style="flex:1" onclick="finApAnswer(\''+esc(p.key)+'\')">Save rule</button><button class="btn ghost" style="flex:1" onclick="finApDismiss(\''+esc(p.key)+'\')">Not now</button></div><div id="apq_err_'+esc(p.key)+'" class="tiny" style="color:var(--bad)"></div></div>';}).join('');
   const rl=rules.map(r=>'<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line-soft)"><div style="flex:1;min-width:0"><b>'+esc(r.name)+'</b>'+(r.match&&r.match.every==='weekly'&&r.match.dow!=null?'<div class="tiny" style="text-transform:none">Expected '+esc(FinDates.countdownLabel(FinGoals.nextRuleDate({freq:'weekly',dow:r.match.dow},today),today))+'</div>':'')+'</div><button class="btn '+(r.enabled?'dark':'ghost')+'" style="width:auto;padding:8px 14px" aria-pressed="'+r.enabled+'" onclick="finApToggle(\''+esc(r.id)+'\')">'+(r.enabled?'On':'Off')+'</button></div>').join('');
   const log=st.log.slice(0,6).map(l=>'<div class="tiny" style="text-transform:none;padding:2px 0">'+esc(FinDates.longDate(l.date))+' · '+AUD0(l.amount)+' → '+esc(l.target||l.rule)+'</div>').join('')||'<p class="f" style="margin:0">Nothing sorted yet. Pip works on transfers that arrive from now on.</p>';
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🤖 Autopilot</h2><div class="sub">When a transfer arrives, Pip puts it where it belongs. Pip never moves money, you do the transfers.</div>'+psCard+pats+'<div class="card"><h2 style="margin:0 0 4px">Rules</h2>'+rl+'</div><div class="card"><h2 style="margin:0 0 6px">Recently sorted</h2>'+log+'</div>';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🤖 Auto-sort transfers</h2><div class="sub">When money is moved into Savings, this puts it in the right goal or fund for you. It never moves money itself.</div>'+psCard+pats+'<div class="card"><h2 style="margin:0 0 4px">Rules</h2>'+rl+'</div><div class="card"><h2 style="margin:0 0 6px">Recently sorted</h2>'+log+'</div>';
   openSheet();
 }
 async function finApSync(){const b=document.getElementById('ap_sync'),ps=finPocketSmith();if(!ps||!b)return;b.disabled=true;b.textContent='Syncing…';try{await ps.syncNow(true);_apLen=-1;finAutopilotRun();toastMsg('Synced');}catch(e){toastMsg((e&&e.message)||'Sync needs attention.');}finOpenAutopilot();}
@@ -333,12 +333,12 @@ function finMoveAlertNow(){
 }
 function finOpenMoves(){
   const d=finMovesData(),al=finMoveAlert(),name=id=>(acctById(id)||{name:id}).name;
-  const alertCard=al?'<div class="card" style="background:var(--t-warn);border-color:var(--t-warn-line)"><h2 style="margin:0 0 6px">⚠️ '+al.text+'</h2><p class="f" style="margin:0 0 8px">Three ways to fix it. Pip does not move money. You choose and do the transfer.</p>'+al.fixes.map((f,i)=>'<div style="padding:8px 0;border-top:1px solid var(--t-warn-line)"><b>'+(i+1)+'.</b> '+esc(f.text)+'</div>').join('')+'</div>':'<div class="card" style="background:var(--t-good);border-color:var(--t-good-line)"><b>✅ No top-up is putting Everyday short.</b></div>';
+  const alertCard=al?'<div class="card" style="background:var(--t-warn);border-color:var(--t-warn-line)"><h2 style="margin:0 0 6px">⚠️ '+al.text+'</h2><p class="f" style="margin:0 0 8px">Here are three ways to fix it. Nothing moves by itself. You choose and make the transfer.</p>'+al.fixes.map((f,i)=>'<div style="padding:8px 0;border-top:1px solid var(--t-warn-line)"><b>'+(i+1)+'.</b> '+esc(f.text)+'</div>').join('')+'</div>':'<div class="card" style="background:var(--t-good);border-color:var(--t-good-line)"><b>✅ No top-up is putting Everyday short.</b></div>';
   const counts='<div class="card"><h2 style="margin:0 0 6px">This month</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><div class="fh-lab">TOP-UPS</div><div class="fh-big">'+d.counts.topUps+'</div><div class="tiny" style="text-transform:none">'+AUD0(d.counts.topUpTotal)+' in total</div></div><div><div class="fh-lab">CASH OUT</div><div class="fh-big">'+d.counts.cash+'</div><div class="tiny" style="text-transform:none">'+AUD0(d.counts.cashTotal)+' in total</div></div></div></div>';
   const tops=d.tops.slice(0,6).map(m=>'<div style="display:flex;justify-content:space-between;padding:4px 0"><span>'+esc(name(m.from))+' → '+esc(name(m.to))+'<div class="tiny" style="text-transform:none">'+esc(FinDates.longDate(m.date))+'</div></span><b>'+AUD0(m.amount)+'</b></div>').join('')||'<p class="f" style="margin:0">No top-ups spotted in the last few months.</p>';
   const pend=d.pending.slice(0,5).map(t=>'<div style="padding:8px 0;border-top:1px solid var(--line-soft)"><div style="display:flex;justify-content:space-between"><b>'+esc(FinDates.longDate(t.date))+'</b><b>'+AUD0(-t.amount)+'</b></div><div class="tiny" style="text-transform:none;margin-bottom:6px">What was it for?</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+FinMoves.CASH_TAGS.map(tag=>'<button class="btn ghost" style="width:auto;padding:6px 10px;font-size:13px" onclick="finCashTag(\''+esc(t.id)+'\',\''+esc(tag)+'\')">'+esc(tag)+'</button>').join('')+'</div></div>').join('');
   const cashCard='<div class="card"><h2 style="margin:0 0 6px">💵 Cash withdrawals</h2>'+(d.pending.length?pend:'<p class="f" style="margin:0">'+(d.cash.length?'All tagged. Nice.':'No cash withdrawals spotted.')+'</p>')+'</div>';
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔄 Money moves</h2><div class="sub">Transfers between your own accounts</div>'+alertCard+counts+'<div class="card"><h2 style="margin:0 0 6px">Top-ups</h2>'+tops+'</div>'+cashCard;
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔄 Transfers between my accounts</h2><div class="sub">Shows money you moved between your own accounts, and warns you if a top-up leaves Everyday short.</div>'+alertCard+counts+'<div class="card"><h2 style="margin:0 0 6px">Top-ups</h2>'+tops+'</div>'+cashCard;
   openSheet();
 }
 function finCashTag(id,tag){const t=load(K_CASH_TAGS,{});t[id]=tag;save(K_CASH_TAGS,t);finGameEvent('cash');finOpenMoves();}
@@ -406,7 +406,7 @@ function finFileCard(f){
 }
 function finOpenFiles(){
   const all=finFiles(),plain=Object.values(load(K_FILES_DATA,{})).some(e=>e.plain);
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>📥 Files inbox</h2><div class="sub">Receipts and bills. Pip reads them on this device, nothing is uploaded.</div>'
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>📥 Receipts and bills</h2><div class="sub">Add a photo or PDF. It reads the shop, amount and date for you, then you choose where it goes. Nothing is uploaded.</div>'
    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><label class="btn dark" style="text-align:center;cursor:pointer">📷 Take photo<input type="file" accept="image/*" capture="environment" hidden onchange="finAddFiles(this.files)"></label><label class="btn ghost" style="text-align:center;cursor:pointer">📄 Choose files<input type="file" accept="image/*,application/pdf" multiple hidden onchange="finAddFiles(this.files)"></label></div>'
    +'<p class="f">On iPhone, “Choose files” also opens your Photos and Files. The iPhone share sheet cannot send files straight to a web app, so save to Photos or Files first.</p>'
    +(plain?'<div class="flag" style="background:var(--t-warn);border-color:var(--t-warn-line)"><span class="fi">🔓</span><div>Some files are not sealed yet. Tap your initial at the top, set your passcode and unlock, and they are sealed with it.</div></div>':'')
@@ -513,7 +513,7 @@ function finOpenPip(){
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🍊 Ask Pip</h2><div class="sub">Answers come from your own numbers, on this device.</div><div id="pip_msgs" style="max-height:38vh;overflow:auto"></div>'
    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">'+FinPip.SUGGESTED.map(q=>'<button class="btn ghost" style="width:auto;padding:7px 11px;font-size:13px" onclick="finPipAsk(this.textContent)">'+esc(q)+'</button>').join('')+'</div>'
    +'<div style="display:flex;gap:8px"><input id="pip_in" style="flex:1" placeholder="Ask about your money" onkeydown="if(event.key===\'Enter\')finPipSend()"><button class="btn dark" style="width:auto" onclick="finPipSend()">Ask</button></div>'+brain
-   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn soft" style="flex:1" onclick="finOpenCoach()">❤️ My money health</button><button class="btn soft" style="flex:1" onclick="finOpenSwap()">🔀 Budget swap</button></div>';
+   +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btn soft" style="flex:1" onclick="finOpenCoach()">❤️ Money health</button><button class="btn soft" style="flex:1" onclick="finOpenSwap()">🔀 Fit in a new cost</button></div>';
   openSheet();finPipChat('pip','Hi! Ask me something, or tap a question.');
 }
 function finPipSend(){const i=document.getElementById('pip_in');const q=i.value;i.value='';finPipAsk(q);}
@@ -529,7 +529,7 @@ async function finPipBrain(){
 }
 function finOpenCoach(){
   const f=finPipFacts(),h=FinPip.healthScore(f),c=FinPip.buildChecks(f),mv=FinPip.suggestedMoves(f,c.checks),col=h.score>=75?'var(--good)':h.score>=50?'var(--warn)':'var(--bad)';
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>❤️ My money health</h2><div class="card" style="text-align:center"><div style="font:700 56px/1 Fredoka,sans-serif;color:'+col+'">'+h.score+'</div><div class="fh-lab">OUT OF 100 · '+esc(h.label.toUpperCase())+'</div></div>'
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>❤️ Money health</h2><div class="sub">A score out of 100, and the next best things to do.</div><div class="card" style="text-align:center"><div style="font:700 56px/1 Fredoka,sans-serif;color:'+col+'">'+h.score+'</div><div class="fh-lab">OUT OF 100 · '+esc(h.label.toUpperCase())+'</div></div>'
    +'<div class="card">'+h.parts.map(p=>'<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><b>'+esc(p.name)+'</b><span class="tiny" style="text-transform:none">'+esc(p.note)+'</span></div><div class="fh-bar" style="margin-top:4px"><i style="width:'+Math.round(p.points/p.max*100)+'%"></i></div></div>').join('')+'</div>'
    +'<div class="card"><h2 style="margin:0 0 6px">Suggested moves</h2>'+(mv.length?mv.map((m,i)=>'<div style="padding:6px 0"><b>'+(i+1)+'.</b> '+esc(m)+'</div>').join(''):'<p class="f" style="margin:0">Nothing to fix. Keep going.</p>')+'</div>'
    +'<button class="btn ghost" onclick="closeSheet();openWealthReview()">📈 Full wealth review</button>';
@@ -560,7 +560,7 @@ function finOpenQuests(){
   const st=finGameState(),today=todayISO(),ctx={today,checkinDone:Object.values(dailyState().done||{}).some(Boolean)},l=FinGame.level(st),qs=FinGame.quests(st,ctx),all=qs.every(q=>q.done);
   const bs=FinGame.boss(st,finGameLoans()),needs=TXNS.filter(t=>t.needsReview&&!t.deleted).length;
   const chest=st.day.chest?'<button class="btn ghost" disabled>🎁 Chest opened today</button>':'<button class="btn '+(all?'dark':'ghost')+'" '+(all?'':'aria-disabled="true"')+' onclick="finClaimChest()">🎁 '+(all?'Open today\'s chest':'Finish all 3 to open the chest')+'</button>';
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🏆 Quests</h2>'
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🏆 Daily wins</h2><div class="sub">Three tiny jobs a day for XP, a streak and a chest. Just for fun.</div>'
    +'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font:700 28px Fredoka,sans-serif">Level '+l.level+'</div><div style="font:700 20px Fredoka,sans-serif">🔥 '+st.streak+' day'+(st.streak===1?'':'s')+'</div></div><div class="fh-bar" style="margin-top:8px;height:14px"><i style="width:'+l.pct+'%;background:var(--sunshine)"></i></div><div class="tiny" style="text-transform:none;margin-top:4px">'+l.into+' of '+l.span+' XP to the next level · best streak '+st.best+'</div></div>'
    +'<div class="card"><h2 style="margin:0 0 6px">Today</h2>'+qs.map(q=>'<div style="display:flex;gap:10px;align-items:center;padding:6px 0">'+dchk(q.done)+'<span style="'+(q.done?'text-decoration:line-through;opacity:.6':'')+'">'+esc(q.label)+'</span></div>').join('')+'<div style="margin-top:10px">'+chest+'</div></div>'
    +'<div class="card"><h2 style="margin:0 0 6px">🧹 Tidy-up sprint</h2><p class="f" style="margin:0 0 8px">'+(needs?needs+' record'+(needs===1?'':'s')+' still need a check. Do 5 and earn XP for each one.':'Everything is checked. Nice work.')+'</p>'+(needs?'<button class="btn dark" onclick="closeSheet();openDataReview()">Start the sprint</button>':'')+'</div>'
@@ -609,7 +609,7 @@ function finSwapCategories(){
 function finOpenSwap(){
   if(finIsMatt())return;
   const undo=load(K_SWAP_UNDO,null),secs=BUDGET.map(g=>g.sec);
-  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔀 Budget swap</h2><div class="sub">A new regular cost is coming. Pip finds things to trim so your budget total stays the same.</div>'
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔀 Fit in a new cost</h2><div class="sub">Got a new regular cost? This finds spending to trim so your budget total stays the same.</div>'
    +'<div class="field"><label>What is the new cost?</label><input id="sw_name" placeholder="e.g. New phone plan"></div><div class="row2"><div class="field"><label>Amount</label><input id="sw_amt" inputmode="decimal" placeholder="$140"></div><div class="field"><label>How often</label><select id="sw_freq"><option value="monthly">every month</option><option value="fortnightly">every fortnight</option><option value="weekly">every week</option><option value="yearly">every year</option></select></div></div>'
    +'<div class="field"><label>Add it to this part of the budget</label><select id="sw_sec">'+secs.map(s=>'<option>'+esc(s)+'</option>').join('')+'</select></div>'
    +'<div id="sw_err" class="tiny" role="alert" style="color:var(--bad);min-height:18px"></div><button class="btn dark" onclick="finSwapPreview()">Show me the swaps</button><div id="sw_out"></div>'
@@ -675,4 +675,14 @@ function finStartAutoSync(){
     finRefreshFeedLine();
     if(++n%15===0){const ps=finPocketSmith();if(ps&&ps.state&&ps.state().connected&&!_feedBusy)ps.syncNow(false).then(()=>{_apLen=-1;try{render();}catch(e){}}).catch(()=>{});}
   },60000);
+}
+
+/* One plain sentence at the top of every screen */
+function finExplain(){
+  try{
+    const v=route.view;if(route.acct)return;
+    const host=document.getElementById(v);if(!host)return;
+    host.querySelectorAll(':scope > .fh-explain').forEach(x=>x.remove());
+    host.insertAdjacentHTML('afterbegin',FinHome.explainHtml(v));
+  }catch(e){}
 }

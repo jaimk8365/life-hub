@@ -121,6 +121,13 @@ function simplify(s){
   const b="$('today').innerHTML=finHome()+cycleAlertsCard()+`<details class=\"bsec\"><summary>More overview details</summary><div class=\"body\">`+cycleHeader()+householdDashboard()+sharingStatusFooter()+`</div></details><details class=\"bsec\"><summary>All balances and planning details</summary>";
   return once(s,a,b,'fold');
 }
+/* One plain sentence at the top of every screen. */
+function explain(s){
+  s=once(s,"[route.view])();\n}\nfunction updateNotifBadge","[route.view])();finExplain();\n}\nfunction updateNotifBadge",'explain hook');
+  const marker='/* PHASES FALLBACK 4 */';
+  if(!s.includes(marker)){const at='/* FINANCE REDESIGN v1 */';must(s.includes(at),'fallback4 anchor');s=s.replace(at,marker+"\nif(typeof finExplain!=='function'){var finExplain=()=>{};}\n"+at);}
+  return s;
+}
 function phase5(s){
   s=once(s,'<script src="../finance/goals-funds.js?v='+V+'"></script>','<script src="../finance/goals-funds.js?v='+V+'"></script>\n<script src="../finance/autopilot.js?v='+V+'"></script>','p5 head');
   s=once(s,"if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();","if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();if(typeof finAutopilotRun==='function')finAutopilotRun();",'ap run');
@@ -143,5 +150,6 @@ export function patchPhasesFinance(source){
   s=phase9(s);
   s=phase10(s);
   s=simplify(s);
+  s=explain(s);
   return bump(s);
 }
