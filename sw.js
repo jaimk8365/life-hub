@@ -1,11 +1,11 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v66';
+const CACHE = 'lifehub-v67';
 const PRECACHE = [
   './finance/bulk-storage.js', './finance/recovery.html', './finance/recovery.js', './finance/app.html', './finance/standalone.js', './finance/pocketsmith-client.js', './finance/pocketsmith-import.js', './finance/manifest.webmanifest',
   './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './hub/index.html', './finance/index.html', './partner/index.html', './plan/index.html',
-  './partner-sync.js', './finance/pay-cycle.js', './finance/fin-dates.js', './finance/partner-ocean.css', './finance/partner-glue.js', './finance/home-redesign.js', './finance/home-redesign.css', './finance/profiles.js', './finance/goals-funds.js', './finance/autopilot.js', './finance/money-moves.js', './finance/files-inbox.js', './finance/pip.js', './finance/game.js', './finance/swap.js', './finance/phase-glue.js', './finance/statement-review.js', './finance/interactive-guide.js', './finance/interactive-guide.css', './finance/household-dashboard.js', './finance/household-dashboard.css', './finance/money-map.js', './finance/money-map.css', './finance/csv-batch.js', './finance/account-migrations.js', './finance/shared-budget.js', './finance/ui-safety.js', './finance/wealth-coach.js',
+  './partner-sync.js', './finance/pay-cycle.js', './finance/fin-dates.js', './finance/meaning.js', './finance/partner-ocean.css', './finance/partner-glue.js', './finance/home-redesign.js', './finance/home-redesign.css', './finance/profiles.js', './finance/goals-funds.js', './finance/autopilot.js', './finance/money-moves.js', './finance/files-inbox.js', './finance/pip.js', './finance/game.js', './finance/swap.js', './finance/phase-glue.js', './finance/statement-review.js', './finance/interactive-guide.js', './finance/interactive-guide.css', './finance/household-dashboard.js', './finance/household-dashboard.css', './finance/money-map.js', './finance/money-map.css', './finance/csv-batch.js', './finance/account-migrations.js', './finance/shared-budget.js', './finance/ui-safety.js', './finance/wealth-coach.js',
   './copilot/index.html', './copilot/engine.mjs', './copilot/steps-library.mjs', './copilot/store.mjs',
   './quest/index.html', './course/index.html', './recipes/index.html', './task-engine/index.html',
   './task-engine/models/index.mjs', './task-engine/logic/index.mjs', './task-engine/store/index.mjs', './task-engine/ui/index.mjs'

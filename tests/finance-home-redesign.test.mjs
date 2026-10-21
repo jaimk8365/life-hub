@@ -61,3 +61,12 @@ test('the menu is only five things, every screen has a plain one-line explanatio
  const home=H.homeHtml({today:'2026-10-18',safe:{trusted:false},alert:{count:0},jars:[],goals:[{name:'Trip',saved:1,target:2}],funds:[{name:'Rates',saved:1,target:2}],files:{waiting:0},shop:{connected:false}});
  assert.ok(!home.includes('Receipts and bills')&&!home.includes('fh-shop'),'files and shop cards only appear when there is something to show');
 });
+test('Home explains the safe-to-spend number in plain words, with the right tone',()=>{
+ globalThis.FinMeaning=require('../finance/meaning.js');
+ try{
+  const base={today:'2026-10-18',account:'Everyday',alert:{count:0},jars:[],goals:[],funds:[]};
+  const ok=H.homeHtml({...base,safe:{trusted:true,safe:340,free:900}});assert.ok(ok.includes('fh-t-good')&&ok.includes('This is what is free to spend this week'));
+  const bad=H.homeHtml({...base,safe:{trusted:true,safe:-20,free:900}});assert.ok(bad.includes('fh-t-act')&&bad.includes('Hold off on extras'));
+  assert.ok(ok.includes('Each jar shows how full the account is'));
+ }finally{delete globalThis.FinMeaning;}
+});

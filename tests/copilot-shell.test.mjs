@@ -34,7 +34,7 @@ test('sync preserves all existing prefixes and adds only Co-Pilot tracking', asy
 test('service worker precaches encrypted page and modules with bumped cache version', async () => {
   const source = await read('../sw.js');
   for (const file of ['copilot/index.html', 'copilot/engine.mjs', 'copilot/steps-library.mjs', 'copilot/store.mjs']) assert.ok(source.includes(`'./${file}'`));
-  assert.match(source, /lifehub-v66/);
+  assert.match(source, /lifehub-v67/);
 });
 
 test('encrypted Co-Pilot output contains ciphertext wrapper rather than feed data', async () => {

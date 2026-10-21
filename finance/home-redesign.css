@@ -135,3 +135,12 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
 /* One plain sentence at the top of every screen */
 .fh-explain{margin:2px 2px 12px;font:700 15px/1.45 'Nunito',system-ui,sans-serif;color:var(--ink-soft)}
 .fh-sub{margin:12px 0 6px;font:800 11px 'Nunito',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+
+/* "What this means": one colour language everywhere (green fine, amber keep an eye on it, red do something) */
+.fh-t-good{--tone:var(--good)}.fh-t-watch{--tone:var(--warn)}.fh-t-act{--tone:var(--bad)}
+.fh-meaning{margin:0 0 14px;padding:14px 16px;border-radius:22px;background:var(--card);border:1px solid var(--line-soft);border-left:8px solid var(--tone,var(--line));box-shadow:0 5px 0 var(--shadow);font-family:'Nunito',system-ui,sans-serif;color:var(--ink)}
+.fh-mean-h{font:800 11px 'Nunito',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
+.fh-meaning p{margin:6px 0 0;font:700 15px/1.5 'Nunito',sans-serif}
+.fh-meaning p.fh-mean-main{font:600 18px/1.4 'Fredoka',system-ui,sans-serif;margin-top:0}
+.fh-mean-line{margin:8px 0 0;padding-left:10px;border-left:5px solid var(--tone,var(--line));font:700 14px/1.45 'Nunito',sans-serif;color:var(--ink-soft)}
+.fh-rowmean{flex-basis:100%;margin-top:6px;padding-left:10px;border-left:5px solid var(--tone,var(--line));font:700 12.5px/1.4 'Nunito',sans-serif;color:var(--ink-soft);text-align:left}

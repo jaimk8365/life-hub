@@ -20,3 +20,5 @@ body.fin-partner .wrap{padding-bottom:calc(120px + var(--sab))}
 /* a pale-yellow notice written inline by an older safety patch */
 body.finance-matthew [style*="#FFF7CF"]{background:var(--t-yellow)!important;color:var(--ink)!important}
 body.finance-matthew [style*="#FCFAF5" i]{background:var(--t-paper2)!important;color:var(--ink)!important}
+/* let the plain-English status sit on its own line under each account */
+body.fin-partner #accounts button[onclick*="openPartnerAccount("]{flex-wrap:wrap}

@@ -79,8 +79,8 @@
  function safeBlock(d,week){
   if(d.safe&&d.safe.hidden)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">On '+esc((d.names&&d.names.owner)||'the owner')+'\'s profile</div><p class="fh-note">Ask '+esc((d.names&&d.names.owner)||'them')+' to check this one with you.</p>';
   if(!d.safe||!d.safe.trusted)return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big fh-muted">Not ready yet</div><p class="fh-note">'+esc((d.safe&&d.safe.note)||'It shows once your balances are confirmed up to date. See the bank feed line above.')+'</p>'+(d.safe&&d.safe.canUpdate===false?'':'<button type="button" class="fh-link" onclick="FinHome.act(\'manual\')">Other ways to update by hand ›</button>');
-  const s=d.safe.safe,left=week.daysLeft+1,perDay=s>0?Math.floor(s/left):0;
-  return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big'+(s<0?' fh-bad':'')+'">'+aud(s)+' <span>'+(s>0?'· '+aud(perDay)+' a day':s<0?'· hold off on extras':'')+'</span></div>'+energy(s,d.safe.free)+(s<0?'<p class="fh-note">What is already spoken for is more than what is in there.</p>':'');
+  const s=d.safe.safe,left=week.daysLeft+1,perDay=s>0?Math.floor(s/left):0,M=globalThis.FinMeaning,mean=M?M.safeMeaning({trusted:true,safe:s,daysLeft:week.daysLeft}):null;
+  return '<div class="fh-lab">SAFE TO SPEND</div><div class="fh-big'+(s<0?' fh-bad':'')+'">'+aud(s)+' <span>'+(s>0?'· '+aud(perDay)+' a day':s<0?'· hold off on extras':'')+'</span></div>'+energy(s,d.safe.free)+(mean?'<p class="fh-mean-line fh-t-'+mean.tone+'">'+esc(mean.text)+'</p>':'');
  }
  function card(key,title,body,cls){return '<section class="fh-card '+(cls||'')+'" aria-label="'+esc(title)+'"><div class="fh-h"><h2>'+esc(title)+'</h2>'+helpBtn(key)+'</div>'+body+'</section>';}
  function jars(list){
@@ -109,10 +109,10 @@ function feedHtml(f){
    ? '<section class="fh-alert" aria-label="Needs a look"><div class="fh-pip" aria-hidden="true">🍊</div><div class="fh-at"><div class="fh-tag">'+alert.count+(alert.count===1?' THING NEEDS A LOOK':' THINGS NEED A LOOK')+'</div><div>'+alert.text+'</div></div><button type="button" class="fh-open" onclick="go(\'insights\',null)" aria-label="See everything that needs a look">›</button>'+helpBtn('alert')+'</section>'
    : '';
   const fw=d.files&&d.files.waiting>0,files=fw?card('files','Receipts and bills','<p class="fh-note">📥 '+d.files.waiting+(d.files.waiting===1?' file is':' files are')+' waiting for you.</p><button type="button" class="fh-btn" onclick="FinHome.act(\'files\')">Open</button>','fh-files'):'';
-  const saving=card('saving','Saving for',bars(d.goals||[],'No goals yet.','FinHome.tab(\'goals\')','Goals')+((d.funds||[]).length?'<div class="fh-sub">Sinking funds (set aside for bills)</div>'+bars(d.funds||[],'','FinHome.tab(\'funds\')','Funds'):''));
+  const saving=card('saving','Saving for',(((d.goals||[]).length||(d.funds||[]).length)?'<p class="fh-note">Each bar shows how much you have saved toward its target.</p>':'')+bars(d.goals||[],'No goals yet.','FinHome.tab(\'goals\')','Goals')+((d.funds||[]).length?'<div class="fh-sub">Sinking funds (set aside for bills)</div>'+bars(d.funds||[],'','FinHome.tab(\'funds\')','Funds'):''));
   return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div>'+(d.feed?'':'<div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div>')+(d.game?'<button type="button" class="fh-lv" onclick="FinHome.act(\'quests\')" aria-label="Level '+d.game.level+', '+d.game.streak+' day streak. Open daily wins"><b>Lv '+d.game.level+'</b><span class="fh-lvbar"><i style="width:'+d.game.pct+'%"></i></span><span>🔥 '+d.game.streak+'</span></button>':'')+'</div>'
    +feedHtml(d.feed)+hero+al
-   +card('accounts','Accounts',jars(d.jars||[]))
+   +card('accounts','Accounts',jars(d.jars||[])+'<p class="fh-note">Each jar shows how full the account is compared with its monthly budget.</p>')
    +saving+files+shopCard(d.shop)+'</div>';
  }
 

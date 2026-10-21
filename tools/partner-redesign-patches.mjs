@@ -4,7 +4,7 @@ const V='20261019-partner1';
 const must=(cond,msg)=>{if(!cond)throw new Error('Partner redesign patch: '+msg)};
 export function patchPartnerRedesign(source){
   let s=source;
-  const bump=t=>t.replace(/(partner-ocean\.css|partner-glue\.js|home-redesign\.css|home-redesign\.js|fin-dates\.js)\?v=partner-[^"']+/g,'$1?v='+V);
+  const bump=t=>t.replace(/(meaning\.js|partner-ocean\.css|partner-glue\.js|home-redesign\.css|home-redesign\.js|fin-dates\.js)\?v=partner-[^"']+/g,'$1?v='+V);
   if(s.includes('<!-- Partner redesign v1 -->'))return fix(s);
 
   // 1) swap pale hard-coded tints for theme variables, and the fonts
@@ -41,6 +41,7 @@ export function patchPartnerRedesign(source){
       must(t.includes(a),'fallback anchor');
       t=t.replace(a,a+"\n/* PARTNER FALLBACK */\nif(typeof pfNavSync!=='function'){var pfNavSync=()=>{};}\nif(typeof pfHome!=='function'){var pfHome=()=>'';}\nif(typeof pfAddHelp!=='function'){var pfAddHelp=()=>{};}");
     }
+    if(!t.includes('meaning.js')){const m=t.match(/<script src="\.\.\/finance\/partner-glue\.js\?v=[^"]*"><\/script>/);must(m,'meaning anchor');t=t.replace(m[0],'<script src="../finance/meaning.js?v=partner-1"></script>\n'+m[0]);}
     // one plain sentence at the top of every screen
     if(!t.includes("renderReview();pfExplain();")){const e="else if(route.view==='insights') renderReview();";must(t.includes(e),'explain anchor');t=t.replace(e,e+"pfExplain();");}
     if(!t.includes('var pfExplain')){const f="var pfAddHelp=()=>{};}";must(t.includes(f),'explain fallback anchor');t=t.replace(f,f+"\nif(typeof pfExplain!=='function'){var pfExplain=()=>{};}");}

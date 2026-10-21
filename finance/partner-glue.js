@@ -91,5 +91,25 @@ function pfExplain(){
     const v=route.view,host=document.getElementById(v);if(!host)return;
     host.querySelectorAll(':scope > .fh-explain').forEach(x=>x.remove());
     host.insertAdjacentHTML('afterbegin',FinHome.explainHtml(v));
+    pfMeaning(v,host);
   }catch(e){}
+}
+/* "What this means" cards, built only from the shared snapshot. */
+function pfMeaning(v,host){
+  if(!window.FinMeaning||!SHARED)return;
+  host.querySelectorAll(':scope > .fh-meaning').forEach(x=>x.remove());
+  const today=pfToday(),put=m=>{const e=host.querySelector(':scope > .fh-explain'),h=FinMeaning.meaningHtml(m,v);if(!h)return;if(e)e.insertAdjacentHTML('afterend',h);else host.insertAdjacentHTML('afterbegin',h);};
+  const accts=sharedAccounts();
+  if(v==='accounts'){
+    const last={};(SHARED.txns||[]).forEach(t=>{if(!last[t.acct]||t.date>last[t.acct])last[t.acct]=t.date;});
+    const m=FinMeaning.accountsSummary({today,accounts:accts.map(a=>({id:a.id,name:a.name,type:a.type,balance:+a.balance||0,buffer:+((typeof BUFFERS!=='undefined'&&BUFFERS[a.id])||0),lastDate:last[a.id]||null}))});
+    put(m);
+    host.querySelectorAll('button[onclick*="openPartnerAccount("]').forEach(row=>{const id=(row.getAttribute('onclick').match(/openPartnerAccount\('([^']+)'/)||[])[1],r=id&&m.rows[id];if(r&&!row.querySelector('.fh-rowmean'))row.insertAdjacentHTML('beforeend',FinMeaning.pillHtml(r));});
+  }else if(v==='budget'){
+    const byCat={};(SHARED.insights||[]).forEach(i=>{byCat[i.category]=i;});
+    put(FinMeaning.budgetSummary({categories:Object.keys(CAT_BUDGET||{}).filter(id=>+CAT_BUDGET[id]>0).map(id=>{const i=byCat[id],b=+CAT_BUDGET[id],nm=(typeof CAT_NAMES!=='undefined'&&CAT_NAMES[id])||id;return i?{name:nm,actual:i.actual,budget:b,status:i.status,remaining:b-i.actual}:{name:nm,actual:0,budget:b,status:'on_track',remaining:b};})}));
+  }else if(v==='bills'){
+    const balances={},names={};accts.forEach(a=>{balances[a.id]=+a.balance||0;names[a.id]=a.name;});
+    put(FinMeaning.billsSummary({today,balances,names,bills:(SHARED.bills||[]).filter(b=>b.nextDue).map(b=>({name:b.name,amount:+b.amount||0,due:b.nextDue,acct:b.acct||'everyday'}))}));
+  }
 }

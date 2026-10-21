@@ -4,7 +4,7 @@ import {readFileSync,existsSync} from 'node:fs';
 const V='20261018-phases1';
 const must=(cond,msg)=>{if(!cond)throw new Error('Phases patch: '+msg)};
 const once=(s,a,b,label)=>{if(s.includes(b))return s;must(s.includes(a),label+' anchor');return s.replace(a,b);};
-const bump=t=>t.replace(/(profiles|goals-funds|autopilot|money-moves|files-inbox|pip|game|swap|phase-glue|autopilot|money-moves|goals-funds|files-inbox|pip|game|swap)\.(js|css)\?v=[^"']+/g,'$1.$2?v='+V);
+const bump=t=>t.replace(/(profiles|meaning|goals-funds|autopilot|money-moves|files-inbox|pip|game|swap|phase-glue|autopilot|money-moves|goals-funds|files-inbox|pip|game|swap)\.(js|css)\?v=[^"']+/g,'$1.$2?v='+V);
 
 function phase3(s){
   const head='<script src="../finance/home-redesign.js?v=20261018-redesign1"></script>';
@@ -128,6 +128,11 @@ function explain(s){
   if(!s.includes(marker)){const at='/* FINANCE REDESIGN v1 */';must(s.includes(at),'fallback4 anchor');s=s.replace(at,marker+"\nif(typeof finExplain!=='function'){var finExplain=()=>{};}\n"+at);}
   return s;
 }
+/* Plain-English "what this means" summaries. */
+function meaningHead(s){
+  const a='<script src="../finance/swap.js?v='+V+'"></script>';
+  return once(s,a,a+'\n<script src="../finance/meaning.js?v='+V+'"></script>','meaning head');
+}
 function phase5(s){
   s=once(s,'<script src="../finance/goals-funds.js?v='+V+'"></script>','<script src="../finance/goals-funds.js?v='+V+'"></script>\n<script src="../finance/autopilot.js?v='+V+'"></script>','p5 head');
   s=once(s,"if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();","if(typeof finSeedGoalsFunds==='function')finSeedGoalsFunds();if(typeof finAutopilotRun==='function')finAutopilotRun();",'ap run');
@@ -151,5 +156,6 @@ export function patchPhasesFinance(source){
   s=phase10(s);
   s=simplify(s);
   s=explain(s);
+  s=meaningHead(s);
   return bump(s);
 }

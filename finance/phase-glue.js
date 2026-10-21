@@ -684,5 +684,26 @@ function finExplain(){
     const host=document.getElementById(v);if(!host)return;
     host.querySelectorAll(':scope > .fh-explain').forEach(x=>x.remove());
     host.insertAdjacentHTML('afterbegin',FinHome.explainHtml(v));
+    finMeaning(v,host);
   }catch(e){}
+}
+/* "What this means" card at the top of Accounts, Budget and Bills, plus a plain status under each account. */
+function finMeaning(v,host){
+  if(!window.FinMeaning)return;
+  host.querySelectorAll(':scope > .fh-meaning').forEach(x=>x.remove());
+  const today=todayISO(),put=m=>{const e=host.querySelector(':scope > .fh-explain'),h=FinMeaning.meaningHtml(m,v);if(!h)return;if(e)e.insertAdjacentHTML('afterend',h);else host.insertAdjacentHTML('afterbegin',h);};
+  if(v==='accounts'){
+    const m=FinMeaning.accountsSummary({today,accounts:ACCTS.map(a=>({id:a.id,name:a.name,type:a.type,balance:balance(a.id),buffer:+BUFFERS[a.id]||0,lastDate:((txnsFor(a.id)||[])[0]||{}).date||a.openDate||null}))});
+    put(m);
+    host.querySelectorAll('.acct[onclick*="openAcct("]').forEach(row=>{const id=(row.getAttribute('onclick').match(/openAcct\('([^']+)'/)||[])[1],r=id&&m.rows[id];if(r&&!row.querySelector('.fh-rowmean'))row.insertAdjacentHTML('beforeend',FinMeaning.pillHtml(r));});
+  }else if(v==='budget'){
+    // every area with a budget, even if nothing has been spent in it yet this month
+    const byCat={};transactionInsights().forEach(i=>{byCat[i.category]=i;});
+    put(FinMeaning.budgetSummary({categories:CATS.concat(CUSTOM_CATS||[]).filter(c=>+CAT_BUDGET[c.id]>0).map(c=>{const i=byCat[c.id],b=+CAT_BUDGET[c.id];return i?{name:c.n,actual:i.actual,budget:b,status:i.status,remaining:b-i.actual}:{name:c.n,actual:0,budget:b,status:'on_track',remaining:b};})}));
+  }else if(v==='bills'){
+    const balances={},names={};ACCTS.forEach(a=>{balances[a.id]=balance(a.id);names[a.id]=a.name;});
+    put(FinMeaning.billsSummary({today,balances,names,bills:BILLS.filter(b=>b.active!==false).map(b=>({name:b.name,amount:+b.amount||0,due:billNextDue(b),acct:b.acct||'everyday'}))}));
+    // "3d" and "1d overdue" in plain words
+    host.querySelectorAll('.txn .tiny').forEach(t=>{const x=t.textContent.trim();let m;if((m=x.match(/^(\d+)d$/)))t.textContent='in '+m[1]+(m[1]==='1'?' day':' days');else if((m=x.match(/^(\d+)d overdue$/)))t.textContent=m[1]+(m[1]==='1'?' day':' days')+' overdue';});
+  }
 }
