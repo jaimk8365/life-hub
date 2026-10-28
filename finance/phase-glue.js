@@ -141,8 +141,18 @@ async function finPrivUnlock(p,key){
 
 /* ================= Phase 4: goals and sinking funds ================= */
 var _finSeeded=false;
+/* Accounts the owner added later (listed in FIN_CONFIG inside the encrypted page). Added once; never re-added if archived. */
+function finAddConfigAccounts(){
+  try{
+    const extra=(globalThis.FIN_CONFIG&&FIN_CONFIG.extraAccounts)||[];if(!extra.length)return;
+    const archived=new Set(load('fin_archived_accounts_v1',[]).map(x=>x&&x.account&&x.account.id));let changed=false;
+    extra.forEach(a=>{if(a&&a.id&&!ACCTS.some(x=>x.id===a.id)&&!archived.has(a.id)){ACCTS.push(Object.assign({},a));changed=true;}});
+    if(changed)save(K_ACCTS,ACCTS);
+  }catch(e){}
+}
 function finSeedGoalsFunds(){
   if(_finSeeded||finIsMatt())return;_finSeeded=true;
+  finAddConfigAccounts();
   try{
     if(!load('fin_phase4_seeded_v1',false)){
       const seed=FinGoals.seedGoal(uid);

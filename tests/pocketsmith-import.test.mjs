@@ -49,7 +49,9 @@ test('transaction planner refreshes already-linked PocketSmith rows and skips un
  assert.equal(plan.additions.length,0);
  assert.equal(plan.updates.length,1);
  assert.equal(plan.updates[0].amount,-12);
- assert.equal(plan.skipped.length,1);
+ // an account that is not matched yet is set aside (it no longer blocks the whole sync)
+ assert.equal(plan.skipped.length,0);
+ assert.deepEqual(plan.unmapped,['2']);
 });
 
 test('PocketSmith categories map to Finance category IDs used by existing calculations',()=>{
@@ -95,4 +97,23 @@ test('durable storage allows new bank imports above the legacy 5000-row limit',(
  const existing=Array.from({length:7025},(_,i)=>({id:'ps_'+i,pocketsmithId:String(i),acct:'everyday',date:'2026-10-01',amount:-1}));
  const plan=planTransactions(existing,[{id:9000,transactionAccountId:1,date:'2026-10-07',amount:-9,payee:'Synthetic new purchase'}],{'1':'everyday'},'2026-10-08',true);
  assert.equal(plan.additions.length,1);assert.equal(existing.length,7025);
+});
+
+test('a newly linked Ubank account is matched to J Spending 2, while J Spending stays matched',()=>{
+ const ps=[{id:3,title:'J Spending',type:'bank'},{id:9,title:'ubank Spend Account',type:'bank'}];
+ const finance=[{id:'jspend',name:'J Spendings'},{id:'jspend2',name:'J Spending 2'}];
+ const r=buildAccountMapping(ps,finance);
+ assert.equal(r.map['3'],'jspend');assert.equal(r.map['9'],'jspend2');assert.equal(r.unmatched.length,0);
+});
+test('two Ubank accounts are never guessed: both wait for a manual match',()=>{
+ const r=buildAccountMapping([{id:8,title:'ubank Holiday',type:'bank'},{id:9,title:'ubank Extra',type:'bank'}],[{id:'jspend2',name:'J Spending 2'}]);
+ assert.equal(r.mappings.length,0);assert.equal(r.unmatched.length,2);
+});
+test('transactions from a bank account that is not matched yet are set aside, not treated as bad data',()=>{
+ const tx=[{id:'a1',transactionAccountId:1,date:'2026-10-27',amount:-12.5,payee:'Coles',currencyCode:'AUD'},{id:'n1',transactionAccountId:99,date:'2026-10-27',amount:-5,payee:'New account',currencyCode:'AUD'}];
+ const plan=planTransactions([],tx,{'1':'everyday'},'2026-10-28T00:00:00Z',true);
+ assert.equal(plan.skipped.length,0,'nothing counted as invalid');assert.deepEqual(plan.unmapped,['n1']);
+ assert.equal(plan.additions.length,1);assert.equal(plan.additions[0].acct,'everyday');
+ const bad=planTransactions([],[{id:'b1',transactionAccountId:1,date:'not a date',amount:-1}],{'1':'everyday'},'2026-10-28T00:00:00Z',true);
+ assert.equal(bad.skipped.length,1,'genuinely bad rows are still caught');
 });

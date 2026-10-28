@@ -12,6 +12,7 @@
     everyday:['everyday','everyday expenses','main offset','everyday offset'],
     bills:['bills','bills offset'],
     jspend:['j spending','j spend','jaimi spending','jaimi spend'],
+    jspend2:['j spending 2','j spend 2','jaimi spending 2','ubank','ubank spend','ubank spend account'],
     mspend:['m spending','m spend','matt spending','matt spend'],
     savings:['sinking funds','sinking fund','sinking funds offset'],
     loanrepay:['loan repayment','loan repayments','loan repay','loan repayments account'],
@@ -119,10 +120,13 @@
       if(t?.pocketsmithId!=null)byExternal.set(String(t.pocketsmithId),t);
       if(String(t?.importKey||'').startsWith('pocketsmith:'))byExternal.set(String(t.importKey).slice(12),t);
     }
-    const additions=[],updates=[],links=[],skipped=[],outsideWindow=[],used=new Set(),seenExternal=new Set();
+    const additions=[],updates=[],links=[],skipped=[],outsideWindow=[],unmapped=[],used=new Set(),seenExternal=new Set();
     for(const src of snapshotTransactions){
       const psId=String(src?.id??'');
       const acct=accountMap[String(src?.transactionAccountId??'')];
+      // A bank account that is not matched yet (for example a newly linked account) is set aside, not treated as bad data,
+      // so it cannot stop the matched accounts from updating.
+      if(psId&&!acct){unmapped.push(psId);continue;}
       if(!psId||!acct||!validDate(src?.date)||src?.currencyCode&&String(src.currencyCode).trim().toUpperCase()!=='AUD'||src?.amount==null||src?.amount===''||!Number.isFinite(Number(src?.amount))){skipped.push(psId||'unknown');continue;}
       if(seenExternal.has(psId)){skipped.push(psId);continue;}seenExternal.add(psId);
       const row={id:'ps_'+psId,acct,date:String(src.date).slice(0,10),amount:round2(src.amount),cat:categoryFor(src),note:String(src.payee||src.category?.title||'PocketSmith transaction'),src:'pocketsmith',pocketsmithId:psId,importKey:'pocketsmith:'+psId,sourceCategory:src.category||null,sourceStatus:src.status||null,needsReview:src.needsReview===true||categoryFor(src)==='other'||/pending/i.test(src.status||''),currencyCode:src.currencyCode||'AUD',sourceUpdatedAt:src.updatedAt||null,sourceCat:categoryFor(src)};
@@ -141,7 +145,7 @@
     }
     const bankRows=existing.filter(t=>t.pocketsmithId!=null||String(t.importKey||'').startsWith('pocketsmith:')).length;
     if(!largeStore&&additions.length&&bankRows+additions.length>MAX_BANK_ROWS)throw new Error('Bank history has reached its safe storage limit. Existing records were kept; no new import was saved. Download a recovery backup before expanding history.');
-    return {additions,updates,links,skipped,outsideWindow};
+    return {additions,updates,links,skipped,outsideWindow,unmapped};
   }
 
   let lastMapping=null;
@@ -261,14 +265,14 @@
       const invalid=snapshot.accounts.filter(a=>mapping.map[String(a.id)]).map(a=>{const problems=[];if(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance)))problems.push('missing valid balance');if(!validDate(a.currentBalanceDate))problems.push('missing valid balance date');if(a.currencyCode&&String(a.currencyCode).trim().toUpperCase()!=='AUD')problems.push('unsupported currency');return problems.length?String(a.title||a.name||'Bank account')+': '+problems.join(', '):null;}).filter(Boolean);
       if(invalid.length)throw new Error('Bank feed needs attention — '+invalid.join('; ')+'. Nothing was imported.');
       const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt,!!financeFrame()?.contentWindow?.FinanceStore);
-      if(mapping.unmatched.length||plan.skipped.length)return setState('attention','Review unmatched accounts or invalid transactions before importing. Nothing was changed.',{mapping});
+      if(plan.skipped.length)return setState('attention','Some bank transactions look invalid, so nothing was imported. Open Bank feed to review them.',{mapping});
       const applied=await applyOps(snapshot,mapping,plan);
       if(!applied||!applied.ok)throw new Error('Finance runtime did not accept the PocketSmith update.');
       const badBalances=(applied.balances||[]).filter(x=>cents(x.target)!==cents(x.calculated));
       if(badBalances.length)throw new Error('A synced account did not reconcile to the PocketSmith balance.');
       const historyNote=plan.outsideWindow.length?` Older bank history (${plan.outsideWindow.length} rows) remains in PocketSmith; your existing Finance history was kept.`:'';
       const detail=mapping.unmatched.length
-        ? `Updated ${applied.balances.length} account(s); ${mapping.unmatched.length} PocketSmith account(s) still need matching.`
+        ? `Updated ${applied.balances.length} account(s) and imported ${applied.added} new transaction(s). ${mapping.unmatched.length} new bank account(s) (${mapping.unmatched.map(a=>a.title).join(', ')}) still need matching in Bank feed.`
         : `Updated ${applied.balances.length} account(s), imported ${applied.added} new transaction(s) and refreshed ${applied.updated||0} changed transaction(s).`;
       return setState(mapping.unmatched.length?'attention':'ok',detail+historyNote,{mapping,plan:{added:applied.added,updated:applied.updated||0,linked:applied.linked,skipped:plan.skipped.length},balances:applied.balances});
     }catch(e){
