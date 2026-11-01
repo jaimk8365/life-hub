@@ -30,6 +30,7 @@ function finProfileData(d){
   }else{
     out.files={waiting:finFilesWaiting()};
     out.feed=finFeedData();
+    out.coach=typeof coachHome==='function'?coachHome():null;
     out.game=finGameHome();out.shop=finShopSummary();
     const ma=finMoveAlert();
     if(ma)out.alert={count:(d.alert.count||0)+1,text:ma.text};
@@ -310,7 +311,7 @@ function finApAnswer(key){
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
-  const map={sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
+  const map={checkin:'coachOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
   if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }

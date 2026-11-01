@@ -25,7 +25,7 @@
 
  /* ---------- navigation ---------- */
  const SECTIONS=[
-  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Needs a look',e:'🔔',v:'insights'},{t:'Receipts and bills',e:'📥',a:'files'},{t:'Money health',e:'❤️',a:'coach'},{t:'Daily wins',e:'🏆',a:'quests'}]},
+  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Money check-in',e:'🧭',a:'checkin'},{t:'Needs a look',e:'🔔',v:'insights'},{t:'Receipts and bills',e:'📥',a:'files'},{t:'Money health',e:'❤️',a:'coach'},{t:'Daily wins',e:'🏆',a:'quests'}]},
   {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Where money goes',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
   {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'Wishlist',e:'🎁',v:'save',s:'wishlist'},{t:'Auto-sort transfers',e:'🤖',a:'autopilot'},{t:'Transfers between my accounts',e:'🔄',a:'moves'},{t:'Fit in a new cost',e:'🔀',a:'swap'}]},
   {id:'growing',label:'Growing',colour:'mint',items:[{t:'Shared goals',e:'🎯',v:'save',s:'sharedgoals',m:1},{t:'Kids\' goals',e:'🧒',v:'save',s:'goals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds',m:1},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
@@ -102,6 +102,12 @@ function feedHtml(f){
   return '<section class="fh-feed fh-feed-'+esc(f.state||'old')+'" aria-label="Bank feed status" role="status"><div class="fh-feed-t"><span class="fh-feed-i" aria-hidden="true">'+icon+'</span><div><div class="fh-feed-h">'+esc(f.title)+'</div>'+(f.sub?'<div class="fh-feed-s">'+esc(f.sub)+'</div>':'')+'</div></div>'
    +(f.canSync?'<button type="button" class="fh-btn fh-feed-b" onclick="FinHome.act(\'sync\')"'+(f.busy?' disabled':'')+'>'+(f.busy?'Syncing…':'Sync now')+'</button>':'')+'</section>';
  }
+ function coachCard(c){
+  if(!c)return '';
+  if(c.state==='done')return '<section class="fh-coach fh-coach-done" aria-label="Money check-in"><span>✅ Today\'s money check-in is done.</span><button type="button" class="fh-link" onclick="FinHome.act(\'checkin\')">See summary ›</button></section>';
+  const label=c.state==='resume'?'Carry on with today\'s check-in (step '+c.step+' of '+c.total+')':'Start today\'s money check-in';
+  return '<section class="fh-coach" aria-label="Money check-in"><div><div class="fh-coach-h">🧭 '+esc(label)+'</div><div class="fh-coach-s">About 2 minutes. One question at a time.</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'checkin\')">'+(c.state==='resume'?'Carry on':'Start')+'</button></section>';
+ }
  function homeHtml(d){
   const week=D.budgetWeek(d.today),alert=d.alert||{count:0};
   const hero=card('week',(d.account||'Everyday').toUpperCase()+' · '+week.range,'<div class="fh-days">'+daysText(week.daysLeft)+'</div>'+weekPath(week)+safeBlock(d,week),'fh-hero');
@@ -111,7 +117,7 @@ function feedHtml(f){
   const fw=d.files&&d.files.waiting>0,files=fw?card('files','Receipts and bills','<p class="fh-note">📥 '+d.files.waiting+(d.files.waiting===1?' file is':' files are')+' waiting for you.</p><button type="button" class="fh-btn" onclick="FinHome.act(\'files\')">Open</button>','fh-files'):'';
   const saving=card('saving','Saving for',(((d.goals||[]).length||(d.funds||[]).length)?'<p class="fh-note">Each bar shows how much you have saved toward its target.</p>':'')+bars(d.goals||[],'No goals yet.','FinHome.tab(\'goals\')','Goals')+((d.funds||[]).length?'<div class="fh-sub">Sinking funds (set aside for bills)</div>'+bars(d.funds||[],'','FinHome.tab(\'funds\')','Funds'):''));
   return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div>'+(d.feed?'':'<div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div>')+(d.game?'<button type="button" class="fh-lv" onclick="FinHome.act(\'quests\')" aria-label="Level '+d.game.level+', '+d.game.streak+' day streak. Open daily wins"><b>Lv '+d.game.level+'</b><span class="fh-lvbar"><i style="width:'+d.game.pct+'%"></i></span><span>🔥 '+d.game.streak+'</span></button>':'')+'</div>'
-   +feedHtml(d.feed)+hero+al
+   +feedHtml(d.feed)+coachCard(d.coach)+hero+al
    +card('accounts','Accounts',jars(d.jars||[])+'<p class="fh-note">Each jar shows how full the account is compared with its monthly budget.</p>')
    +saving+files+shopCard(d.shop)+'</div>';
  }

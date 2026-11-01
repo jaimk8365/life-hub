@@ -44,6 +44,7 @@ test('data check: stale or failed feed, records to review, duplicates, and an op
  assert.equal(d.tone,'act');const k=d.issues.map(i=>i.kind);assert.deepEqual(k,['feed','review','dups','reconcile']);
  assert.match(d.issues[3].text,/never approved just to finish/);
  assert.equal(C.dataCheck({today:'2026-10-30',connected:false}).issues[0].tone,'act');
+ assert.match(C.dataCheck({today:'2026-10-30',connected:true,lastSync:'2026-10-30T08:00:00Z',untrusted:['Bills']}).issues[0].text,/Bills's balance is not confirmed/);
  assert.equal(C.dataCheck({today:'2026-10-30',connected:true,lastSync:'2026-10-30T08:00:00Z',txns:[]}).ok,true);
 });
 test('spending position keeps cash and spendable apart and withholds safe-to-spend when data is not trusted',()=>{

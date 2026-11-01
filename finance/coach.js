@@ -80,6 +80,7 @@
   if(!o.connected){issues.push({kind:'feed',tone:'act',text:'The bank feed is not connected on this device.'});}
   else if(o.feedError){issues.push({kind:'feed',tone:'act',text:'The bank feed needs attention: '+o.feedError});}
   else if(age==null||age>1.5){issues.push({kind:'feed',tone:'watch',text:age==null?'The bank feed has not synced yet on this device.':'The last bank sync was '+Math.round(age)+' days ago.'});}
+  if((o.untrusted||[]).length)issues.push({kind:'confirm',tone:'watch',text:(o.untrusted.length===1?o.untrusted[0]+'\'s balance is':o.untrusted.join(', ')+' balances are')+' not confirmed up to date yet.'});
   if(o.needsReview>0)issues.push({kind:'review',tone:'watch',text:o.needsReview+(o.needsReview===1?' record needs':' records need')+' a quick check.'});
   const dups=findDuplicates(o.txns);if(dups.length)issues.push({kind:'dups',tone:'watch',text:dups.length+' possible duplicate'+(dups.length===1?'':'s')+' to look at.',pairs:dups});
   if(o.unreconciled>0)issues.push({kind:'reconcile',tone:'act',text:'A balance does not match the bank by '+aud(o.unreconciled)+'. It stays open until it is fixed. It is never approved just to finish a check-in.'});
