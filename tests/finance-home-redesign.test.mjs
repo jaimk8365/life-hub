@@ -70,3 +70,11 @@ test('Home explains the safe-to-spend number in plain words, with the right tone
   assert.ok(ok.includes('Each jar shows how full the account is'));
  }finally{delete globalThis.FinMeaning;}
 });
+test('Home shows the money check-in button: start, carry on, or done',()=>{
+ const base={today:'2026-10-18',safe:{trusted:false},alert:{count:0},jars:[],goals:[],funds:[]};
+ assert.match(H.homeHtml({...base,coach:{state:'due'}}),/Start today(&#39;|')s money check-in/);
+ assert.match(H.homeHtml({...base,coach:{state:'resume',step:2,total:5}}),/step 2 of 5/);
+ assert.match(H.homeHtml({...base,coach:{state:'done'}}),/check-in is done/);
+ assert.ok(!H.homeHtml(base).includes('fh-coach'),'no button for anyone without the coach (for example Matt)');
+ assert.ok(H.everythingHtml().includes("FinHome.act('checkin')")&&!H.everythingHtml('matt').includes("act('checkin')"));
+});
