@@ -4,7 +4,7 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 01/11/2026)
-- Branch: feature/money-coach (rollback tag: pre-money-coach). NOT merged, NOT pushed.
+- Branch: feature/money-coach MERGED into main and PUSHED 01/11 (cd1b5d8); Pages build green; live files match. Rollback tag: pre-money-coach.
 - What changed last: Money Coach Stage 1 (approved by Jaimi): new finance/coach.js, logic only, no screens. It decides which review is due (daily / Wednesday Payday Reset / Month-End, merged when they overlap, missed weeks never pile up), keeps check-in progress (start, next, back, skip, pause, resume, finish), data check (feed, records to review, duplicates, reconciliation gaps never auto-approved), cash vs spendable position (safe to spend withheld when untrusted), pay received vs expected, protected obligations without double counting, weekly allocation with its working, savings suggestions only when affordable, leak detector (over limit + weeks in a row, rising, small purchases, repeat shop, fees, savings pulls, budget borrowing, double subscriptions; never essentials, transfers or marked items; 14-day quiet period), reality check (the $85/wk example: $368/month, $2,210/6 months, $4,420/year; thin evidence labelled estimate), direct coach messages, actions (accept/change/dismiss with reason/complete/later, follow-up using evidence), one-reminder-a-day logic, owner profile only.
 - Files touched: finance/coach.js (new), tests/finance-coach.test.mjs (new), PROGRESS.md
 - Half-done: nothing. Stage 2 done on the same branch (see Done). Stage 3 (Wednesday Payday Reset) waits for approval.
