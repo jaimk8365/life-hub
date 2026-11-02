@@ -1,4 +1,5 @@
-/* Money Coach screens (Stage 2: the daily check-in). One question per screen, progress dots, Back / Next / Skip,
+/* Money Coach screens: the daily check-in (Stage 2), Wednesday Payday Reset (Stage 3), Month-End Review (Stage 4) and
+   reminders plus the Co-Pilot note (Stage 5). One question per screen, progress dots, Back / Next / Skip,
    and it can be closed at any time and picked up again. All numbers come from the app's existing calculations;
    finance/coach.js decides what to show. Owner profile only. Nothing moves money and nothing changes a budget. */
 'use strict';
@@ -8,8 +9,9 @@ function coachOn(){try{return FinCoach.available(typeof FIN_PROFILE==='string'?F
 var _coachSt=null;
 function coachState(){if(!_coachSt)_coachSt=Object.assign(FinCoach.emptyState(),load(K_COACH,{}));return _coachSt;}
 function coachSave(st){_coachSt=st;try{const r=save(K_COACH,JSON.parse(JSON.stringify(st)));if(r&&r.catch)r.catch(()=>toastMsg('Could not save your check-in progress.'));}catch(e){toastMsg('Could not save your check-in progress.');}}
-/* Stage 2 runs the daily check-in only. The Wednesday and month-end reviews arrive in later stages. */
-function coachDue(st){return FinCoach.reviewsDue({today:todayISO(),state:st}).filter(d=>d.kind==='daily');}
+/* The month-end review is only offered once the bank data reaches the last day of that month. */
+function coachLastDataDate(){let m='';for(const t of TXNS)if(!t.deleted&&t.date>m&&t.date<=todayISO())m=t.date;return m||null;}
+function coachDue(st){return FinCoach.reviewsDue({today:todayISO(),state:st,lastDataDate:coachLastDataDate()});}
 
 /* ---------- the numbers each step needs, from the existing app ---------- */
 function coachDataCheck(){
@@ -44,14 +46,87 @@ function coachWeeklyFor(f){
   return out;
 }
 
+/* ---------- Wednesday Payday Reset: numbers from the existing app ---------- */
+function coachPayCheck(){
+  let hist=[];try{hist=allDetectedPays().map(p=>({person:p.person,date:p.txn.date,amount:+p.txn.amount}));}catch(e){}
+  const pays=(BASE_PAY||[]).map(p=>({person:p.name,base:+p.base,cadence:p.cadence}));
+  const today=todayISO(),expected=FinCoach.expectedPays({today,pays,history:hist}),received=FinCoach.receivedPays({today,history:hist});
+  let unsure=0;try{unsure=ambiguousPayCount();}catch(e){}
+  return{rows:FinCoach.incomeCheck({expected,received}),received,total:received.reduce((s,r)=>s+r.amount,0),unsure};
+}
+function coachProtect(){
+  const today=todayISO(),end=FinDates.budgetWeek(today).end,ob=[];
+  try{BILLS.filter(b=>b.active!==false).forEach(b=>billOccurrencesBetween(b,today,end).forEach(due=>ob.push({id:b.id,name:b.name||b.n,amount:+b.amount||0,due,acct:b.acct||'everyday',kind:/loan/i.test(b.name||b.n||'')?'loan':'bill'})));}catch(e){}
+  ACCTS.filter(a=>a.type==='loan'&&+a.minRepay>0).forEach(a=>ob.push({name:a.name,amount:+a.minRepay,due:end,acct:'loanrepay',kind:'loan'}));
+  const balances={};['bills','loanrepay'].forEach(id=>{if(acctById(id))balances[id]=balance(id);});
+  const p=FinCoach.protectPlan({obligations:ob,balances});
+  p.groups.forEach(g=>{g.label=(acctById(g.acct)||{}).name||g.acct;});
+  return p;
+}
+function coachAllocate(){
+  let trusted=false;try{trusted=financeEvidence().trusted;}catch(e){}
+  if(!trusted)return{withheld:true};
+  const s=safeSpend();let rows=[];try{rows=cycleRows().filter(r=>r.accountId==='everyday'&&r.budget>0);}catch(e){}
+  const parts=[{label:'bills due from Everyday',amount:s.upcomingBills},{label:'transfers out (loans, savings, Bills top-ups)',amount:s.transfers},{label:'one-off costs',amount:s.oneoffs},{label:'extra the Bills account still needs',amount:s.billsShortfall},{label:'money already set aside',amount:(+s.reserved||0)+(+s.wishlist||0)}];
+  const protectedTotal=parts.reduce((t,x)=>t+(+x.amount||0),0);
+  const a=FinCoach.allocate({available:s.bal,parts,protected:protectedTotal,buffer:s.buffer,areas:rows.map(r=>({name:(catOf(r.category)||{}).n||r.name,weekly:r.budget}))});
+  return a;
+}
+function coachGoals(){
+  const out=[];
+  // a goal whose saving already happens by a regular transfer is counted in the spending step, so it is not suggested again
+  const byTransfer=r=>(TRANSFERS||[]).some(t=>t.active!==false&&t.toAcct===(r.acct||'savings')&&t.frequency===r.freq&&Math.abs((+t.amount||0)-r.amount)<0.5);
+  try{(SHARED_GOALS||[]).forEach(g=>{const w=g.fundRule?FinGoals.weeklyEquivalent(g.fundRule):(sharedGoalPlan(g).weekly||0);const pr=FinGoals.goalProgress(g);if(w>0&&pr.saved<pr.target)out.push({name:(g.emoji?g.emoji+' ':'')+g.name,weekly:Math.round(w*100)/100,saved:pr.saved,target:pr.target,planned:!!(g.fundRule&&byTransfer(g.fundRule))});});}catch(e){}
+  // sinking-fund buckets are shares of the regular transfer into the Sinking Funds account: already set aside
+  try{(FUNDS||[]).filter(f=>+f.mapAmount>0&&f.mapFrequency).forEach(f=>{const w=FinGoals.weeklyEquivalent({amount:+f.mapAmount,freq:f.mapFrequency});if(w>0)out.push({name:(f.emoji||'🪙')+' '+f.name,weekly:Math.round(w*100)/100,fund:true,planned:true});});}catch(e){}
+  return out;
+}
+function coachCatsWeekly(){const cats={};CATS.concat(CUSTOM_CATS||[]).forEach(c=>{const m=+CAT_BUDGET[c.id]||0;if(m>0)cats[c.id]={name:c.n,weekly:Math.round(m*12/52*100)/100,monthly:m};});return cats;}
+function coachWeekReview(st){return FinCoach.weekReview({today:todayISO(),txns:TXNS.filter(t=>t.date>=FinDates.shift(todayISO(),-49)),cats:coachCatsWeekly(),marks:st.marks});}
+
+/* ---------- Month-End Review: numbers from the existing app ---------- */
+var _coachMonth=null;
+function coachMonth(st){
+  const ym=st.session&&st.session.keys&&st.session.keys.month;if(!ym)return null;
+  const stamp=ym+'|'+TXNS.length+'|'+Object.keys(st.marks||{}).length;if(_coachMonth&&_coachMonth.stamp===stamp)return _coachMonth.r;
+  const pm=FinCoach.prevMonth(ym+'-15'),from=pm+'-01',end=FinCoach.lastDayOfMonth(ym),txns=TXNS.filter(t=>t.date>=from&&t.date<=end);
+  const loans=ACCTS.filter(a=>a.type==='loan');let ev={};try{financeEvidence().accounts.forEach(a=>{ev[a.id]=a.trusted;});}catch(e){}
+  const accts=ACCTS.filter(a=>a.type==='spend'||a.type==='save'),by=Object.fromEntries(accts.map(a=>[a.id,a]));
+  let moves=[];try{moves=FinMoves.detectMoves(txns.filter(t=>t.date.slice(0,7)===ym),accts);}catch(e){}
+  const into=moves.filter(m=>by[m.to]&&by[m.to].type==='save'&&by[m.from]&&by[m.from].type==='spend'),outOf=moves.filter(m=>by[m.from]&&by[m.from].type==='save'&&by[m.to]&&by[m.to].type==='spend');
+  let subs=[];try{subs=recurringScan().filter(r=>!r.bnpl&&r.perMo>0).map(r=>({label:r.label,perMo:r.perMo}));}catch(e){}
+  const goals=[];try{(SHARED_GOALS||[]).forEach(g=>{const p=FinGoals.goalProgress(g);if(p.target>0)goals.push({name:g.name,saved:p.saved,target:p.target});});}catch(e){}
+  const r=FinCoach.monthReview({month:ym,txns,cats:Object.fromEntries(Object.entries(coachCatsWeekly()).map(([k,c])=>[k,{name:c.name,monthly:c.monthly}])),marks:st.marks,
+    income:coachMonthIncome(txns,ym),
+    expectedIncome:(INCOME||[]).filter(i=>i.type==='base').reduce((s,i)=>s+(+i.mo||0),0),
+    loanIds:loans.map(a=>a.id),loans:loans.map(a=>({id:a.id,name:a.name,balance:balance(a.id),verified:!!(a.sourceBalance&&a.sourceBalance.date>=end)})),
+    savings:{in:into.reduce((s,m)=>s+m.amount,0),out:outOf.reduce((s,m)=>s+m.amount,0),pulls:outOf.map(m=>({id:m.id,date:m.date,amount:m.amount}))},goals,subscriptions:subs});
+  _coachMonth={stamp,r};return r;
+}
+/* Income: deposits marked as income, plus pay the app already recognises from your pay rules (each deposit once). */
+function coachMonthIncome(txns,ym){
+  const ids=new Set(),out=[];
+  let pays=[];try{pays=allDetectedPays().map(p=>p.txn);}catch(e){}
+  txns.filter(t=>t.date.slice(0,7)===ym&&isActualIncome(t)).concat(pays.filter(t=>String(t.date).slice(0,7)===ym)).forEach(t=>{if(ids.has(t.id))return;ids.add(t.id);out.push({amount:+t.amount});});
+  return out;
+}
+function coachMonthName(ym){return new Intl.DateTimeFormat('en-AU',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(ym+'-15T12:00:00Z'));}
+const COACH_SPLIT={necessary:'Necessary',oneoff:'One-off',avoidable:'Could change'};
+function coachRow(label,value,note){return '<div class="ck-row"><span>'+esc(label)+'</span><b>'+value+'</b></div>'+(note?'<p class="tiny ck-why">'+esc(note)+'</p>':'');}
+function coachBox(tone,head,lines){return '<div class="fh-meaning fh-t-'+tone+'">'+(head?'<div class="fh-mean-h">'+head+'</div>':'')+lines.map((l,i)=>'<p'+(i===0&&!head?' class="fh-mean-main"':'')+'>'+l+'</p>').join('')+'</div>';}
+
 /* ---------- drawing ---------- */
-const COACH_STEP_TITLE={data:'Is the data right?',position:'Where you stand',leak:'One thing to look at',coach:'What to do now',finish:'All done'};
+const COACH_STEP_TITLE={data:'Is the data right?',position:'Where you stand',leak:'One thing to look at',coach:'What to do now',finish:'All done',
+  income:'Did the pay arrive?',protect:'Bills and loans to cover',allocate:'Your spending money this week',savings:'Savings this week',accountability:'How last week went',
+  'month-income':'Income this month','month-fixed':'Must-pay spending','month-variance':'Budget areas','month-leaks':'Top money leaks','month-habits':'Better or worse than last month',
+  'month-savings':'Savings','month-debt':'Loans','month-next':'Changes for next month'};
+const COACH_KIND={daily:{name:'money check-in',time:'About 2 minutes'},payday:{name:'Payday Reset',time:'10 to 15 minutes'},month:{name:'Month-End Review',time:'15 to 20 minutes'}};
 function coachTag(kind){const t={fact:['FACT','fh-t-good'],estimate:['ESTIMATE','fh-t-watch'],suggestion:['SUGGESTION','fh-t-act']}[kind];return '<span class="ck-tag '+t[1]+'">'+t[0]+'</span>';}
 function coachDots(s){return '<div class="ck-dots" role="img" aria-label="Step '+(s.at+1)+' of '+s.steps.length+'">'+s.steps.map((x,i)=>'<i class="'+(i<s.at?'done':i===s.at?'on':'')+'"></i>').join('')+'</div>';}
 function coachFrame(s,body,opts){
   opts=opts||{};
   return '<button class="close" onclick="closeSheet()" aria-label="Close and keep my progress">✕</button>'+coachDots(s)
-   +'<div class="ck-step">Step '+(s.at+1)+' of '+s.steps.length+'</div><h2>'+esc(COACH_STEP_TITLE[s.steps[s.at]]||'')+'</h2>'+body
+   +'<div class="ck-step">'+esc(s.primary==='daily'?'':(COACH_KIND[s.primary]||{}).name+' · ')+'Step '+(s.at+1)+' of '+s.steps.length+'</div><h2>'+esc(COACH_STEP_TITLE[s.steps[s.at]]||'')+'</h2>'+body
    +'<div class="ck-nav">'+(s.at>0?'<button class="btn ghost" onclick="coachBack()">‹ Back</button>':'<span></span>')+'<button class="btn dark" onclick="coachNext()">'+(opts.next||'Next ›')+'</button></div>'
    +(opts.noSkip?'':'<button class="fh-link ck-skip" onclick="coachSkip()">Skip this step</button>')
    +'<p class="tiny ck-pause">You can close this any time. Your progress is kept.</p>';
@@ -82,7 +157,8 @@ function coachRender(){
        +(ev.length?'<details class="ck-ev"><summary>Show the transactions ('+ev.length+')</summary>'+ev.map(t=>'<div class="ck-tx"><span>'+esc(FinDates.short(t.date))+' · '+esc(t.note||'')+'</span><b>'+FinCoach.aud(-t.amount)+'</b><div class="ck-marks">'+FinCoach.MARKS.map(m=>'<button class="btn ghost" onclick="coachMark(\''+esc(t.id)+'\',\''+m+'\')">'+{planned:'Planned',essential:'Essential',exceptional:'One-off',miscategorised:'Wrong category'}[m]+'</button>').join('')+'</div></div>').join('')+'<p class="tiny">Marked items are left out of future checks.</p></details>':'');
     }
   }else if(step==='coach'){
-    const f=s.leak||null,rc=f?FinCoach.realityCheck({weekly:coachWeeklyFor(f)}):null,m=FinCoach.message(f,rc);
+    let f=s.leak||null;if(!f&&s.kinds.includes('month')){const r=coachMonth(st);f=r&&r.leaks[0]||null;if(f){s.leak=f;coachSaveSession(st);}}
+    const rc=f?FinCoach.realityCheck({weekly:coachWeeklyFor(f)}):null,m=FinCoach.message(f,rc);
     body='<div class="ck-coach"><p><b>What happened.</b> '+esc(m.happened)+'</p><p><b>Why it matters.</b> '+esc(m.matters)+'</p><p><b>What to do now.</b> '+esc(m.todo)+'</p></div>';
     if(rc&&rc.weekly>0)body+='<details class="ck-ev"><summary>'+(rc.proven?coachTag('fact'):coachTag('estimate'))+' If this carries on</summary><div class="ck-rows"><div class="ck-row"><span>A month</span><b>'+FinCoach.aud(rc.monthly)+'</b></div><div class="ck-row"><span>Six months</span><b>'+FinCoach.aud(rc.sixMonths)+'</b></div><div class="ck-row"><span>A year</span><b>'+FinCoach.aud(rc.annual)+'</b></div></div><p class="tiny">'+esc(rc.label)+'. '+esc(rc.basis)+' '+esc(rc.saving.text)+'</p></details>';
     if(f&&m.options.length){
@@ -90,8 +166,72 @@ function coachRender(){
        +'<button class="btn ghost" onclick="coachDismiss()">Not this time (say why)</button><button class="btn ghost" onclick="coachChoose(-1)">Remind me later</button></div>';
       opts.next='Skip choosing ›';
     }
-    const open=FinCoach.followUps(st,coachEvidence()).slice(0,3);
+    const open=s.steps.includes('accountability')?[]:FinCoach.followUps(st,coachEvidence()).slice(0,3);   // already covered in "How last week went"
     if(open.length)body+='<div class="fh-meaning fh-t-watch"><div class="fh-mean-h">From earlier</div>'+open.map(a=>'<p>'+esc(a.text)+(a.verdict==='kept'?' · ✅ on track':a.verdict==='missed'?' · ⚠️ not yet':'')+' <button class="fh-link" onclick="coachActionDone(\''+esc(a.id)+'\')">Mark done</button></p>').join('')+'</div>';
+  }else if(step==='income'){
+    const p=coachPayCheck();
+    body=(p.rows.length?'<div class="ck-rows">'+p.rows.map(r=>coachRow(r.person,r.status==='missing'?'<span class="fh-muted">not yet</span>':FinCoach.aud(r.received),r.text)).join('')+'</div>':'<p class="f">No pay is expected this week.</p>')
+     +coachBox(p.rows.some(r=>r.status!=='ok')?'watch':'good',coachTag('fact')+' What this means',[p.rows.some(r=>r.status==='missing')?'Pay that has not arrived is not counted. Nothing is assumed.':'Pay received since Tuesday: '+FinCoach.aud(p.total)+'.'])
+     +(p.unsure?'<p class="f">'+p.unsure+' deposit'+(p.unsure===1?' matches':'s match')+' more than one pay rule, so '+(p.unsure===1?'it is':'they are')+' not counted. Check it in Income.</p>':'')
+     +'<p class="tiny">Expected amounts come from Income › base pay. A fortnightly pay is only expected every second week.</p>';
+  }else if(step==='protect'){
+    const p=coachProtect();
+    body=p.rows.length?'<div class="ck-rows">'+p.groups.map(g=>'<div class="ck-row"><span><b>'+esc(g.label)+'</b></span><b>'+FinCoach.aud(g.due)+'</b></div>'+g.rows.map(r=>'<div class="ck-row tiny"><span>'+esc(r.name)+' · '+esc(FinDates.short(r.due))+'</span><span>'+FinCoach.aud(r.amount)+'</span></div>').join('')
+       +'<p class="tiny ck-why">'+(g.have==null?'Comes out of Everyday. It is taken off your spending money in the next step.':g.covered?'✅ Covered: '+esc(g.label)+' already holds '+FinCoach.aud(g.have)+'.':'⚠️ '+esc(g.label)+' holds '+FinCoach.aud(g.have)+'. It is short by '+FinCoach.aud(g.short)+'.')+'</p>').join('')+'</div>'
+      +coachBox(p.groups.some(g=>g.have!=null&&!g.covered)?'act':'good',coachTag('fact')+' What this means',['Before next Wednesday: '+FinCoach.aud(p.bills)+' in bills and '+FinCoach.aud(p.loans)+' in loan repayments.',p.groups.some(g=>g.have!=null&&!g.covered)?'Top up the short account from this week\'s pay before spending money is worked out.':'Every bill and loan account already has enough in it.'])
+      +'<p class="tiny">Each bill counts once. A loan listed as a bill too is not counted twice.</p>'
+     :coachBox('good','',['✅ No bills or loan repayments are due before next Wednesday.']);
+  }else if(step==='allocate'){
+    const a=coachAllocate();
+    if(a.withheld)body=coachBox('watch',coachTag('fact')+' Held back',['Your balances are not confirmed up to date, so your spending money is not worked out. A guess could be wrong.','Sync, or check the balances, then come back to this step.'])+'<button class="btn ghost" onclick="coachDo(\'sync\')">🔄 Sync now</button>';
+    else{
+      s.spare=a.spare;coachSaveSession(st);
+      body='<div class="ck-rows">'+a.areas.map(x=>coachRow(x.name,FinCoach.aud(x.amount))).join('')+coachRow('Total spending allowance',FinCoach.aud(a.need))+'</div>'
+       +coachBox(a.fits?'good':'act',coachTag('fact')+' '+(a.fits?'It fits':'It does not fit'),[a.fits?'After everything that must be paid, '+FinCoach.aud(a.available)+' is free. Your allowance is '+FinCoach.aud(a.need)+', leaving '+FinCoach.aud(a.spare)+' spare.':'Only '+FinCoach.aud(a.available)+' is free, but the allowance is '+FinCoach.aud(a.need)+'. That is '+FinCoach.aud(a.short)+' short. Spend less this week, or change a limit.'])
+       +'<details class="ck-ev"><summary>How this was worked out</summary>'+a.working.map(w=>'<p class="tiny">'+esc(w)+'</p>').join('')+'</details>'
+       +'<button class="btn ghost" onclick="coachDo(\'budget\')">Change a limit</button><p class="tiny">Nothing changes unless you change it yourself in Budget.</p>';
+    }
+  }else if(step==='savings'){
+    const all=coachGoals(),goals=all.filter(g=>!g.planned),planned=all.filter(g=>g.planned),spare=Number.isFinite(s.spare)?s.spare:null;
+    const plannedHtml=planned.length?'<details class="ck-ev"><summary>'+coachTag('fact')+' Already set aside by regular transfers ('+planned.length+')</summary><div class="ck-rows">'+planned.map(g=>coachRow(g.name,FinCoach.aud(g.weekly)+'/wk')).join('')+'</div><p class="tiny">These were taken off your spending money in the last step, so they are not counted again.</p></details>':'';
+    if(!goals.length)body=plannedHtml+coachBox('good','',[planned.length?'Your regular transfers already cover your savings. Nothing extra to move this week.':'No savings goals have a weekly amount yet. You can add one in Goals.']);
+    else if(spare==null)body=coachBox('watch',coachTag('fact')+' Not worked out',['The spending step was skipped or held back, so it is not clear what is spare. No transfers are suggested.'])+'<div class="ck-rows">'+goals.map(g=>coachRow(g.name,FinCoach.aud(g.weekly)+'/wk')).join('')+'</div>'+plannedHtml;
+    else{
+      const sug=FinCoach.savingsSuggestions({spare,goals});
+      body='<p class="f">Spare this week: <b>'+FinCoach.aud(spare)+'</b></p><div class="ck-rows">'+sug.map((g,i)=>'<div class="ck-row"><span>'+esc(g.name)+'</span><b>'+FinCoach.aud(g.amount)+'</b></div><p class="tiny ck-why">'+(g.ok?coachTag('suggestion')+' Affordable this week. <button class="fh-link" onclick="coachSaveAction('+i+')">I will move it</button>':esc(g.why))+'</p>').join('')+'</div>'
+       +plannedHtml+'<p class="tiny">Nothing moves by itself. "I will move it" adds a reminder to your actions; you move the money in your bank app.</p>';
+      s.sug=sug.map(g=>({name:g.name,amount:g.amount,ok:g.ok}));coachSaveSession(st);
+    }
+  }else if(step==='accountability'){
+    const r=coachWeekReview(st),open=FinCoach.followUps(st,coachEvidence());
+    body='<p class="f">Week of '+esc(FinDates.short(r.week.start))+' to '+esc(FinDates.short(r.week.end))+': spent '+FinCoach.aud(r.spent)+' of '+FinCoach.aud(r.limit)+'.</p>'
+     +(r.over.length?coachBox(r.repeats.length?'act':'watch',coachTag('fact')+' Over the limit',r.over.slice(0,4).map(o=>esc(o.name)+': '+FinCoach.aud(o.spent)+' of '+FinCoach.aud(o.limit)+(o.repeat?' · over '+o.times+' of the last 5 weeks':''))):coachBox('good','',['✅ Every area stayed within its limit last week.']))
+     +(r.kept.length?'<p class="tiny">Within the limit: '+esc(r.kept.slice(0,6).map(k=>k.name).join(', '))+'.</p>':'')
+     +(open.length?coachBox('watch','Actions from before',open.slice(0,4).map(a=>esc(a.text)+(a.verdict==='kept'?' · ✅ on track':a.verdict==='missed'?' · ⚠️ not kept':'')+' <button class="fh-link" onclick="coachActionDone(\''+esc(a.id)+'\')">Done</button> <button class="fh-link" onclick="coachActionDrop(\''+esc(a.id)+'\')">Drop it</button>')):'<p class="tiny">No open actions from before.</p>');
+  }else if(step.indexOf('month-')===0){
+    const r=coachMonth(st);
+    if(!r)body=coachBox('watch','',['The month could not be worked out.']);
+    else if(step==='month-income')body='<p class="f">'+esc(coachMonthName(r.month))+'</p><div class="ck-rows">'+coachRow('Received',FinCoach.aud(r.income.actual))+coachRow('Expected',r.income.expected?FinCoach.aud(r.income.expected):'<span class="fh-muted">not set</span>')+'</div>'+coachBox(r.income.tone,coachTag('fact')+' What this means',[esc(r.income.text)]);
+    else if(step==='month-fixed')body='<div class="ck-rows">'+Object.keys(COACH_SPLIT).map(k=>coachRow(COACH_SPLIT[k],FinCoach.aud(r.split[k]))).join('')+coachRow('Total spent',FinCoach.aud(r.totalSpent))+'</div>'
+      +(r.essentials.length?'<details class="ck-ev"><summary>Must-pay areas ('+r.essentials.length+')</summary><div class="ck-rows">'+r.essentials.slice(0,8).map(e=>coachRow(e.name,FinCoach.aud(e.amount))).join('')+'</div></details>':'')
+      +'<p class="tiny">'+coachTag('fact')+' Necessary is groceries, bills, loans, kids and health, plus anything you marked essential or planned. One-off is anything you marked one-off. Could change is the rest.</p>';
+    else if(step==='month-variance')body=(r.variance.length?'<div class="ck-rows">'+r.variance.slice(0,10).map(v=>coachRow(v.name,FinCoach.aud(v.spent)+' / '+FinCoach.aud(v.budget),v.diff<0?'Over by '+FinCoach.aud(-v.diff):'')).join('')+'</div>':'<p class="f">No budget areas are set.</p>')
+      +coachBox(r.overCats.length?'watch':'good',coachTag('fact')+' What this means',[r.overCats.length?r.overCats.length+' area'+(r.overCats.length===1?' was':'s were')+' over budget.':'Every budgeted area stayed within its limit.']);
+    else if(step==='month-leaks')body=r.leaks.length?r.leaks.map((f,i)=>coachBox(i===0?'act':'watch',coachTag('fact')+' '+(i+1)+'. '+esc(f.name),[esc(FinCoach.message(f).happened)])).join('')+'<p class="tiny">Essentials, transfers and anything you marked are left out.</p>':coachBox('good','',['✅ No money leaks stand out this month.']);
+    else if(step==='month-habits')body=(r.habits.better.length?coachBox('good','Better than last month',r.habits.better.slice(0,4).map(h=>esc(h.name)+': '+FinCoach.aud(h.before)+' → '+FinCoach.aud(h.now))):'')
+      +(r.habits.worse.length?coachBox('watch','Worse than last month',r.habits.worse.slice(0,4).map(h=>esc(h.name)+': '+FinCoach.aud(h.before)+' → '+FinCoach.aud(h.now))):'')
+      +(!r.habits.better.length&&!r.habits.worse.length?coachBox('good','',['Spending was about the same as last month.']):'')+'<p class="tiny">Only changes of at least 15% and $30 are shown. Essentials are left out.</p>';
+    else if(step==='month-savings')body='<div class="ck-rows">'+coachRow('Put into savings',FinCoach.aud(r.savings.in))+coachRow('Taken out of savings',FinCoach.aud(r.savings.out))+coachRow('Net',FinCoach.aud(r.savings.net))+'</div>'
+      +(r.savings.pulls?coachBox('watch',coachTag('fact')+' Savings used for spending',['Money came out of savings into a spending account '+r.savings.pulls+' time'+(r.savings.pulls===1?'':'s')+'.']):'')
+      +(r.savings.goals.length?'<div class="ck-rows">'+r.savings.goals.map(g=>coachRow(g.name,FinCoach.aud(g.saved)+' of '+FinCoach.aud(g.target)+(g.pct!=null?' · '+g.pct+'%':''))).join('')+'</div>':'');
+    else if(step==='month-debt')body=r.debt.length?'<div class="ck-rows">'+r.debt.map(d=>coachRow(d.name,FinCoach.aud(d.balance),(d.verified?'Balance confirmed by the bank. ':'Balance not confirmed for the end of the month. ')+(d.paid?'Paid in '+FinCoach.aud(d.paid)+', interest '+FinCoach.aud(d.interest)+'.':''))).join('')+'</div><p class="tiny">'+coachTag('fact')+' Only confirmed balances count as progress.</p>':coachBox('good','',['No loans are set up.']);
+    else if(step==='month-next'){
+      body='<div class="ck-opts">'+r.next.map((x,i)=>'<div class="fh-meaning fh-t-'+(x.kind==='avoidable'?'act':x.kind==='oneoff'?'watch':'good')+'"><div class="fh-mean-h">'+coachTag('suggestion')+' '+esc(COACH_SPLIT[x.kind])+'</div><p>'+esc(x.text)+'</p><button class="fh-link" onclick="coachMonthAction('+i+')">Add to my actions</button></div>').join('')+'</div>'
+       +'<div class="fh-meaning fh-t-good"><div class="fh-mean-h">Your scorecard</div>'+r.score.map(x=>'<p>'+({good:'✅',watch:'👀',act:'⚠️'}[x.tone])+' <b>'+esc(x.label)+'.</b> '+esc(x.text)+'</p>').join('')+'</div>'
+       +'<div class="ck-opts"><button class="btn ghost" onclick="coachDo(\'health\')">❤️ Money health</button><button class="btn ghost" onclick="coachDo(\'pip\')">💬 Ask Pip about this month</button><button class="btn ghost" onclick="coachDo(\'quests\')">🏆 Daily wins</button></div>';
+    }
+  }else if(step==='finish'&&s.primary!=='daily'){
+    body=coachPlanSummary(st,s);opts.next='Confirm and finish';opts.noSkip=true;
   }else if(step==='finish'){
     const d=coachDataCheck();
     body='<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ Today\'s check-in is done.</p>'
@@ -103,11 +243,36 @@ function coachRender(){
 function coachSaveSession(st){coachSave(st);}
 function coachEvidence(){const out={};try{cycleRows().filter(r=>r.accountId==='everyday').forEach(r=>{out[r.category]=(out[r.category]||0)+(+r.spent||0);});}catch(e){}return{weekSpend:out};}
 
+/* The closing summary for the Payday Reset and Month-End Review. */
+function coachPlanSummary(st,s){
+  const lines=[],warn=[];
+  if(s.kinds.includes('payday')){
+    const p=coachPayCheck(),pr=coachProtect(),a=coachAllocate(),sug=(s.sug||[]).filter(g=>g.ok);
+    lines.push(['Income received',FinCoach.aud(p.total)],['Bills protected',FinCoach.aud(pr.bills)],['Loans covered',FinCoach.aud(pr.loans)],['Spending available',a.withheld?'held back':FinCoach.aud(a.need)],['Savings proposed',FinCoach.aud(sug.reduce((t,g)=>t+g.amount,0))]);
+    p.rows.filter(r=>r.status!=='ok').forEach(r=>warn.push(r.text));
+    pr.groups.filter(g=>g.have!=null&&!g.covered).forEach(g=>warn.push(g.label+' is short by '+FinCoach.aud(g.short)+'.'));
+    if(a.withheld)warn.push('Spending money is held back until balances are confirmed.');else if(!a.fits)warn.push('The spending allowance is '+FinCoach.aud(a.short)+' more than is free.');
+  }
+  if(s.kinds.includes('month')){const r=coachMonth(st);if(r){lines.push(['Spent in '+coachMonthName(r.month),FinCoach.aud(r.totalSpent)]);r.score.filter(x=>x.tone==='act').forEach(x=>warn.push(x.text));}}
+  const d=coachDataCheck();if(!d.ok)d.issues.forEach(i=>warn.push(i.text));
+  const acts=st.actions.filter(a=>a.created===todayISO()&&(a.status==='accepted'||a.status==='changed')).slice(0,3);
+  return '<div class="ck-rows">'+lines.map(l=>coachRow(l[0],esc(l[1]))).join('')+'</div>'
+   +(warn.length?coachBox('watch','Important',warn.slice(0,4).map(esc)):'')
+   +coachBox('good','Your actions this week',acts.length?acts.map(a=>esc(a.text)):['No new actions. That is fine.'])
+   +'<p class="tiny">Confirming saves this review. It does not change any budget, limit or account, and no money moves.</p>';
+}
+function coachSaveAction(i){const st=coachState(),s=st.session,g=s&&s.sug&&s.sug[i];if(!g)return;FinCoach.addAction(st,{text:'Move '+FinCoach.aud(g.amount)+' to '+g.name},todayISO());coachSave(st);toastMsg('Added to your actions. Move it in your bank app.');coachRender();}
+function coachMonthAction(i){const st=coachState(),r=coachMonth(st),x=r&&r.next[i];if(!x)return;FinCoach.addAction(st,{text:x.text},todayISO());coachSave(st);toastMsg('Added to your actions.');}
+function coachActionDrop(id){const why=prompt('Why are you dropping this action?');if(!why||!why.trim())return;const st=coachState();try{FinCoach.setStatus(st,id,'dismissed',why,todayISO());coachSave(st);}catch(e){}coachRender();}
+
 /* ---------- actions ---------- */
 function coachOpen(){
   if(!coachOn())return;
-  const st=coachState(),due=coachDue(st);
-  if(!st.session){const plan=FinCoach.planSession(due);if(!plan){coachSummary(st);return;}FinCoach.start(st,plan,Date.now());coachSave(st);}
+  const st=coachState(),plan=FinCoach.planSession(coachDue(st));
+  // a review that became due since you started (for example payday, while a daily check-in was half done) joins in;
+  // the same review just carries on where you left off
+  if(plan&&(!st.session||st.session.steps.join()!==plan.steps.join())){FinCoach.start(st,plan,Date.now());coachSave(st);}
+  if(!st.session){coachSummary(st);return;}
   coachRender();
 }
 function coachNext(){const st=coachState(),s=st.session;if(!s)return;if(s.steps[s.at]==='finish'){const sum=FinCoach.finish(st,todayISO());coachSave(st);coachDone(sum);return;}FinCoach.confirm(st);coachSave(st);coachRender();}
@@ -131,26 +296,60 @@ function coachActionDone(id){const st=coachState();try{FinCoach.setStatus(st,id,
 function coachDo(what){
   if(what==='sync'&&typeof finSyncNow==='function'){finSyncNow().then(()=>coachRender());return;}
   if(what==='review'){closeSheet();try{openDataReview();}catch(e){}}
+  if(what==='budget'){closeSheet();try{go('budget');}catch(e){}}
+  const other={health:'finOpenCoach',pip:'finOpenPip',quests:'finOpenQuests'}[what];
+  if(other&&typeof window[other]==='function'){closeSheet();window[other]();}
 }
 function coachDone(sum){
   try{const d=dailyState();d.done.coach=true;save(K_DAILY,d);}catch(e){}   // also ticks "Tick one daily check-in" in Daily wins
-  closeSheet();toastMsg('✅ Check-in done'+(sum.skipped.length?'. Skipped steps stay on your list.':'.'));try{render();}catch(e){}
+  const nm=sum.kinds[0]==='daily'?'Check-in':(COACH_KIND[sum.kinds[0]]||{}).name||'Review';
+  closeSheet();toastMsg('✅ '+nm+' done'+(sum.skipped.length?'. Skipped steps stay on your list.':'.'));coachPublish();try{render();}catch(e){}
 }
 function coachSummary(st){
   const today=todayISO(),rec=st.done.daily[today],open=FinCoach.followUps(st,coachEvidence());
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>✅ Today\'s check-in is done</h2>'
    +(rec&&rec.skipped&&rec.skipped.length?'<p class="f">You skipped: '+esc(rec.skipped.map(x=>COACH_STEP_TITLE[x]||x).join(', '))+'.</p>':'')
    +(open.length?'<div class="fh-meaning fh-t-watch"><div class="fh-mean-h">Your actions</div>'+open.map(a=>'<p>'+esc(a.text)+'</p>').join('')+'</div>':'<p class="f">No open actions.</p>')
-   +'<button class="btn ghost" onclick="coachRedo()">Do it again</button>';
+   +'<button class="btn ghost" onclick="coachRedo()">Do it again</button><button class="btn ghost" style="margin-top:8px" onclick="coachPrefsOpen()">🔔 Reminder settings</button>';
   openSheet();
+}
+/* ---------- reminders (Stage 5) ---------- */
+/* One gentle in-app invitation a day, the most important review first, never before your chosen hour. Missed reviews
+   stay on Home without stacking up. Nothing is sent anywhere: there is no notification server. */
+function coachHour(){try{return +new Intl.DateTimeFormat('en-AU',{hour:'numeric',hourCycle:'h23',timeZone:'Australia/Brisbane'}).format(new Date());}catch(e){return new Date().getHours();}}
+function coachPrefsOpen(){
+  const st=coachState(),pr=Object.assign(FinCoach.defaultPrefs(),st.prefs||{}),hrs=[];for(let h=5;h<=21;h++)hrs.push(h);
+  const fmt=h=>(h%12||12)+(h<12?'am':'pm');
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔔 Money reminders</h2><p class="f">A gentle reminder when you open the app, at most once a day. Missed reviews wait on Home. They do not pile up.</p>'
+   +['daily','payday','month'].map(k=>'<label class="ck-row" style="cursor:pointer"><span>'+{daily:'Daily money check-in',payday:'Wednesday Payday Reset',month:'Month-End Review'}[k]+'</span><input type="checkbox" id="ckp-'+k+'"'+(pr[k]?' checked':'')+' style="width:22px;height:22px"></label>').join('')
+   +'<label class="ck-row"><span>Not before</span><select id="ckp-hour">'+hrs.map(h=>'<option value="'+h+'"'+(h===pr.fromHour?' selected':'')+'>'+fmt(h)+'</option>').join('')+'</select></label>'
+   +'<button class="btn dark" style="margin-top:12px" onclick="coachPrefsSave()">Save</button>';
+  openSheet();
+}
+function coachPrefsSave(){
+  const st=coachState();
+  try{FinCoach.setPrefs(st,{daily:$('ckp-daily').checked,payday:$('ckp-payday').checked,month:$('ckp-month').checked,fromHour:+$('ckp-hour').value});}catch(e){toastMsg(e.message);return;}
+  coachSave(st);coachPublish();closeSheet();toastMsg('Reminder settings saved.');
+}
+/* Co-Pilot (the daily front door) reads this one small note: what is due, nothing else. No amounts or names. */
+var K_COPILOT_MONEY='cp_money_v1';
+function coachPublish(){
+  if(!coachOn())return;
+  try{const st=coachState(),n=FinCoach.copilotNote(coachDue(st),st,todayISO());n.updatedAt=new Date().toISOString();localStorage.setItem(K_COPILOT_MONEY,JSON.stringify(n));}catch(e){}
+}
+function coachRemind(st,due){
+  try{const r=FinCoach.reminder(due,st,todayISO(),coachHour());if(!r)return;FinCoach.reminded(st,todayISO());coachSave(st);setTimeout(()=>toastMsg('🧭 '+r.text),900);}catch(e){}
 }
 function coachRedo(){const st=coachState();delete st.done.daily[todayISO()];st.session=null;coachSave(st);coachOpen();}
 /* What Home shows on the check-in button. */
 function coachHome(){
   if(!coachOn())return null;
   try{
-    const st=coachState();
-    if(st.session)return{state:'resume',step:st.session.at+1,total:st.session.steps.length};
-    return coachDue(st).length?{state:'due'}:{state:'done'};
+    const st=coachState(),due=coachDue(st);
+    coachPublish();coachRemind(st,due);
+    const plan=FinCoach.planSession(due);
+    if(st.session&&(!plan||st.session.steps.join()===plan.steps.join()))return{state:'resume',kind:st.session.primary,step:st.session.at+1,total:st.session.steps.length};
+    const first=['month','payday','daily'].map(k=>due.find(d=>d.kind===k)).find(Boolean);
+    return first?{state:'due',kind:first.kind,late:!!first.late}:{state:'done'};
   }catch(e){return null;}
 }

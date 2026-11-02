@@ -14,7 +14,9 @@
  /* The coach looks at private spending, so it belongs to the owner's profile only. */
  function available(profile){return profile==='jaimi';}
  function storeKey(profile){if(!available(profile))throw Error('The money coach is only for the owner profile.');return 'fin_coach_v1';}
- function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null};}
+ function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs()};}
+ /* Reminder settings: which reviews to invite you to, and not before what hour (Brisbane time). */
+ function defaultPrefs(){return{daily:true,payday:true,month:true,fromHour:7};}
 
  /* ---------- which review is due ---------- */
  /* daily: once a day. payday: the Wednesday budget week, until done (no pile-up of missed weeks).
@@ -40,8 +42,11 @@
   for(const k of order)for(const s of STEPS[k])if(!steps.includes(s)&&s!=='finish')steps.push(s);
   // a daily leak check is already covered by the bigger reviews' leak steps
   if(order[0]!=='daily'){const i=steps.indexOf('leak');if(i>=0&&steps.includes('month-leaks'))steps.splice(i,1);}
-  if(!steps.includes('coach'))steps.splice(steps.length,0,'coach');
-  steps.push('finish');
+  // the payday allocation already shows where you stand, so the daily 'position' step is not repeated
+  if(order.includes('payday')){const i=steps.indexOf('position');if(i>=0)steps.splice(i,1);}
+  // the coach's advice always comes last, after every number has been looked at
+  const c=steps.indexOf('coach');if(c>=0)steps.splice(c,1);
+  steps.push('coach','finish');
   return{primary:order[0],kinds:order,keys:Object.fromEntries(due.map(d=>[d.kind,d.key])),steps};
  }
 
@@ -132,14 +137,69 @@
   const available=round((o.available||0)-(o.protected||0)-(o.buffer||0));
   const wants=(o.areas||[]).map(a=>({name:a.name,amount:round(a.weekly)}));
   const need=round(wants.reduce((s,a)=>s+a.amount,0));
-  return{available,need,fits:available>=need,short:round(Math.max(0,need-available)),areas:wants,
-   working:['Money available '+aud(o.available||0),'minus protected bills and loans '+aud(o.protected||0),'minus your buffer '+aud(o.buffer||0),'= '+aud(available)+' for the week']};
+  const parts=(o.parts||[]).filter(x=>Math.abs(+x.amount||0)>=0.5);
+  return{available,need,fits:available>=need,short:round(Math.max(0,need-available)),spare:round(Math.max(0,available-need)),areas:wants,
+   working:['Money available '+aud(o.available||0)].concat(parts.length?parts.map(x=>'minus '+x.label+' '+aud(x.amount)):['minus protected bills and loans '+aud(o.protected||0)],['minus your buffer '+aud(o.buffer||0),'= '+aud(available)+' for the week'])};
  }
  /* Savings transfers are only suggested when the money is really there after spending. Never moved automatically. */
  function savingsSuggestions(o){
   let spare=round(o.spare);const out=[];
   for(const g of o.goals||[]){const amt=round(g.weekly||0);if(amt<=0)continue;if(spare>=amt){out.push({name:g.name,amount:amt,ok:true});spare=round(spare-amt);}else out.push({name:g.name,amount:amt,ok:false,why:'Not enough spare this week.'});}
   return out;
+ }
+
+ /* ---------- pay expected this budget week (Wednesday step 1) ---------- */
+ /* pays: [{person,base,cadence}], history: [{person,date,amount}] every pay seen. Pay landing on the Tuesday before counts
+    for this week (banks often pay a day early). A fortnightly pay is only expected if the last one was not in the week before. */
+ function payWindow(today){const wk=D.budgetWeek(today);return{from:D.shift(wk.start,-1),to:wk.end,start:wk.start};}
+ function expectedPays(o){
+  const w=payWindow(o.today),hist=o.history||[];
+  return(o.pays||[]).filter(p=>+p.base>0).map(p=>{
+   if(p.cadence==='fortnightly'){
+    const last=hist.filter(h=>h.person===p.person&&h.date<w.from).map(h=>h.date).sort().pop();
+    if(last&&D.diffDays(last,w.from)<=7)return null;     // paid last week, so this is the off week
+   }
+   return{person:p.person,amount:round(p.base)};
+  }).filter(Boolean);
+ }
+ function receivedPays(o){const w=payWindow(o.today);return(o.history||[]).filter(h=>h.date>=w.from&&h.date<=o.today);}
+
+ /* ---------- protect committed money, grouped by the account that pays it (Wednesday step 2) ---------- */
+ /* obligations: [{id,name,amount,due,acct,kind}], balances: {acct: balance}. Each obligation counts once (same id, or the
+    same name on the same day, e.g. a loan that is also listed as a bill). An account that already holds enough is "covered":
+    that money is already set aside, so it is not taken from this week's pay again. */
+ const normName=n=>String(n||'').toLowerCase().replace(/\b(repayments?|payment|direct debit|dd)\b/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+ function protectPlan(o){
+  const seen=new Set(),rows=[];
+  for(const x of o.obligations||[]){
+   if(!(+x.amount>0))continue;
+   const k1=x.id?'id:'+x.id+'|'+x.due:null,k2='n:'+normName(x.name)+'|'+(x.kind==='loan'?'loan':x.due);
+   if((k1&&seen.has(k1))||seen.has(k2))continue;if(k1)seen.add(k1);seen.add(k2);
+   rows.push({name:x.name,amount:round(x.amount),due:x.due,acct:x.acct||'everyday',kind:x.kind||'bill'});
+  }
+  const by={};rows.forEach(r=>{(by[r.acct]=by[r.acct]||{acct:r.acct,rows:[],due:0}).rows.push(r);by[r.acct].due=round(by[r.acct].due+r.amount);});
+  const groups=Object.values(by).map(g=>{const have=(o.balances||{})[g.acct];const known=Number.isFinite(have);
+   return{...g,have:known?round(have):null,covered:known&&have>=g.due,short:known?round(Math.max(0,g.due-have)):null};});
+  const total=round(rows.reduce((s,r)=>s+r.amount,0)),uncovered=round(groups.filter(g=>!g.covered).reduce((s,g)=>s+(g.short==null?g.due:g.short),0));
+  return{rows,groups,total,uncovered,loans:round(rows.filter(r=>r.kind==='loan').reduce((s,r)=>s+r.amount,0)),bills:round(rows.filter(r=>r.kind!=='loan').reduce((s,r)=>s+r.amount,0))};
+ }
+
+ /* ---------- last week, honestly (Wednesday step 5) ---------- */
+ /* cats: {id:{name,weekly}}. Looks at last finished budget week against each weekly limit, and at the 4 weeks before it
+    to tell a one-off from a repeat. Every budgeted area counts here, essentials included: this is about the plan, not leaks. */
+ function weekReview(o){
+  const today=o.today,marks=o.marks||{},spend=(o.txns||[]).filter(t=>!t.deleted&&t.amount<0&&t.cat!=='transfer'&&marks[t.id]!=='exceptional');
+  const over=[],kept=[];let limit=0,spent=0;
+  for(const [id,c] of Object.entries(o.cats||{})){
+   if(!(c.weekly>0))continue;
+   const w=weeklyTotals(spend,id,today,6),last=w[w.length-2],before=w.slice(0,-2);
+   limit+=c.weekly;spent+=last;
+   if(last>c.weekly){const times=before.filter(x=>x>c.weekly).length+1;over.push({cat:id,name:c.name,limit:c.weekly,spent:last,amount:round(last-c.weekly),times,repeat:times>=3});}
+   else kept.push({cat:id,name:c.name,limit:c.weekly,spent:last});
+  }
+  over.sort((a,b)=>b.amount-a.amount);
+  const lw=D.shift(D.budgetWeek(today).start,-7);
+  return{week:{start:lw,end:D.shift(lw,6)},over,kept,limit:round(limit),spent:round(spent),diff:round(limit-spent),repeats:over.filter(x=>x.repeat)};
  }
 
  /* ---------- money leaks ---------- */
@@ -260,15 +320,91 @@
   });
  }
 
+ /* ---------- Month-End Review ---------- */
+ /* o: {month:'YYYY-MM', txns (this month and the month before), cats {id:{name,monthly}}, marks, income [{amount,person}],
+    expectedIncome (monthly), loans [{id,name,balance,verified}], savings {in,out,pulls}, goals [{name,saved,target}], state}
+    Spending is split three ways: necessary (essentials, or marked essential/planned), one-off (marked one-off) and
+    repeated avoidable (everything else). Calendar month throughout, so weekly budgets are never counted twice. */
+ function monthReview(o){
+  const ym=o.month,end=lastDayOfMonth(ym),start=ym+'-01',pm=prevMonth(ym+'-15'),marks=o.marks||{},cats=o.cats||{};
+  const live=(o.txns||[]).filter(t=>!t.deleted&&t.cat!=='transfer'&&t.cat!=='redraw');
+  const inM=(t,m)=>String(t.date).slice(0,7)===m;
+  const spendOf=m=>live.filter(t=>t.amount<0&&inM(t,m)&&!(o.loanIds||[]).includes(t.acct));
+  const spend=spendOf(ym),prior=spendOf(pm);
+  const kind=t=>marks[t.id]==='exceptional'?'oneoff':(isEssential(t.cat)||marks[t.id]==='essential'||marks[t.id]==='planned')?'necessary':'avoidable';
+  const split={necessary:0,oneoff:0,avoidable:0};spend.forEach(t=>{split[kind(t)]=round(split[kind(t)]-t.amount);});
+  const totalSpent=round(split.necessary+split.oneoff+split.avoidable);
+  // 1) income
+  const got=round((o.income||[]).reduce((s,x)=>s+(+x.amount||0),0)),exp=round(o.expectedIncome||0);
+  const income={actual:got,expected:exp,diff:round(got-exp),tone:!got||!exp?'watch':got<exp*0.95?'act':'good',
+   text:!got?'No pay was recorded this month. If you were paid, the bank data is missing or the deposits are not marked as income yet, so this cannot be compared.':!exp?'Income this month: '+aud(got)+'. No expected amount is set, so it cannot be compared.':got<exp*0.95?'Income was '+aud(exp-got)+' lower than expected ('+aud(got)+' of '+aud(exp)+').':got>exp*1.05?'Income was '+aud(got-exp)+' higher than expected ('+aud(got)+'). Check for overtime or a one-off.':'Income came in as expected: '+aud(got)+'.'};
+  // 2) fixed and essential
+  const byCat={};spend.forEach(t=>{byCat[t.cat]=round((byCat[t.cat]||0)-t.amount);});
+  const priorCat={};prior.forEach(t=>{priorCat[t.cat]=round((priorCat[t.cat]||0)-t.amount);});
+  const nm=id=>(cats[id]&&cats[id].name)||String(id||'Other').replace(/\b\w/g,c=>c.toUpperCase());
+  const essentials=Object.entries(byCat).filter(([c])=>isEssential(c)).map(([c,v])=>({cat:c,name:nm(c),amount:v})).sort((a,b)=>b.amount-a.amount);
+  // 3) categories against their monthly budget
+  const variance=Object.entries(cats).filter(([,c])=>c.monthly>0).map(([id,c])=>{const s=byCat[id]||0;return{cat:id,name:c.name,budget:round(c.monthly),spent:s,diff:round(c.monthly-s),pct:Math.round(s/c.monthly*100)};}).sort((a,b)=>a.diff-b.diff);
+  const overCats=variance.filter(v=>v.diff<0);
+  // 4) top three leaks, seen from the last day of the month
+  const lk=leaks({today:end,txns:(o.txns||[]).filter(t=>t.date<=end),cats:Object.fromEntries(Object.entries(cats).map(([k,c])=>[k,{name:c.name,weekly:round((c.monthly||0)*12/52)}])),marks,savingsWithdrawals:(o.savings&&o.savings.pulls)||[],subscriptions:o.subscriptions||[]});
+  const top=[],keys=new Set();for(const f of lk){const g=f.kind+':'+(f.cat||f.name);if(keys.has(g))continue;keys.add(g);top.push(f);if(top.length===3)break;}
+  // 5) habits: better or worse than last month (at least 15% and $30 either way)
+  const habits={better:[],worse:[]};
+  for(const c of new Set(Object.keys(byCat).concat(Object.keys(priorCat)))){
+   if(isEssential(c))continue;const a=priorCat[c]||0,b=byCat[c]||0,d=round(b-a);
+   if(Math.abs(d)<30||(a>0&&Math.abs(d)/a<0.15))continue;
+   (d<0?habits.better:habits.worse).push({cat:c,name:nm(c),before:a,now:b,change:d});
+  }
+  habits.better.sort((x,y)=>x.change-y.change);habits.worse.sort((x,y)=>y.change-x.change);
+  // 6) savings
+  const sv=o.savings||{},savings={in:round(sv.in||0),out:round(sv.out||0),net:round((sv.in||0)-(sv.out||0)),pulls:(sv.pulls||[]).length,goals:(o.goals||[]).map(g=>({name:g.name,saved:round(g.saved),target:round(g.target),pct:g.target>0?Math.min(100,Math.round(g.saved/g.target*100)):null}))};
+  // 7) debt: only balances that are confirmed are compared
+  const debt=(o.loans||[]).map(l=>{const paid=round(live.filter(t=>t.acct===l.id&&inM(t,ym)&&t.amount>0).reduce((s,t)=>s+t.amount,0)),interest=round(live.filter(t=>t.acct===l.id&&inM(t,ym)&&t.amount<0).reduce((s,t)=>s-t.amount,0));
+   return{name:l.name,balance:round(Math.abs(l.balance||0)),verified:!!l.verified,paid,interest,principal:round(paid-interest)};});
+  // 8) realistic changes for next month (at most three, each labelled)
+  const next=[];
+  const repeatOver=overCats.filter(v=>(priorCat[v.cat]||0)>v.budget);
+  repeatOver.slice(0,1).forEach(v=>next.push({kind:'avoidable',text:v.name+' has been over budget two months running. Either set a realistic limit of about '+aud(Math.ceil(((priorCat[v.cat]||0)+v.spent)/2/10)*10)+' a month, or choose one thing to cut.'}));
+  if(top[0])next.push({kind:'avoidable',text:'Biggest leak: '+message(top[0]).happened+' Pick one change for next month, for example a weekly limit.'});
+  if(savings.pulls)next.push({kind:'necessary',text:'Savings were used to cover everyday spending '+savings.pulls+' time'+(savings.pulls===1?'':'s')+'. Plan for what ran short on Wednesday instead.'});
+  if(split.oneoff>0&&next.length<3)next.push({kind:'oneoff',text:aud(split.oneoff)+' was one-off spending. It is not counted as a habit, so no change is needed for it.'});
+  if(!next.length)next.push({kind:'necessary',text:'No changes needed. Keep the same plan for next month.'});
+  // scorecard: plain lines, no made-up score
+  const score=[
+   {label:'Income',tone:income.tone,text:income.text},
+   {label:'Spending',tone:overCats.length?'watch':'good',text:'You spent '+aud(totalSpent)+': '+aud(split.necessary)+' necessary, '+aud(split.oneoff)+' one-off and '+aud(split.avoidable)+' that could change.'},
+   {label:'Budget',tone:overCats.length>2?'act':overCats.length?'watch':'good',text:overCats.length?overCats.length+' area'+(overCats.length===1?' was':'s were')+' over budget: '+overCats.slice(0,3).map(v=>v.name+' by '+aud(-v.diff)).join(', ')+'.':'Every budgeted area stayed within its limit.'},
+   {label:'Savings',tone:savings.net<0?'act':savings.pulls?'watch':'good',text:'Saved '+aud(savings.in)+', taken out '+aud(savings.out)+'.'},
+   {label:'Habits',tone:habits.worse.length>habits.better.length?'watch':'good',text:(habits.better.length?habits.better.length+' better than last month':'None better than last month')+', '+(habits.worse.length?habits.worse.length+' worse':'none worse')+'.'}
+  ];
+  return{month:ym,start,end,income,split,totalSpent,essentials,variance,overCats,leaks:top,habits,savings,debt,next:next.slice(0,3),score};
+ }
+
  /* ---------- reminders: one at a time, no pile-up ---------- */
- function reminder(due,st,today){
+ function reminder(due,st,today,hour){
+  const pr=Object.assign(defaultPrefs(),st.prefs||{});
   if(st.reminded===today||!due.length)return null;
-  const order=['month','payday','daily'],first=order.map(k=>due.find(d=>d.kind===k)).find(Boolean);
-  const text={month:'Your month-end money review is ready.',payday:first&&first.late?'Your payday reset is still waiting for this week.':'It is Wednesday: time for your payday reset.',daily:'Your 2-minute money check-in is ready.'}[first.kind];
+  if(Number.isFinite(hour)&&hour<pr.fromHour)return null;
+  const order=['month','payday','daily'],first=order.map(k=>due.find(d=>d.kind===k&&pr[k]!==false)).find(Boolean);
+  if(!first)return null;
+  const text={month:'Your Month-End Review is ready.',payday:first&&first.late?'Your Payday Reset is still waiting for this week.':'It is Wednesday: time for your Payday Reset.',daily:'Your 2-minute money check-in is ready.'}[first.kind];
   return{kind:first.kind,text};
  }
  function reminded(st,today){st.reminded=today;}
+ function setPrefs(st,p){const cur=Object.assign(defaultPrefs(),st.prefs||{});for(const k of ['daily','payday','month'])if(k in p)cur[k]=!!p[k];
+  if('fromHour' in p){const h=Math.round(+p.fromHour);if(!(h>=0&&h<=22))throw Error('Choose an hour between 0 and 22.');cur.fromHour=h;}st.prefs=cur;return cur;}
+ /* A short note for Co-Pilot: what is due and nothing else. No amounts, names or balances leave the Finance page. */
+ function copilotNote(due,st,today){
+  const pr=Object.assign(defaultPrefs(),st.prefs||{}),s=st.session;
+  const order=['month','payday','daily'],first=order.map(k=>due.find(d=>d.kind===k&&pr[k]!==false)).find(Boolean);
+  const label={month:'Month-End Review',payday:'Payday Reset',daily:'money check-in'};
+  if(s&&(!first||s.kinds.includes(first.kind)))return{date:today,kind:s.primary,status:'resume',text:'Carry on with your '+label[s.primary]+' (step '+(s.at+1)+' of '+s.steps.length+').'};
+  if(!first)return{date:today,kind:null,status:'done',text:'Money check-in done for today.'};
+  return{date:today,kind:first.kind,status:'due',text:{month:'Your Month-End Review is ready (15 to 20 minutes).',payday:'Your Payday Reset is ready (10 to 15 minutes).',daily:'Your 2-minute money check-in is ready.'}[first.kind]};
+ }
 
  return{available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
-  ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud};
+  ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud,
+  defaultPrefs,setPrefs,copilotNote,payWindow,expectedPays,receivedPays,protectPlan,weekReview,monthReview,lastDayOfMonth,prevMonth};
 });

@@ -25,7 +25,7 @@
 
  /* ---------- navigation ---------- */
  const SECTIONS=[
-  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Money check-in',e:'🧭',a:'checkin'},{t:'Needs a look',e:'🔔',v:'insights'},{t:'Receipts and bills',e:'📥',a:'files'},{t:'Money health',e:'❤️',a:'coach'},{t:'Daily wins',e:'🏆',a:'quests'}]},
+  {id:'today',label:'Today',colour:'sea',items:[{t:'Overview',e:'🏠',v:'today',m:1},{t:'Money check-in',e:'🧭',a:'checkin'},{t:'Money reminders',e:'🔔',a:'reminders'},{t:'Needs a look',e:'🔔',v:'insights'},{t:'Receipts and bills',e:'📥',a:'files'},{t:'Money health',e:'❤️',a:'coach'},{t:'Daily wins',e:'🏆',a:'quests'}]},
   {id:'spending',label:'Spending',colour:'coral',items:[{t:'Accounts',e:'🏦',v:'accounts'},{t:'Where money goes',e:'🗺️',v:'money-map'},{t:'Budget',e:'⛽',v:'budget'},{t:'Expenses',e:'🧾',v:'expenses'}]},
   {id:'planning',label:'Planning ahead',colour:'sun',items:[{t:'Income',e:'💵',v:'income'},{t:'Bills',e:'📄',v:'bills'},{t:'Wishlist',e:'🎁',v:'save',s:'wishlist'},{t:'Auto-sort transfers',e:'🤖',a:'autopilot'},{t:'Transfers between my accounts',e:'🔄',a:'moves'},{t:'Fit in a new cost',e:'🔀',a:'swap'}]},
   {id:'growing',label:'Growing',colour:'mint',items:[{t:'Shared goals',e:'🎯',v:'save',s:'sharedgoals',m:1},{t:'Kids\' goals',e:'🧒',v:'save',s:'goals'},{t:'Sinking funds',e:'🪙',v:'save',s:'funds',m:1},{t:'Investing',e:'📈',v:'save',s:'invest'},{t:'Debts',e:'💳',v:'debts'}]},
@@ -105,8 +105,10 @@ function feedHtml(f){
  function coachCard(c){
   if(!c)return '';
   if(c.state==='done')return '<section class="fh-coach fh-coach-done" aria-label="Money check-in"><span>✅ Today\'s money check-in is done.</span><button type="button" class="fh-link" onclick="FinHome.act(\'checkin\')">See summary ›</button></section>';
-  const label=c.state==='resume'?'Carry on with today\'s check-in (step '+c.step+' of '+c.total+')':'Start today\'s money check-in';
-  return '<section class="fh-coach" aria-label="Money check-in"><div><div class="fh-coach-h">🧭 '+esc(label)+'</div><div class="fh-coach-s">About 2 minutes. One question at a time.</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'checkin\')">'+(c.state==='resume'?'Carry on':'Start')+'</button></section>';
+  const k=c.kind==='payday'||c.kind==='month'?c.kind:'daily',name={daily:'today\'s money check-in',payday:'your Payday Reset',month:'your Month-End Review'}[k];
+  const label=c.state==='resume'?'Carry on with '+name+' (step '+c.step+' of '+c.total+')':k==='payday'?(c.late?'Your Payday Reset is still waiting':'It is Wednesday: time for your Payday Reset'):k==='month'?'Your Month-End Review is ready':'Start today\'s money check-in';
+  const sub={daily:'About 2 minutes. One question at a time.',payday:'10 to 15 minutes. Pay, bills, spending money and savings for the week.',month:'15 to 20 minutes. How last month went and what to change.'}[k];
+  return '<section class="fh-coach" aria-label="Money check-in"><div><div class="fh-coach-h">'+(k==='payday'?'💸':k==='month'?'📅':'🧭')+' '+esc(label)+'</div><div class="fh-coach-s">'+sub+'</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'checkin\')">'+(c.state==='resume'?'Carry on':'Start')+'</button></section>';
  }
  function homeHtml(d){
   const week=D.budgetWeek(d.today),alert=d.alert||{count:0};
