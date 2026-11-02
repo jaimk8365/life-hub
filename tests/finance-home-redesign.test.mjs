@@ -76,5 +76,9 @@ test('Home shows the money check-in button: start, carry on, or done',()=>{
  assert.match(H.homeHtml({...base,coach:{state:'resume',step:2,total:5}}),/step 2 of 5/);
  assert.match(H.homeHtml({...base,coach:{state:'done'}}),/check-in is done/);
  assert.ok(!H.homeHtml(base).includes('fh-coach'),'no button for anyone without the coach (for example Matt)');
+ assert.match(H.homeHtml({...base,coach:{state:'due',kind:'payday'}}),/time for your Payday Reset/);
+ assert.match(H.homeHtml({...base,coach:{state:'due',kind:'payday',late:true}}),/Payday Reset is still waiting/);
+ assert.match(H.homeHtml({...base,coach:{state:'due',kind:'month'}}),/Month-End Review is ready/);
+ assert.match(H.homeHtml({...base,coach:{state:'resume',kind:'payday',step:3,total:9}}),/Payday Reset \(step 3 of 9\)/);
  assert.ok(H.everythingHtml().includes("FinHome.act('checkin')")&&!H.everythingHtml('matt').includes("act('checkin')"));
 });

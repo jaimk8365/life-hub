@@ -417,3 +417,13 @@ export function dayCapacity(input) {
     sum + Math.max(0, interval.end - interval.start - busyMinutes(input, input.mode, interval)), 0);
   return { free, capacity: Math.floor(free * (input.settings.capacityRatio ?? 0.7)) };
 }
+
+/* Money card: My Finance leaves a small note (what is due, no amounts) under cp_money_v1. A note from an earlier day
+   is not trusted, so Co-Pilot just suggests opening Finance. Wednesday always nudges the Payday Reset. */
+export function moneyCard(note, today, weekday = '') {
+  const fresh = note && typeof note === 'object' && note.date === today && typeof note.text === 'string';
+  if (fresh && note.status === 'done') return { tone: 'done', title: 'Money', text: 'Money check-in done for today.', action: null };
+  if (fresh) return { tone: note.kind === 'daily' ? 'soft' : 'nudge', title: note.kind === 'month' ? 'Month-end money review' : note.kind === 'payday' ? 'Payday Reset' : 'Money check-in', text: note.text, action: note.status === 'resume' ? 'Carry on' : 'Start' };
+  if (weekday === 'Wednesday') return { tone: 'nudge', title: 'Payday Reset', text: 'It is Wednesday. Open My Finance for your Payday Reset (10 to 15 minutes).', action: 'Open Finance' };
+  return { tone: 'soft', title: 'Money check-in', text: 'Open My Finance for your 2-minute money check-in.', action: 'Open Finance' };
+}
