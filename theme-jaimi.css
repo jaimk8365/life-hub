@@ -1,67 +1,67 @@
-/* Jaimi's shared visual theme: joyful, calm and easy to scan. */
+/* Jaimi's shared visual theme: Soft Ocean. Calm, gentle on the eyes and easy to scan. */
 :root{
-  --joy-yellow:#F7C948;
-  --joy-yellow-soft:#FFF3B8;
-  --joy-lilac:#A78BFA;
-  --joy-lilac-soft:#EEE7FF;
-  --joy-turquoise:#2EC4B6;
-  --joy-turquoise-soft:#DDF8F4;
-  --joy-pink:#C94F7C;
-  --joy-pink-soft:#FBE3EC;
-  --joy-cream:#FFF9EE;
-  --joy-ink:#30263D;
+  --joy-yellow:#E8C26B;
+  --joy-yellow-soft:#FBF3DC;
+  --joy-lilac:#9AA9D3;
+  --joy-lilac-soft:#E8EEF5;
+  --joy-turquoise:#5FA394;
+  --joy-turquoise-soft:#E3F2EE;
+  --joy-pink:#5F8BAA;
+  --joy-pink-soft:#E6EEF4;
+  --joy-cream:#F1F5F8;
+  --joy-ink:#34404A;
   --paper:var(--joy-cream)!important;
-  --paper-2:#FFFCF6!important;
-  --card:#FFFFFF!important;
+  --paper-2:#F7FAFC!important;
+  --card:#FBFCFD!important;
   --ink:var(--joy-ink)!important;
-  --ink-soft:#675D70!important;
-  --ink-faint:#94889E!important;
-  --line:#E8DFF0!important;
-  --line-soft:#F3EDF7!important;
-  --coral:var(--joy-pink)!important;
+  --ink-soft:#5B6B78!important;
+  --ink-faint:#6B7A87!important;
+  --line:#D6E0E8!important;
+  --line-soft:#E4EBF1!important;
+  --coral:#D98C80!important;
   --mint:var(--joy-turquoise)!important;
   --sunshine:var(--joy-yellow)!important;
   --sky:var(--joy-turquoise)!important;
   --plum:var(--joy-lilac)!important;
-  --good:#178A78;
-  --warn:#B47700;
-  --bad:#B83D68;
+  --good:#3F8F7F;
+  --warn:#B87425;
+  --bad:#BF5E55;
 }
 
 body{
   background:
-    radial-gradient(circle at 8% 3%,rgba(247,201,72,.20),transparent 24rem),
-    radial-gradient(circle at 96% 12%,rgba(167,139,250,.16),transparent 27rem),
-    radial-gradient(circle at 55% 100%,rgba(46,196,182,.12),transparent 32rem),
+    radial-gradient(circle at 8% 3%,rgba(232,194,107,.10),transparent 24rem),
+    radial-gradient(circle at 96% 12%,rgba(95,139,170,.10),transparent 27rem),
+    radial-gradient(circle at 55% 100%,rgba(95,163,148,.08),transparent 32rem),
     var(--paper);
 }
 
 .card,.scard,.item,.acct,.bsec,.stat,.sheet{
   border-color:var(--line)!important;
-  box-shadow:0 7px 22px rgba(72,50,90,.07)!important;
+  box-shadow:0 7px 22px rgba(52,64,74,.06)!important;
 }
 .card h2,.card-title,h1{color:var(--joy-ink)}
 .pills,.tabs{background:var(--joy-lilac-soft)!important}
 .pills button.on,.tab.active{background:var(--joy-ink)!important;color:#fff!important}
-.btn.dark,.btn-primary,.primary{background:linear-gradient(135deg,var(--joy-pink),#A83F73)!important;color:#fff!important}
-.btn.soft,.btn-soft,.ghost{background:var(--joy-lilac-soft);border-color:#D9C9FA!important}
+.btn.dark,.btn-primary,.primary{background:linear-gradient(135deg,var(--joy-pink),#4F7896)!important;color:#fff!important}
+.btn.soft,.btn-soft,.ghost{background:var(--joy-lilac-soft);border-color:#CCDAE6!important}
 .bar>i,.progress>i{background:linear-gradient(90deg,var(--joy-turquoise),var(--joy-lilac),var(--joy-pink))!important}
 .chip,.tagchip{border-radius:999px!important}
 .flag{border-left:5px solid var(--joy-yellow)!important}
-.em,.ico{filter:saturate(1.13)}
+.em,.ico{filter:none}
 
 button:not(.close):not(.check):not(.chk):not(.rbox),
 .btn,.acct,.tab{min-height:44px}
 button:active,.btn:active,.acct:active{transform:scale(.97)}
 button:focus-visible,.btn:focus-visible,.acct:focus-visible{
-  outline:3px solid rgba(167,139,250,.48)!important;
+  outline:3px solid rgba(95,139,170,.45)!important;
   outline-offset:2px;
 }
 input[type="checkbox"]:checked{accent-color:var(--joy-turquoise)}
 
 @media (prefers-reduced-motion:no-preference){
   .card,.item,.acct,.btn,button{transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
-  .card:hover{box-shadow:0 10px 28px rgba(72,50,90,.10)!important}
+  .card:hover{box-shadow:0 10px 28px rgba(52,64,74,.09)!important}
   input[type="checkbox"]:checked{animation:joy-pop .28s ease-out}
   @keyframes joy-pop{50%{transform:scale(1.28)}}
 }

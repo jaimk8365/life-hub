@@ -1,10 +1,42 @@
 // Ocean theme (Day/Dusk) for the Finance page. Idempotent; used by tests to replay the patch chain.
+// Soft Ocean (v2, 03/11/2026): gentler day and a slate-grey night instead of navy.
+const day=`--paper:#F1F5F8; --card:#FBFCFD; --card2:#E6EEF4; --ink:#34404A; --ink-soft:#5B6B78; --ink-faint:#6B7A87;
+    --line:#D6E0E8; --line-soft:#E4EBF1; --track:#E0E8EE; --shadow:#CBD7E0; --glass:rgba(251,252,253,.85);
+    --sea:#4F7E9F; --coral:#D98C80; --mint:#4E9A8A; --sunshine:#E8C26B; --sky:#5F8BAA; --plum:#A99BC4;
+    --good:#3F8F7F; --warn:#B87425; --bad:#BF5E55; --warn-ink:#94601F; --og-ink:#34404A; --og-soft:#5B6B78;
+    --t-good:#E3F2EE; --t-good-line:#BFDFD6; --t-bad:#F9E9E6; --t-bad-line:#EDCBC5; --t-bad2:#FBF1EF;
+    --t-warn:#FBF2E3; --t-warn-line:#EEDCB8; --t-paper2:#F4F8FB; --t-yellow:#FBF3DC; --t-plum:#EFECF6; --t-plum-line:#D9D2E9;`;
+const dusk=`--paper:#2B323A; --card:#353D46; --card2:#3D4650; --ink:#E6ECF1; --ink-soft:#B5C1CB; --ink-faint:#9DAAB5;
+    --line:#46505A; --line-soft:#3C454E; --track:#46505A; --shadow:#1F252B; --glass:rgba(53,61,70,.85);
+    --sea:#4E7C9C; --coral:#E3A398; --mint:#8DCBB9; --sunshine:#E8C98A; --sky:#9EC3DD; --plum:#BFB0D3;
+    --good:#8DCBB9; --warn:#E3B47F; --bad:#E3A398; --warn-ink:#E3B47F; --og-ink:#E6ECF1; --og-soft:#B5C1CB;
+    --t-good:#34504B; --t-good-line:#4A6E66; --t-bad:#4D3F43; --t-bad-line:#6E5458; --t-bad2:#463F47;
+    --t-warn:#4A4438; --t-warn-line:#6A5E48; --t-paper2:#313942; --t-yellow:#4A463A; --t-plum:#3E4256; --t-plum-line:#585D78;`;
+export const softOceanRoot=`  /* SOFT OCEAN THEME v2 */
+  :root{
+    color-scheme:light;
+    ${day}
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="day"]){
+      color-scheme:dark;
+      ${dusk}
+    }
+  }
+  :root[data-theme="dusk"]{
+    color-scheme:dark;
+    ${dusk}
+  }`;
+
 export function patchOceanFinance(source){
   const bump=t=>t.replace(/household-dashboard\.css\?v=[^"']+/g,'household-dashboard.css?v=20261017-ocean3');
   let s=source;
   const must=(cond,msg)=>{if(!cond)throw new Error(msg)};
 
-if(s.includes('/* OCEAN THEME v1 */'))return bump(s);
+if(s.includes('/* SOFT OCEAN THEME v2 */'))return bump(s);
+if(s.includes('/* OCEAN THEME v1 */')){const a=s.indexOf('  /* OCEAN THEME v1 */'),d=s.indexOf(':root[data-theme="dusk"]{',a),e=s.indexOf('}',d)+1;must(a>0&&d>a,'v1 block');return bump(s.slice(0,a)+softOceanRoot+s.slice(e));}
 
 // 1) swap pale hard-coded tints for theme variables (CSS + inline styles only)
 const tints={eaf3ee:'--t-good',cbe3d4:'--t-good-line',fbede9:'--t-bad',e6c9bf:'--t-bad-line',fcf3ef:'--t-bad2',fcf7ea:'--t-warn',ebdbb0:'--t-warn-line',fcfaf5:'--t-paper2',fff7cf:'--t-yellow',f7f0f6:'--t-plum',f4f1fa:'--t-plum',f1f0f8:'--t-plum',d6d0e8:'--t-plum-line',efe9dd:'--track'};
@@ -24,36 +56,7 @@ head=swap(head);tail=swap(tail);
 head=head.replace(/family=Fraunces[^"]*display=swap/,'family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
 must(head.includes('family=Fredoka'),'font link');
 
-const day=`--paper:#EAF6FB; --card:#FFFFFF; --card2:#DCEFF7; --ink:#0E2A3A; --ink-soft:#4B6676; --ink-faint:#5A7586;
-    --line:#BFDDEA; --line-soft:#D5EAF3; --track:#CDE6F0; --shadow:#B9D7E4; --glass:rgba(255,255,255,.8);
-    --sea:#0B6E99; --coral:#FF7A6B; --mint:#14A88B; --sunshine:#FFC857; --sky:#1D8FD1; --plum:#B79BC7;
-    --good:#14A88B; --warn:#E07A16; --bad:#D6453A; --warn-ink:#A8560E; --og-ink:#0E2A3A; --og-soft:#4B6676;
-    --t-good:#DDF5EE; --t-good-line:#A9E0D2; --t-bad:#FFE6E2; --t-bad-line:#FFC4BC; --t-bad2:#FFF0ED;
-    --t-warn:#FFF4DC; --t-warn-line:#F6DCA0; --t-paper2:#F3FAFD; --t-yellow:#FFF2C2; --t-plum:#F1EDF8; --t-plum-line:#D6CDEB;`;
-const dusk=`--paper:#26435C; --card:#305474; --card2:#3A5F81; --ink:#F1F8FC; --ink-soft:#C2D7E5; --ink-faint:#A9C3D4;
-    --line:#527597; --line-soft:#3F6485; --track:#476A8B; --shadow:#1C3448; --glass:rgba(48,84,116,.8);
-    --sea:#1F7FAE; --coral:#FF9C8F; --mint:#72E5C7; --sunshine:#FFD27A; --sky:#8FCDF5; --plum:#CDB5DA;
-    --good:#72E5C7; --warn:#FFB273; --bad:#FF9C8F; --warn-ink:#FFB273; --og-ink:#F1F8FC; --og-soft:#C2D7E5;
-    --t-good:#2B5F66; --t-good-line:#3F8579; --t-bad:#5B4B63; --t-bad-line:#8A6475; --t-bad2:#4F4A66;
-    --t-warn:#5A5668; --t-warn-line:#8A7F6A; --t-paper2:#2E4D6C; --t-yellow:#5C5A62; --t-plum:#3F4F7A; --t-plum-line:#62679A;`;
-const newRoot=`  /* OCEAN THEME v1 */
-  :root{
-    color-scheme:light;
-    ${day}
-    --sat: env(safe-area-inset-top, 0px);
-    --sab: env(safe-area-inset-bottom, 0px);
-  }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="day"]){
-      color-scheme:dark;
-      ${dusk}
-    }
-  }
-  :root[data-theme="dusk"]{
-    color-scheme:dark;
-    ${dusk}
-  }`;
-s=head+newRoot+tail;
+s=head+softOceanRoot+tail;
 
 // 3) Appearance card in the existing Settings area
 const anchor="${partnerSyncCard()}</div></details>`;";
