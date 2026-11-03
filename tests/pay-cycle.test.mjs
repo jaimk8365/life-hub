@@ -30,9 +30,9 @@ test('budget alert source patch is repeatable and leaves all other private sourc
 });
 test('overview alert card is compact, actionable and does not call unbudgeted spending exhausted',()=>{
  const rows=P.budgetRows({budget:[{acct:'everyday',items:[{category:'fuel',n:'Fuel',mo:520}]}],transactions:[{id:'one',acct:'everyday',cat:'fuel',amount:-140,date:'2026-10-14',needsReview:true},{id:'two',acct:'everyday',cat:'other',amount:-30,date:'2026-10-14'}],today:'2026-10-14'});
- const sheet={innerHTML:''},context=vm.createContext({PayCycle:P,cycleRows:()=>rows,load:()=>[75,90,100],K_BUDGET_ALERTS:'alerts',acctById:()=>({name:'Everyday'}),catOf:id=>({n:id}),esc:v=>String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;'),AUD:n=>'$'+Number(n).toFixed(2),todayISO:()=> '2026-10-14',TXNS:[],cycleBorrowRows:[],$:()=>sheet,openSheet:()=>{}});
+ const sheet={innerHTML:''},context=vm.createContext({PayCycle:P,cycleRows:()=>rows,load:()=>[75,90,100],K_BUDGET_ALERTS:'alerts',acctById:()=>({name:'Everyday'}),catOf:id=>({n:id}),esc:v=>String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;'),AUD:n=>'$'+Number(n).toFixed(2),todayISO:()=> '2026-10-14',FinDates:createRequire(import.meta.url)('../finance/fin-dates.js'),TXNS:[],cycleBorrowRows:[],$:()=>sheet,openSheet:()=>{}});
  vm.runInContext(fn('cycleAlertRow')+'\n'+fn('cycleAlertsCard')+'\n'+fn('openCycleAlertDetail'),context);
- const html=context.cycleAlertsCard();assert.match(html,/Budget check-in/);assert.match(html,/Over weekly share by \$20\.00/);assert.match(html,/1 category has spending but no weekly allowance/);assert.doesNotMatch(html,/100% used|allowance exhausted/);assert.match(html,/openCycleAlertDetail\(this.dataset.cycleId\)/);
+ const html=context.cycleAlertsCard();assert.match(html,/Budget check-in/);assert.match(html,/\$20\.00 over/);assert.match(html,/1 category over budget/);assert.match(html,/1 category with spending but no budget set/);assert.doesNotMatch(html,/100% used|allowance exhausted/);assert.match(html,/openCycleAlertDetail\(this.dataset.cycleId\)/);
  context.openCycleAlertDetail(rows[0].id);assert.match(sheet.innerHTML,/Move allowance for this week/);
 });
 test('weekly budget save waits for durability and failures preserve the current view and allowances',async()=>{
