@@ -14,7 +14,7 @@
  /* The coach looks at private spending, so it belongs to the owner's profile only. */
  function available(profile){return profile==='jaimi';}
  function storeKey(profile){if(!available(profile))throw Error('The money coach is only for the owner profile.');return 'fin_coach_v1';}
- function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs(),notes:{}};}
+ function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs(),notes:{},plans:{}};}
  /* Reminder settings: which reviews to invite you to, and not before what hour (Brisbane time). */
  function defaultPrefs(){return{daily:true,payday:true,month:true,fromHour:7};}
 
@@ -270,6 +270,68 @@
   return null;
  }
  function markRaised(st,f,today){st.raised[f.key]={on:today,amount:f.amount};}
+ /* ---------- Your plan for this week (Payday Reset's last step, then pinned on Home) ----------
+    Every step has a date inside the Wednesday-to-Tuesday week (or "any time this week"). Nothing here moves money:
+    a "move" step is a reminder to do it in your bank app, and ticking it only records that you did. */
+ const PLAN_ORDER={pay:0,check:1,move:2,bill:3,action:4,spend:5,note:6};
+ function buildWeekPlan(o){
+  const wk=D.budgetWeek(o.today),start=wk.start,end=wk.end,items=[];let n=0;
+  const add=(x)=>items.push(Object.assign({id:'p'+(++n),done:false,removed:false},x));
+  const inWeek=d=>d&&d>=start&&d<=end?d:start;
+  (o.pays&&o.pays.received||[]).forEach(p=>add({date:inWeek(p.date),kind:'pay',text:'Pay in: '+p.person,amount:round(p.amount),done:true,auto:true}));
+  (o.pays&&o.pays.missing||[]).forEach(p=>add({date:start,kind:'check',text:'Check '+p.person+'\'s pay has arrived',amount:p.amount?round(p.amount):null}));
+  (o.shorts||[]).forEach(x=>add({date:start,kind:'move',text:'Move money into '+x.label+' before '+D.short(x.by),amount:round(x.amount),from:x.from||'everyday',to:x.acct}));
+  const tr=(o.transfers||[]).filter(t=>!t.toLoan);
+  if(tr.length)add({date:start,kind:'move',text:tr.length===1?'Check the '+tr[0].name+' went through':'Check your '+tr.length+' regular transfers went through',amount:round(tr.reduce((x,t)=>x+(+t.amount||0),0)),regular:true,
+   parts:tr.map(t=>({name:t.name+(t.frequency==='fortnightly'?' (fortnightly, only if due this week)':''),amount:round(t.amount),from:t.from,to:t.to}))});
+  (o.savings||[]).forEach(g=>add({date:D.shift(start,1),kind:'move',text:'Move savings to '+g.name,amount:round(g.amount),from:'everyday',to:g.acct||'savings'}));
+  (o.bills||[]).forEach(b=>add({date:inWeek(b.due),kind:'bill',text:b.name+' comes out of '+(b.acctName||b.acct),amount:round(b.amount),acct:b.acct}));
+  (o.actions||[]).forEach(a=>add({date:null,kind:'action',text:a.text,actionId:a.id}));
+  const sp=o.spending||{};
+  const daily=sp.withheld||!(sp.need>0)?null:round(sp.need/7);
+  if(daily!=null)add({date:D.shift(start,3),kind:'check',text:'Halfway check: about '+aud(round(sp.need*4/7))+' of spending money should be left'});
+  add({date:end,kind:'check',text:'Look over the week. Your next Payday Reset is tomorrow',last:true});
+  items.sort(planSort);
+  return {week:start,end,created:o.at||null,dailyLimit:daily,allowance:sp.withheld?null:(sp.need||null),spare:sp.withheld?null:(sp.spare??null),held:!!sp.withheld,items};
+ }
+ function planSort(a,b){return String(a.date||'9999').localeCompare(String(b.date||'9999'))||(a.last?1:0)-(b.last?1:0)||(PLAN_ORDER[a.kind]??9)-(PLAN_ORDER[b.kind]??9);}
+ function planOf(st,week){return st&&st.plans&&st.plans[week]||null;}
+ function savePlan(st,plan){st.plans=st.plans||{};st.plans[plan.week]=plan;const weeks=Object.keys(st.plans).sort();while(weeks.length>12)delete st.plans[weeks.shift()];return plan;}
+ function planItem(plan,id){const it=plan&&plan.items.find(x=>x.id===id);if(!it)throw Error('That step is not in this week\'s plan.');return it;}
+ function tickPlanItem(st,week,id,done,at){const it=planItem(planOf(st,week),id);it.done=!!done;it.doneAt=done?(at||null):null;return it;}
+ function updatePlanItem(st,week,id,patch){const plan=planOf(st,week),it=planItem(plan,id);
+  ['date','text','amount','from','to','acct'].forEach(k=>{if(patch&&k in patch)it[k]=k==='amount'?(patch.amount==null||patch.amount===''?null:round(patch.amount)):patch[k];});
+  if(it.date&&(it.date<plan.week||it.date>plan.end))throw Error('Pick a day in this budget week.');
+  it.edited=true;plan.items.sort(planSort);return it;}
+ function addPlanItem(st,week,x){const plan=planOf(st,week);if(!plan)throw Error('Make this week\'s plan first.');if(!String(x&&x.text||'').trim())throw Error('Say what the step is.');
+  if(x.date&&(x.date<plan.week||x.date>plan.end))throw Error('Pick a day in this budget week.');
+  const it={id:'u'+(plan.items.length+1)+'_'+Date.now().toString(36),date:x.date||null,kind:x.kind||'note',text:String(x.text).trim().slice(0,160),amount:x.amount==null||x.amount===''?null:round(x.amount),from:x.from||null,to:x.to||null,acct:x.acct||null,done:false,removed:false,added:true};
+  plan.items.push(it);plan.items.sort(planSort);return it;}
+ function removePlanItem(st,week,id){const it=planItem(planOf(st,week),id);it.removed=true;return it;}
+ function planProgress(plan){const live=(plan&&plan.items||[]).filter(x=>!x.removed);return{done:live.filter(x=>x.done).length,total:live.length,next:live.filter(x=>!x.done)};}
+ /* What a change would do, before you save it. ctx: {balances:{acct:$}, names:{acct:name}, bills:[{acct,due,amount}], spare, allowance, today}.
+    change: {kind:'move',from,to,amount,date} or {kind:'spend',acct,amount,date}. Plain lines, each good/watch/act. */
+ function planImpact(ctx,change){
+  const c=ctx||{},bal=Object.assign({},c.balances||{}),nm=id=>(c.names||{})[id]||id,lines=[],amt=Math.max(0,+change.amount||0);
+  if(!amt)return{lines:[{tone:'watch',text:'Enter an amount to see what it changes.'}],ok:true};
+  const touch=[];
+  if(change.kind==='move'){if(change.from&&change.from in bal){bal[change.from]=round(bal[change.from]-amt);touch.push(change.from);}if(change.to&&change.to in bal){bal[change.to]=round(bal[change.to]+amt);touch.push(change.to);}}
+  else if(change.acct&&change.acct in bal){bal[change.acct]=round(bal[change.acct]-amt);touch.push(change.acct);}
+  let ok=true;
+  for(const id of touch){
+   const before=(c.balances||{})[id],due=round((c.bills||[]).filter(b=>b.acct===id&&(!change.date||b.due>=change.date)).reduce((s,b)=>s+(+b.amount||0),0));
+   lines.push({tone:bal[id]<0?'act':'good',text:nm(id)+': '+aud(before)+' → '+aud(bal[id])});
+   if(due>0){const left=round(bal[id]-due);if(left<0){ok=false;lines.push({tone:'act',text:'Bills still to come out of '+nm(id)+' this week: '+aud(due)+'. It would be '+aud(-left)+' short.'});}else lines.push({tone:'good',text:'Bills still to come out of '+nm(id)+' this week ('+aud(due)+') are still covered.'});}
+   else if(bal[id]<0){ok=false;lines.push({tone:'act',text:nm(id)+' would go below $0.'});}
+  }
+  const fromEveryday=(change.kind==='move'&&change.from==='everyday')||(change.kind!=='move'&&change.acct==='everyday'),intoEveryday=change.kind==='move'&&change.to==='everyday';
+  if(Number.isFinite(c.spare)&&(fromEveryday||intoEveryday)){
+   const after=round(c.spare+(intoEveryday?amt:-amt)),days=Math.max(1,c.daysLeft||7);
+   lines.push({tone:after<0?'act':after<50?'watch':'good',text:after<0?'This is '+aud(-after)+' more than is spare this week. Your spending money would need to drop by that much.':'Spare after your spending money: '+aud(c.spare)+' → '+aud(after)+'.'});
+   if(after<0){ok=false;if(c.allowance>0)lines.push({tone:'watch',text:'To fit, spend about '+aud(Math.max(0,round((c.allowance+after)/days)))+' a day instead of '+aud(round(c.allowance/days))+'.'});}
+  }else if(fromEveryday&&!Number.isFinite(c.spare))lines.push({tone:'watch',text:'Spending money is not worked out yet (balances not confirmed), so the effect on it is not shown.'});
+  return{lines,ok};
+ }
  /* "What happened?" notes: your own words plus quick tags, kept per area and period so the next review can show them. */
  const NOTE_TAGS={oneoff:'One-off',emergency:'Emergency',planned:'Planned',wrong:'Wrong category'};
  function addNote(st,n){
@@ -429,7 +491,7 @@
   return{date:today,kind:first.kind,status:'due',text:{month:'Your Month-End Review is ready (15 to 20 minutes).',payday:'Your Payday Reset is ready (10 to 15 minutes).',daily:'Your 2-minute money check-in is ready.'}[first.kind]};
  }
 
- return{overDetail,NOTE_TAGS,addNote,notesFor,noteMark,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
+ return{buildWeekPlan,planOf,savePlan,tickPlanItem,updatePlanItem,addPlanItem,removePlanItem,planProgress,planImpact,overDetail,NOTE_TAGS,addNote,notesFor,noteMark,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
   ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud,
   defaultPrefs,setPrefs,copilotNote,payWindow,expectedPays,receivedPays,protectPlan,weekReview,monthReview,lastDayOfMonth,prevMonth};
 });

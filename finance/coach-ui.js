@@ -277,7 +277,8 @@ function coachRender(){
        +'<div class="ck-opts"><button class="btn ghost" onclick="coachDo(\'health\')">❤️ Money health</button><button class="btn ghost" onclick="coachDo(\'pip\')">💬 Ask Pip about this month</button><button class="btn ghost" onclick="coachDo(\'quests\')">🏆 Daily wins</button></div>';
     }
   }else if(step==='finish'&&s.primary!=='daily'){
-    body=coachPlanSummary(st,s);opts.next='Confirm and finish';opts.noSkip=true;
+    if(s.kinds.includes('payday')){s.plan=coachBuildPlan(st,s);coachSaveSession(st);}
+    body=(s.plan?'<h3 class="pl-title">📋 Your plan for this week</h3>'+coachPlanHead(s.plan)+coachPlanList(s.plan,{preview:true})+'<p class="tiny">After you confirm, this plan sits on Home. Tick steps off, change them, or add your own.</p>':'')+coachPlanSummary(st,s);opts.next=s.plan?'Save my plan':'Confirm and finish';opts.noSkip=true;
   }else if(step==='finish'){
     const d=coachDataCheck();
     body='<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ Today\'s check-in is done.</p>'
@@ -324,7 +325,7 @@ function coachOpen(){
   if(!st.session){coachSummary(st);return;}
   coachRender();
 }
-function coachNext(){const st=coachState(),s=st.session;if(!s)return;if(s.steps[s.at]==='finish'){const sum=FinCoach.finish(st,todayISO());coachSave(st);coachDone(sum);return;}FinCoach.confirm(st);coachSave(st);coachRender();}
+function coachNext(){const st=coachState(),s=st.session;if(!s)return;if(s.steps[s.at]==='finish'){if(s.plan){const old=FinCoach.planOf(st,s.plan.week);if(old)s.plan.items=s.plan.items.concat(old.items.filter(x=>x.added&&!x.removed));FinCoach.savePlan(st,s.plan);}const sum=FinCoach.finish(st,todayISO());coachSave(st);coachDone(sum);return;}FinCoach.confirm(st);coachSave(st);coachRender();}
 function coachBack(){const st=coachState();if(!st.session)return;FinCoach.back(st);coachSave(st);coachRender();}
 function coachSkip(){const st=coachState();if(!st.session)return;FinCoach.skip(st);coachSave(st);coachRender();}
 function coachMark(id,kind){const st=coachState();FinCoach.mark(st,id,kind);coachSave(st);toastMsg('Got it. It will be left out of future checks.');coachRender();}
@@ -402,3 +403,84 @@ function coachHome(){
     return first?{state:'due',kind:first.kind,late:!!first.late}:{state:'done'};
   }catch(e){return null;}
 }
+
+/* ---------- Your plan for this week (built at the end of the Payday Reset, then pinned on Home) ---------- */
+function coachPlanWeek(){return FinDates.budgetWeek(todayISO()).start;}
+function coachBuildPlan(st,s){
+  const p=coachPayCheck(),pr=coachProtect(),a=coachAllocate();
+  const missing=p.rows.filter(r=>r.status==='missing').map(r=>({person:r.person,amount:r.expected||null}));
+  const shorts=pr.groups.filter(g=>g.have!=null&&!g.covered).map(g=>({acct:g.acct,label:g.label,amount:g.short,by:g.rows.map(r=>r.due).sort()[0]||todayISO(),from:'everyday'}));
+  const bills=[];pr.groups.forEach(g=>g.rows.forEach(r=>bills.push({name:r.name,due:r.due,amount:r.amount,acct:g.acct,acctName:g.label})));
+  const transfers=(TRANSFERS||[]).filter(t=>t.active!==false&&(t.frequency==='weekly'||t.frequency==='fortnightly')&&t.fromAcct!==t.toAcct&&+t.amount>0&&acctById(t.fromAcct)&&acctById(t.toAcct)).map(t=>({name:t.name||'transfer',amount:+t.amount,from:t.fromAcct,to:t.toAcct,frequency:t.frequency,toLoan:(acctById(t.toAcct)||{}).type==='loan'}));
+  const savings=((s&&s.sug)||[]).filter(g=>g.ok).map(g=>({name:g.name,amount:g.amount}));
+  const actions=FinCoach.followUps(st,coachEvidence()).map(x=>({id:x.id,text:x.text}));
+  return FinCoach.buildWeekPlan({today:todayISO(),pays:{received:p.received,missing},shorts,bills,transfers,savings,actions,spending:a.withheld?{withheld:true}:{need:a.need,spare:a.spare},at:new Date().toISOString()});
+}
+function coachPlanKind(k){return {pay:'💰',check:'👀',move:'🔄',bill:'🧾',action:'✅',spend:'🛒',note:'📌'}[k]||'📌';}
+function coachPlanDay(d){if(!d)return 'Any time this week';const t=todayISO();return FinDates.short(d)+(d===t?' · today':d===FinDates.shift(t,1)?' · tomorrow':'');}
+function coachPlanList(plan,o){
+  o=o||{};const live=plan.items.filter(x=>!x.removed),days={};live.forEach(x=>{const k=x.date||'~';(days[k]=days[k]||[]).push(x);});
+  return Object.keys(days).sort().map(k=>'<div class="pl-day'+(k===todayISO()?' today':'')+'"><div class="pl-dh">'+esc(coachPlanDay(k==='~'?null:k))+'</div>'+days[k].map(x=>'<div class="pl-item'+(x.done?' done':'')+'">'
+    +(o.preview?'<span class="pl-ico">'+coachPlanKind(x.kind)+'</span>':'<input type="checkbox" aria-label="Done: '+esc(x.text)+'"'+(x.done?' checked':'')+' onchange="coachPlanTick(\''+esc(x.id)+'\',this.checked)">')
+    +'<span class="pl-t">'+(o.preview?'':coachPlanKind(x.kind)+' ')+esc(x.text)+(x.from&&x.to?'<small>'+esc(coachAcctName(x.from))+' → '+esc(coachAcctName(x.to))+'</small>':'')+(x.parts&&x.parts.length>1?'<details class="pl-parts"><summary>Show the '+x.parts.length+'</summary>'+x.parts.map(q=>'<small>'+esc(q.name)+': '+FinCoach.aud(q.amount)+' · '+esc(coachAcctName(q.from))+' → '+esc(coachAcctName(q.to))+'</small>').join('')+'</details>':'')+'</span>'
+    +(x.amount!=null?'<b>'+FinCoach.aud(x.amount)+'</b>':'<b></b>')
+    +(o.preview||x.auto?'':'<button class="pl-edit" aria-label="Change this step" onclick="coachPlanEdit(\''+esc(x.id)+'\')">✏️</button>')+'</div>').join('')+'</div>').join('');
+}
+function coachPlanHead(plan){return '<div class="pl-head">'+(plan.held?'<p>Spending money is held back until your balances match the bank (🧰 Fix my numbers).</p>':plan.dailyLimit!=null?'<p><b>Spending money:</b> '+FinCoach.aud(plan.allowance)+' this week, about <b>'+FinCoach.aud(plan.dailyLimit)+' a day</b>.'+(plan.spare!=null?' Spare after that: '+FinCoach.aud(plan.spare)+'.':'')+'</p>':'')+'</div>';}
+function coachPlanHome(){
+  try{if(!coachOn())return null;const plan=FinCoach.planOf(coachState(),coachPlanWeek());if(!plan)return null;const pg=FinCoach.planProgress(plan),t=todayISO();
+    return{done:pg.done,total:pg.total,daily:plan.dailyLimit,next:pg.next.filter(x=>!x.date||x.date<=FinDates.shift(t,2)).slice(0,3).map(x=>({id:x.id,text:x.text,amount:x.amount,day:x.date?coachPlanDay(x.date):'This week',late:!!(x.date&&x.date<t)}))};}catch(e){return null;}
+}
+function coachPlanOpen(){
+  const st=coachState(),plan=FinCoach.planOf(st,coachPlanWeek());
+  if(!plan){$('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>📋 This week\'s plan</h2><p class="f">Your plan is made at the end of the Wednesday Payday Reset.</p><button class="btn dark" onclick="coachOpen()">Start the Payday Reset</button>';openSheet();return;}
+  const pg=FinCoach.planProgress(plan);
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>📋 This week\'s plan</h2><p class="f">'+esc(FinDates.short(plan.week))+' to '+esc(FinDates.short(plan.end))+' · '+pg.done+' of '+pg.total+' done</p>'
+   +coachPlanHead(plan)+coachPlanList(plan)
+   +'<button class="btn dark" onclick="coachPlanEdit(null)">＋ Add a step</button><p class="tiny">Nothing here moves money. Ticking a step just records that you did it in your bank app.</p>';
+  openSheet();
+}
+async function coachPlanTick(id,done){
+  const st=coachState(),week=coachPlanWeek();try{const it=FinCoach.tickPlanItem(st,week,id,done,new Date().toISOString());if(it.actionId&&done){try{FinCoach.setStatus(st,it.actionId,'completed','',todayISO());}catch(e){}}}catch(e){toastMsg(e.message);return;}
+  coachSave(st);if(done)toastMsg('Done ✓');if($('sheet')&&/This week's plan/.test($('sheet').textContent))coachPlanOpen();try{render();}catch(e){}
+}
+function coachPlanCtx(){
+  const names={},balances={};ACCTS.filter(a=>!a.hidden&&a.type!=='loan').forEach(a=>{names[a.id]=a.name;balances[a.id]=Math.round(balance(a.id)*100)/100;});
+  const bills=[];try{coachProtect().groups.forEach(g=>g.rows.forEach(r=>bills.push({acct:g.acct||'everyday',due:r.due,amount:r.amount})));}catch(e){}
+  const a=coachAllocate(),wk=FinDates.budgetWeek(todayISO());
+  return{names,balances,bills,spare:a.withheld?NaN:a.spare,allowance:a.withheld?null:a.need,daysLeft:wk.daysLeft+1};
+}
+var _plEdit=null;
+function coachPlanEdit(id){
+  const st=coachState(),plan=FinCoach.planOf(st,coachPlanWeek());if(!plan)return;const it=id?plan.items.find(x=>x.id===id):null;
+  _plEdit={id,kind:it?it.kind:'move'};const ctx=coachPlanCtx(),acctOpts=sel=>Object.entries(ctx.names).map(([k,n])=>'<option value="'+esc(k)+'"'+(k===sel?' selected':'')+'>'+esc(n)+'</option>').join('');
+  const days=[];for(let d=plan.week;d<=plan.end;d=FinDates.shift(d,1))days.push(d);
+  const kind=it?it.kind:'move',isMove=kind==='move',isSpend=kind==='spend'||kind==='bill';
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="coachPlanOpen()">‹ This week\'s plan</button><h2>'+(it?'Change this step':'Add a step')+'</h2>'
+   +(it?'':'<label class="pl-f">What kind of step?<select id="pl_kind" onchange="_plEdit.kind=this.value;coachPlanFields()"><option value="move">🔄 Move money between accounts</option><option value="spend">🛒 Pay for or buy something</option><option value="note">📌 A reminder</option></select></label>')
+   +'<label class="pl-f">What is it?<input id="pl_text" maxlength="160" value="'+esc(it?it.text:'')+'" placeholder="e.g. Car service, top up Bills"></label>'
+   +'<label class="pl-f">Which day?<select id="pl_date" oninput="coachPlanImpactShow()"><option value="">Any time this week</option>'+days.map(d=>'<option value="'+d+'"'+(it&&it.date===d?' selected':'')+'>'+esc(coachPlanDay(d))+'</option>').join('')+'</select></label>'
+   +'<label class="pl-f" id="pl_amt_w">Amount ($)<input id="pl_amt" inputmode="decimal" value="'+(it&&it.amount!=null?it.amount:'')+'" oninput="coachPlanImpactShow()"></label>'
+   +'<div id="pl_move"'+(isMove||!it?'':' hidden')+'><label class="pl-f">From<select id="pl_from" oninput="coachPlanImpactShow()">'+acctOpts(it&&it.from||'everyday')+'</select></label><label class="pl-f">To<select id="pl_to" oninput="coachPlanImpactShow()">'+acctOpts(it&&it.to||'bills')+'</select></label></div>'
+   +'<div id="pl_spend"'+(isSpend?'':' hidden')+'><label class="pl-f">Paid from<select id="pl_acct" oninput="coachPlanImpactShow()">'+acctOpts(it&&it.acct||'everyday')+'</select></label></div>'
+   +'<div id="pl_impact" class="pl-impact"></div>'
+   +'<button class="btn dark" onclick="coachPlanSaveEdit()">'+(it?'Save change':'Add to my plan')+'</button>'
+   +(it?'<button class="btn ghost" style="margin-top:8px" onclick="coachPlanRemove(\''+esc(it.id)+'\')">Take this off the plan</button>':'')
+   +'<p class="tiny">This only changes your plan. No money moves, and no budget or limit changes.</p>';
+  openSheet();coachPlanFields();
+}
+function coachPlanFields(){const k=_plEdit&&_plEdit.kind;if(!$('pl_move'))return;$('pl_move').hidden=k!=='move';$('pl_spend').hidden=!(k==='spend'||k==='bill');$('pl_amt_w').hidden=k==='note'||k==='action'||k==='check';coachPlanImpactShow();}
+function coachPlanImpactShow(){
+  const box=$('pl_impact');if(!box)return;const k=_plEdit&&_plEdit.kind;if(!(k==='move'||k==='spend'||k==='bill')){box.innerHTML='';return;}
+  const amount=parseFloat(String($('pl_amt').value||'').replace(/[^0-9.]/g,''))||0,date=$('pl_date').value||todayISO();
+  const change=k==='move'?{kind:'move',from:$('pl_from').value,to:$('pl_to').value,amount,date}:{kind:'spend',acct:$('pl_acct').value,amount,date};
+  const r=FinCoach.planImpact(coachPlanCtx(),change);
+  box.innerHTML='<div class="fh-mean-h">If you do this</div>'+r.lines.map(l=>'<p class="pl-'+l.tone+'">'+({good:'✅',watch:'👀',act:'⚠️'}[l.tone])+' '+esc(l.text)+'</p>').join('');
+}
+function coachPlanSaveEdit(){
+  const st=coachState(),week=coachPlanWeek(),k=_plEdit.kind,text=$('pl_text').value,date=$('pl_date').value||null,raw=$('pl_amt')?$('pl_amt').value:'',amount=raw===''?null:parseFloat(String(raw).replace(/[^0-9.]/g,''));
+  const patch={text,date,amount:Number.isFinite(amount)?amount:null};if(k==='move'){patch.from=$('pl_from').value;patch.to=$('pl_to').value;}if(k==='spend'||k==='bill')patch.acct=$('pl_acct').value;
+  try{if(_plEdit.id)FinCoach.updatePlanItem(st,week,_plEdit.id,patch);else FinCoach.addPlanItem(st,week,Object.assign({kind:k},patch));}catch(e){toastMsg(e.message);return;}
+  coachSave(st);toastMsg(_plEdit.id?'Plan updated ✓':'Added to your plan ✓');coachPlanOpen();try{render();}catch(e){}
+}
+function coachPlanRemove(id){const st=coachState();try{FinCoach.removePlanItem(st,coachPlanWeek(),id);}catch(e){toastMsg(e.message);return;}coachSave(st);toastMsg('Taken off the plan');coachPlanOpen();try{render();}catch(e){}}

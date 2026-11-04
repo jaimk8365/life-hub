@@ -208,3 +208,20 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
 .ck-tx2 .ck-marks .ck-notebtn{grid-column:1/-1}
 .ck-tx-note{grid-column:1/-1;display:flex;gap:8px}.ck-tx-note[hidden]{display:none}.ck-tx-note .btn{width:auto;min-height:40px}
 .ck-tx2 .ck-marks{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* This week's plan: Home card, plan sheet and editor. */
+.fh-plan{margin:0 0 14px;padding:16px;border-radius:18px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--sea)}
+.fh-pl-top{display:flex;justify-content:space-between;align-items:center;gap:10px}.fh-pl-n{font-weight:800;font-size:13px;color:var(--ink-soft)}
+.fh-pl-bar{height:8px;border-radius:9px;background:var(--track);overflow:hidden;margin:10px 0}.fh-pl-bar i{display:block;height:100%;background:var(--good)}
+.fh-pl-i{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line-soft);cursor:pointer}.fh-pl-i input{width:24px;height:24px}
+.fh-pl-i span{display:flex;flex-direction:column;font-size:14.5px}.fh-pl-i small{color:var(--ink-soft);font-size:12.5px}.fh-pl-i.late small{color:var(--bad)}
+.pl-title{margin:4px 0 6px;font-size:18px}
+.pl-head p{margin:6px 0 10px;font-size:14.5px}
+.pl-day{margin:10px 0;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:4px 12px}.pl-day.today{border-color:var(--sea);border-width:2px}
+.pl-dh{font-weight:800;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);padding:8px 0 4px}
+.pl-item{display:grid;grid-template-columns:26px 1fr auto auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line-soft)}.pl-item input{width:24px;height:24px}
+.pl-item .pl-t{display:flex;flex-direction:column;font-size:14.5px}.pl-item small{color:var(--ink-soft);font-size:12.5px}.pl-item.done .pl-t{text-decoration:line-through;color:var(--ink-soft)}
+.pl-edit{border:0;background:none;font-size:18px;min-height:40px;min-width:40px;cursor:pointer}.pl-ico{font-size:18px;text-align:center}
+.pl-f{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:14px;margin:10px 0}.pl-f input,.pl-f select{min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;padding:0 10px}
+.pl-f[hidden],#pl_move[hidden],#pl_spend[hidden]{display:none}
+.pl-impact{margin:12px 0;padding:12px;border-radius:14px;background:var(--card2,#e6eef4)}.pl-impact:empty{display:none}.pl-impact p{margin:6px 0;font-size:14px}.pl-act{color:var(--bad)}
+.pl-parts summary{font-size:12.5px;font-weight:700;color:var(--sea);cursor:pointer}.pl-parts small{display:block;margin-top:3px}

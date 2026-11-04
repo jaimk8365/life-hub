@@ -32,6 +32,7 @@ function finProfileData(d){
     out.feed=finFeedData();
     out.coach=typeof coachHome==='function'?coachHome():null;
     out.fix=typeof fixHome==='function'?fixHome():null;
+    out.plan=typeof coachPlanHome==='function'?coachPlanHome():null;
     out.game=finGameHome();out.shop=finShopSummary();
     const ma=finMoveAlert();
     if(ma)out.alert={count:(d.alert.count||0)+1,text:ma.text};
@@ -312,7 +313,7 @@ function finApAnswer(key){
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
-  const map={checkin:'coachOpen',reminders:'coachPrefsOpen',fixnumbers:'fixOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
+  const map={checkin:'coachOpen',reminders:'coachPrefsOpen',fixnumbers:'fixOpen',plan:'coachPlanOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
   if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }
