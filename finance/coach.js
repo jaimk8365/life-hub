@@ -14,7 +14,7 @@
  /* The coach looks at private spending, so it belongs to the owner's profile only. */
  function available(profile){return profile==='jaimi';}
  function storeKey(profile){if(!available(profile))throw Error('The money coach is only for the owner profile.');return 'fin_coach_v1';}
- function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs()};}
+ function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs(),notes:{}};}
  /* Reminder settings: which reviews to invite you to, and not before what hour (Brisbane time). */
  function defaultPrefs(){return{daily:true,payday:true,month:true,fromHour:7};}
 
@@ -207,7 +207,7 @@
  function overDetail(o){
   const marks=o.marks||{},limit=+o.limit||0;
   const rows=(o.txns||[]).filter(t=>!t.deleted&&t.amount<0&&t.cat===o.cat&&t.date>=o.from&&t.date<=o.to&&t.cat!=='transfer'&&marks[t.id]!=='exceptional').slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
-  let run=0,crossed=null;const list=rows.map(t=>{run=round(run-t.amount);if(crossed==null&&limit>0&&run>limit)crossed=t.id;return {id:t.id,date:t.date,note:t.note||'',acct:t.acct,amount:round(-t.amount),running:run,mark:marks[t.id]||null};});
+  let run=0,crossed=null;const list=rows.map(t=>{run=round(run-t.amount);if(crossed==null&&limit>0&&run>limit)crossed=t.id;return {id:t.id,date:t.date,note:t.note||'',userNote:t.userNote||'',acct:t.acct,amount:round(-t.amount),running:run,mark:marks[t.id]||null};});
   const total=run,biggest=list.slice().sort((a,b)=>b.amount-a.amount).slice(0,3),bigTotal=round(biggest.reduce((s,t)=>s+t.amount,0));
   const by=new Map();for(const t of list){const k=merchant(t.note)||'no description';if(!by.has(k))by.set(k,{name:t.note||'No description',count:0,total:0});const g=by.get(k);g.count++;g.total=round(g.total+t.amount);}
   const shops=[...by.values()].sort((a,b)=>b.total-a.total).slice(0,3);
@@ -270,6 +270,17 @@
   return null;
  }
  function markRaised(st,f,today){st.raised[f.key]={on:today,amount:f.amount};}
+ /* "What happened?" notes: your own words plus quick tags, kept per area and period so the next review can show them. */
+ const NOTE_TAGS={oneoff:'One-off',emergency:'Emergency',planned:'Planned',wrong:'Wrong category'};
+ function addNote(st,n){
+  st.notes=st.notes||{};const text=String(n&&n.text||'').trim().slice(0,500),tags=[...new Set((n&&n.tags)||[])].filter(t=>NOTE_TAGS[t]);
+  if(!n||!n.key)throw Error('A note needs something to belong to.');
+  if(!text&&!tags.length){delete st.notes[n.key];return null;}
+  return st.notes[n.key]={key:n.key,cat:n.cat||null,name:n.name||'',period:n.period||'',text,tags,at:n.at||null};
+ }
+ function notesFor(st,cat,exceptKey){return Object.values((st&&st.notes)||{}).filter(x=>x.cat&&x.cat===cat&&x.key!==exceptKey).sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));}
+ /* Which payment mark a note's tags imply: one-offs and emergencies leave future warnings, planned is planned. */
+ function noteMark(tags){tags=tags||[];return tags.includes('oneoff')||tags.includes('emergency')?'exceptional':tags.includes('planned')?'planned':null;}
  function mark(st,txnId,kind){if(!MARKS.includes(kind))throw Error('Choose planned, essential, exceptional or miscategorised.');st.marks[txnId]=kind;return st.marks;}
 
  /* ---------- reality check ---------- */
@@ -418,7 +429,7 @@
   return{date:today,kind:first.kind,status:'due',text:{month:'Your Month-End Review is ready (15 to 20 minutes).',payday:'Your Payday Reset is ready (10 to 15 minutes).',daily:'Your 2-minute money check-in is ready.'}[first.kind]};
  }
 
- return{overDetail,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
+ return{overDetail,NOTE_TAGS,addNote,notesFor,noteMark,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
   ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud,
   defaultPrefs,setPrefs,copilotNote,payWindow,expectedPays,receivedPays,protectPlan,weekReview,monthReview,lastDayOfMonth,prevMonth};
 });
