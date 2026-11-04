@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { decryptPage, decryptPayload, replaceBetween } from './refresh-crypto.mjs';
+import { expandEvents, parseCalendarList } from './ics-calendar.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const required = name => {
@@ -13,9 +14,13 @@ const required = name => {
   return value;
 };
 const passphrase = required('HUB_KEY');
-const clientId = required('GOOGLE_CLIENT_ID');
-const clientSecret = required('GOOGLE_CLIENT_SECRET');
-const refreshToken = required('GOOGLE_REFRESH_TOKEN');
+// Preferred: Google's private iCal links, one per line "Label | https://…" in the CALENDAR_ICS_URLS secret.
+// Fallback: the Google Calendar API with OAuth secrets.
+const icsCalendars = parseCalendarList(process.env.CALENDAR_ICS_URLS);
+const useIcs = icsCalendars.length > 0;
+const clientId = useIcs ? '' : required('GOOGLE_CLIENT_ID');
+const clientSecret = useIcs ? '' : required('GOOGLE_CLIENT_SECRET');
+const refreshToken = useIcs ? '' : required('GOOGLE_REFRESH_TOKEN');
 const gistId = process.env.LIFEHUB_GIST_ID || 'ca580c4f80258fde4d0910b626c7ed0f';
 const timezone = 'Australia/Brisbane';
 
@@ -71,6 +76,15 @@ async function calendarEvents(token, calendarId, label, timeMin, timeMax) {
   return out;
 }
 
+/* Never prints the link itself: it works like a password. */
+async function icsEvents({label, url}, timeMin, timeMax) {
+  const response = await fetch(url, {headers:{Accept:'text/calendar'}});
+  if (!response.ok) throw new Error(`Calendar link failed for ${label} (${response.status}). Check the secret address is still current.`);
+  const text = await response.text();
+  if (!/BEGIN:VCALENDAR/.test(text)) throw new Error(`Calendar link for ${label} did not return a calendar file.`);
+  return expandEvents(text, label, Date.parse(timeMin), Date.parse(timeMax), ignoredTitles);
+}
+
 async function remindersSnapshot() {
   const response = await fetch(`https://api.github.com/gists/${gistId}`, {headers:{Accept:'application/vnd.github+json'}});
   if (!response.ok) throw new Error(`Encrypted reminders snapshot unavailable (${response.status}).`);
@@ -97,8 +111,16 @@ const localMidnight = new Date(`${isoDate(now)}T00:00:00+10:00`);
 const daysSinceMonday = (localMidnight.getUTCDay() + 6) % 7;
 const from = new Date(localMidnight.getTime() - daysSinceMonday * 86400000);
 const until = new Date(now.getTime() + 45 * 86400000);
-const token = await accessToken();
-const gathered = (await Promise.all(calendars.map(([id,label]) => calendarEvents(token,id,label,from.toISOString(),until.toISOString())))).flat();
+const gathered = useIcs
+  ? await (async () => {
+      const results = await Promise.allSettled(icsCalendars.map(c => icsEvents(c, from.toISOString(), until.toISOString())));
+      const failed = results.filter(r => r.status === 'rejected');
+      for (const r of failed) console.warn(`Warning: ${r.reason?.message || 'a calendar link failed'}`);
+      if (failed.length === results.length) throw new Error('None of the calendar links worked, so nothing was changed.');
+      return results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+    })()
+  : await (async () => { const token = await accessToken(); return (await Promise.all(calendars.map(([id,label]) => calendarEvents(token,id,label,from.toISOString(),until.toISOString())))).flat(); })();
+console.log(`Calendar events gathered: ${gathered.length} from ${useIcs ? icsCalendars.length + ' private calendar links' : 'the Google Calendar API'}.`);
 gathered.sort((a,b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title));
 
 const snapshot = await remindersSnapshot();
