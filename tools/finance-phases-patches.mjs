@@ -165,6 +165,15 @@ function catsPatch(s){
   s=once(s,"<div class=\"icon-library\">${CATEGORY_ICONS.map(x=>`<button class=\"icon-choice ${x===selectedCategoryIcon?'on':''}\" onclick=\"selectedCategoryIcon='${x}';document.querySelectorAll('.icon-choice').forEach(b=>b.classList.toggle('on',b.textContent==='${x}'))\">${x}</button>`).join('')}</div>","${catEmojiPicker(selectedCategoryIcon)}",'budget emoji');
   return s;
 }
+/* Auto-sort payments with a "how sure" level, and goal money from a bank account (finance/auto-sort.js, finance/goal-money.js). */
+function autoSortPatch(s){
+  const cats='<script src="../finance/categories.js?v=20261104"></script>';
+  s=once(s,cats,cats+'\n<script src="../finance/auto-sort.js?v=20261105"></script>\n<script src="../finance/goal-money.js?v=20261105"></script>','autosort head');
+  s=once(s,"function openSharedGoalPayment(id){","function openSharedGoalPayment(id){if(typeof goalMoneyOpen==='function')return goalMoneyOpen('shared',id);",'goal money shared');
+  s=once(s,"+(id==='bills'?BILL_ALLOC.reduce((sum,b)=>sum+(+b.allocated||0),0):0);}","+(id==='bills'?BILL_ALLOC.reduce((sum,b)=>sum+(+b.allocated||0),0):0)+(typeof goalMoneyReserved==='function'?goalMoneyReserved(id):0);}",'goal money reserved');
+  s=once(s,"  if(persist)reconcileObligations();\n  pendingImport=null;","  if(persist){reconcileObligations();try{if(typeof finApplyCatRules==='function')await finApplyCatRules();}catch(e){}}\n  pendingImport=null;",'autosort csv');
+  return s;
+}
 export function patchPhasesFinance(source){
   let s=source;
   s=phase3(s);
@@ -186,5 +195,6 @@ export function patchPhasesFinance(source){
   s=coachHead(s);
   s=fixHead(s);
   s=catsPatch(s);
+  s=autoSortPatch(s);
   return bump(s);
 }

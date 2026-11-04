@@ -211,6 +211,7 @@ function finSaveGoal(type){
 }
 function finPrivAddMoney(id){
   const g=PRIV.jaimi.goals.find(x=>x.id===id);if(!g)return;
+  if(typeof goalMoneyOpen==='function')return goalMoneyOpen('priv',id);
   const v=prompt('How much to add to '+g.name+'? ($)');const n=parseFloat(v);if(!(n>0))return;
   g.payments.push({id:uid(),amount:n,date:todayISO(),note:''});finPrivSave('jaimi');finGameEvent('goal');render();
 }

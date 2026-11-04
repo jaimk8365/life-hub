@@ -120,7 +120,7 @@ function feedHtml(f){
  }
  function fixCard(f){
   if(!f)return '';
-  const bits=[];if(f.misc)bits.push(f.misc+' payments in Miscellaneous');if(f.off)bits.push(f.off+(f.off===1?' account does':' accounts do')+' not match the bank');
+  const bits=[];if(f.misc)bits.push(f.misc+' payments in Miscellaneous');if(f.off)bits.push(f.off+(f.off===1?' account does':' accounts do')+' not match the bank');if(f.check)bits.push(f.check+' sorted for you to check');
   return '<section class="fh-coach fh-fix" aria-label="Fix my numbers"><div><div class="fh-coach-h">🧰 Fix my numbers</div><div class="fh-coach-s">'+esc(bits.join(' · '))+'. Sorting these makes every other number right.</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'fixnumbers\')">Fix</button></section>';
  }
  function coachCard(c){
