@@ -134,8 +134,31 @@ function coachFrame(s,body,opts){
 /* ---------- Detail drawers: every number opens to the payments behind it ---------- */
 const COACH_MARK_LABEL={planned:'Planned',essential:'Essential',exceptional:'One-off',miscategorised:'Wrong category'};
 function coachAcctName(id){return (typeof acctById==='function'&&acctById(id)?.name)||id||'';}
-function coachTxRows(rows,o){o=o||{};return rows.map(t=>'<div class="ck-tx2'+(t.id===o.crossed?' ck-cross':'')+'"><div class="ck-tx2-m"><b>'+esc(t.note||'No description')+'</b><small>'+esc(FinDates.short(t.date))+(t.acct?' · '+esc(coachAcctName(t.acct)):'')+(t.id===o.crossed?' · ⬆ went over here':'')+(t.mark?' · marked '+esc(COACH_MARK_LABEL[t.mark]||t.mark):'')+'</small></div><b class="ck-tx2-a">'+FinCoach.aud(t.amount)+'</b>'
- +(o.marks?'<div class="ck-marks">'+FinCoach.MARKS.map(m=>'<button class="btn ghost'+(t.mark===m?' on':'')+'" onclick="coachMark(\''+esc(t.id)+'\',\''+m+'\')">'+COACH_MARK_LABEL[m]+'</button>').join('')+'</div>':'')+'</div>').join('');}
+function coachTxRows(rows,o){o=o||{};const cats=typeof CATS!=='undefined'?CATS.filter(c=>c.id!=='income'):[];return rows.map(t=>{const sid=String(t.id).replace(/[^\w-]/g,'_');return '<div class="ck-tx2'+(t.id===o.crossed?' ck-cross':'')+'"><div class="ck-tx2-m"><b>'+esc(t.note||'No description')+'</b><small>'+esc(FinDates.short(t.date))+(t.acct?' · '+esc(coachAcctName(t.acct)):'')+(t.id===o.crossed?' · ⬆ went over here':'')+(t.mark?' · marked '+esc(COACH_MARK_LABEL[t.mark]||t.mark):'')+'</small>'+(t.userNote?'<span class="ck-unote">📝 '+esc(t.userNote)+'</span>':'')+'</div><b class="ck-tx2-a">'+FinCoach.aud(t.amount)+'</b>'
+ +(o.marks?'<div class="ck-marks">'+['planned','essential','exceptional'].map(m=>'<button class="btn ghost'+(t.mark===m?' on':'')+'" onclick="coachMark(\''+esc(t.id)+'\',\''+m+'\')">'+COACH_MARK_LABEL[m]+'</button>').join('')
+  +'<select class="ck-move" aria-label="Move to another category" onchange="coachMoveTx(\''+esc(t.id)+'\',this.value)"><option value="">Move to…</option>'+cats.map(c=>'<option value="'+esc(c.id)+'">'+esc((c.e||'')+' '+c.n)+'</option>').join('')+'</select>'
+  +'<button class="btn ghost ck-notebtn" onclick="coachTxNoteOpen(\''+sid+'\')">✏️ '+(t.userNote?'Edit note':'Add a note')+'</button>'
+  +'<div class="ck-tx-note" id="ckt_'+sid+'" hidden><input type="text" maxlength="200" placeholder="What was this? e.g. new fridge, school camp" value="'+esc(t.userNote||'')+'" id="ckti_'+sid+'"><button class="btn dark" onclick="coachTxNoteSave(\''+esc(t.id)+'\',\''+sid+'\')">Save</button></div></div>':'')+'</div>';}).join('');}
+function coachTxNoteOpen(sid){const el=$('ckt_'+sid);if(el){el.hidden=!el.hidden;if(!el.hidden)$('ckti_'+sid).focus();}}
+async function coachTxNoteSave(id,sid){const t=TXNS.find(x=>String(x.id)===String(id));if(!t)return;const before=t.userNote,v=String($('ckti_'+sid).value||'').trim().slice(0,200);if(v)t.userNote=v;else delete t.userNote;try{await saveAtomic({[K_TXNS]:TXNS});}catch(e){if(before)t.userNote=before;else delete t.userNote;toastMsg('Could not save. Nothing changed.');return;}toastMsg(v?'Note saved ✓':'Note removed');coachRender();}
+async function coachMoveTx(id,cat){if(!cat)return;const before=TXNS.slice(),next=FinFix.recategorise(TXNS,[id],cat,new Date().toISOString());TXNS.length=0;next.forEach(t=>TXNS.push(t));try{await saveAtomic({[K_TXNS]:TXNS});}catch(e){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}toastMsg('Moved to '+(catOf(cat)?.n||cat)+' ✓');if(typeof render==='function')try{render();}catch(e){}coachRender();}
+/* "What happened?" box for one area in one period. Past notes for the same area are shown first, so the app remembers. */
+var _ckNotes={};
+function coachNoteBox(ctx){
+ const st=coachState(),sid='ckn_'+String(ctx.key).replace(/[^\w-]/g,'_'),cur=(st.notes||{})[ctx.key]||{text:'',tags:[]},past=FinCoach.notesFor(st,ctx.cat,ctx.key).slice(0,2);_ckNotes[sid]=ctx;
+ return '<div class="ck-note"><div class="fh-mean-h">What happened?</div>'
+  +(past.length?'<div class="ck-past">'+past.map(n=>'<p>🕘 <b>'+esc(n.period||'Before')+':</b> '+(n.text?'“'+esc(n.text)+'”':'')+(n.tags.length?' · '+n.tags.map(t=>esc(FinCoach.NOTE_TAGS[t])).join(', '):'')+'</p>').join('')+'</div>':'')
+  +'<div class="ck-chips" id="'+sid+'_tags">'+Object.entries(FinCoach.NOTE_TAGS).map(([k,l])=>'<button type="button" class="ck-chip'+(cur.tags.includes(k)?' on':'')+'" aria-pressed="'+cur.tags.includes(k)+'" data-tag="'+k+'" onclick="this.classList.toggle(\'on\');this.setAttribute(\'aria-pressed\',this.classList.contains(\'on\'))">'+esc(l)+'</button>').join('')+'</div>'
+  +'<textarea id="'+sid+'_text" rows="2" maxlength="500" placeholder="In your own words, e.g. car service, birthday presents, paid back by Mum">'+esc(cur.text)+'</textarea>'
+  +'<button class="btn dark" onclick="coachNoteSave(\''+sid+'\')">'+(cur.text||cur.tags.length?'Update note':'Save note')+'</button></div>';
+}
+async function coachNoteSave(sid){
+ const ctx=_ckNotes[sid];if(!ctx)return;const st=coachState(),tags=[...document.querySelectorAll('#'+sid+'_tags .ck-chip.on')].map(b=>b.dataset.tag),text=$(sid+'_text').value;
+ FinCoach.addNote(st,{key:ctx.key,cat:ctx.cat,name:ctx.name,period:ctx.period,text,tags,at:new Date().toISOString()});
+ const m=FinCoach.noteMark(tags),ids=(ctx.ids||[]).filter(id=>!(st.marks||{})[id]);
+ if(m&&ids.length&&confirm('Leave '+(ids.length===1?'this payment':'these '+ids.length+' payments')+' out of future warnings ('+(m==='planned'?'planned':'one-off')+')?'))ids.forEach(id=>FinCoach.mark(st,id,m));
+ coachSave(st);toastMsg(tags.includes('wrong')?'Saved. Use "Move to…" on each payment to fix the category.':'Note saved ✓');coachRender();
+}
 function coachWeeksBars(weeks,limit,start){
  if(!weeks||!weeks.length)return '';const last=weeks.slice(-5),max=Math.max(limit,...last,1);
  return '<div class="ck-weeks"><div class="fh-mean-h">Last '+last.length+' weeks</div>'+last.map((v,i)=>{const ws=FinDates.shift(start,-7*(last.length-1-i));return '<div class="ck-wk"><span>'+esc(FinDates.short(ws).replace(/^\S+ /,''))+'</span><i><em class="'+(v>limit?'over':'ok')+'" style="width:'+Math.round(v/max*100)+'%"></em></i><b>'+FinCoach.aud(v)+'</b></div>';}).join('')+'<p class="tiny">Limit '+FinCoach.aud(limit)+' a week. Red weeks went over.</p></div>';
@@ -146,6 +169,7 @@ function coachOverBox(o,from,to,st,scope){
  return '<details class="ck-over"><summary><span><b>'+esc(o.name)+'</b><small>'+FinCoach.aud(d.total||o.spent)+' of '+FinCoach.aud(o.limit)+(o.repeat?' · over '+o.times+' of the last 5 weeks':'')+'</small></span><em>'+FinCoach.aud(Math.max(0,(d.total||o.spent)-o.limit))+' over ›</em></summary>'
   +'<p><b>Budget.</b> '+budget+'.</p><p><b>Why it went over.</b> '+esc(d.why)+'</p>'
   +(d.shops.length?'<p><b>Where it went.</b> '+d.shops.map(x=>esc(x.name)+' '+FinCoach.aud(x.total)+(x.count>1?' ('+x.count+' payments)':'')).join(' · ')+'</p>':'')
+  +coachNoteBox({key:(month?'month:':'week:')+from+':'+o.cat,cat:o.cat,name:o.name,period:(month?coachMonthName(from.slice(0,7)):'Week of '+FinDates.short(from)),ids:d.rows.map(r=>r.id)})
   +(month?'':coachWeeksBars(o.weeks,o.limit,from))
   +'<div class="fh-mean-h">All '+d.count+' payment'+(d.count===1?'':'s')+', oldest first</div><div class="ck-txs">'+coachTxRows(d.rows,{crossed:d.crossed,marks:true})+'</div>'
   +(o.cat==='other'&&typeof fixMiscOpen==='function'?'<button class="btn ghost" onclick="fixMiscOpen(\''+(month?'month':'week')+'\')">🧰 Sort these into the right categories</button><p class="tiny">Your review is saved. Come back with Carry on.</p>':'')
@@ -153,7 +177,7 @@ function coachOverBox(o,from,to,st,scope){
 }
 function coachKeptBox(list){if(!list.length)return '';return '<details class="ck-ev"><summary>Within the limit ('+list.length+')</summary><div class="ck-rows">'+list.map(k=>coachRow(k.name,FinCoach.aud(k.spent)+' of '+FinCoach.aud(k.limit),FinCoach.aud(k.limit-k.spent)+' left')).join('')+'</div></details>';}
 /* Leak evidence: plain transactions, or the two sides of a transfer ("outId>inId"). */
-function coachEvidenceRows(ids){const out=[];(ids||[]).forEach(id=>{const parts=String(id).split('>');if(parts.length===2){const a=TXNS.find(t=>String(t.id)===parts[0]),b=TXNS.find(t=>String(t.id)===parts[1]);if(a||b){const x=a||b;out.push({id,date:x.date,acct:null,note:'From '+coachAcctName(a&&a.acct)+' to '+coachAcctName(b&&b.acct)+(x.note?' · '+x.note:''),amount:Math.abs(+x.amount||0)});}}else{const t=TXNS.find(x=>String(x.id)===String(id));if(t)out.push({id:t.id,date:t.date,acct:t.acct,note:t.note,amount:Math.abs(+t.amount||0),mark:(coachState().marks||{})[t.id]||null});}});return out.sort((a,b)=>b.date.localeCompare(a.date));}
+function coachEvidenceRows(ids){const out=[];(ids||[]).forEach(id=>{const parts=String(id).split('>');if(parts.length===2){const a=TXNS.find(t=>String(t.id)===parts[0]),b=TXNS.find(t=>String(t.id)===parts[1]);if(a||b){const x=a||b;out.push({id,date:x.date,acct:null,note:'From '+coachAcctName(a&&a.acct)+' to '+coachAcctName(b&&b.acct)+(x.note?' · '+x.note:''),amount:Math.abs(+x.amount||0)});}}else{const t=TXNS.find(x=>String(x.id)===String(id));if(t)out.push({id:t.id,date:t.date,acct:t.acct,note:t.note,userNote:t.userNote||'',amount:Math.abs(+t.amount||0),mark:(coachState().marks||{})[t.id]||null});}});return out.sort((a,b)=>b.date.localeCompare(a.date));}
 function coachEvidenceBox(f,label){const rows=coachEvidenceRows(f&&f.evidence);if(!rows.length)return '';const first=rows[rows.length-1].date,last=rows[0].date;return '<details class="ck-ev"'+(label?' open':'')+'><summary>'+(label||'Show the payments')+' ('+rows.length+')</summary><p class="tiny">'+esc(FinDates.short(first))+' to '+esc(FinDates.short(last))+' · total '+FinCoach.aud(rows.reduce((s,t)=>s+t.amount,0))+'</p><div class="ck-txs">'+coachTxRows(rows,{marks:rows.every(r=>r.acct)})+'</div></details>';}
 function coachRender(){
   const st=coachState(),s=st.session;if(!s){closeSheet();return;}
@@ -176,7 +200,7 @@ function coachRender(){
     if(!f)body='<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ No money leaks stand out right now.</p></div>';
     else{
       s.leak=f;coachSaveSession(st);
-      body='<div class="fh-meaning fh-t-act"><div class="fh-mean-h">'+coachTag('fact')+' '+esc(f.name)+'</div><p class="fh-mean-main">'+esc(FinCoach.message(f).happened)+'</p></div>'+coachEvidenceBox(f,'The payments behind this');
+      body='<div class="fh-meaning fh-t-act"><div class="fh-mean-h">'+coachTag('fact')+' '+esc(f.name)+'</div><p class="fh-mean-main">'+esc(FinCoach.message(f).happened)+'</p></div>'+coachEvidenceBox(f,'The payments behind this')+coachNoteBox({key:'leak:'+FinDates.budgetWeek(todayISO()).start+':'+f.key,cat:f.cat||f.key,name:f.name,period:'Week of '+FinDates.short(FinDates.budgetWeek(todayISO()).start),ids:(f.evidence||[]).filter(id=>String(id).indexOf('>')<0)});
     }
   }else if(step==='coach'){
     let f=s.leak||null;if(!f&&s.kinds.includes('month')){const r=coachMonth(st);f=r&&r.leaks[0]||null;if(f){s.leak=f;coachSaveSession(st);}}

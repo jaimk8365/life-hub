@@ -122,6 +122,6 @@ test('reminders: one at a time, the most important first, at most once a day, no
  assert.equal(C.reminder([],st,'2026-11-05'),null);
 });
 test('the coach never stores data itself: everything lives in the state object the page saves',()=>{
- const st=fresh();assert.deepEqual(Object.keys(st).sort(),['actions','done','marks','prefs','raised','reminded','session']);
+ const st=fresh();assert.deepEqual(Object.keys(st).sort(),['actions','done','marks','notes','prefs','raised','reminded','session']);
  assert.equal(JSON.parse(JSON.stringify(st)).done.daily.constructor,Object);
 });

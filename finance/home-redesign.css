@@ -198,3 +198,13 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
 .ck-wk{grid-template-columns:52px 1fr 64px}
 .ck-tx2 .ck-marks{gap:5px}.ck-tx2 .ck-marks .btn{min-height:32px;padding:4px 9px;font-size:12.5px;border-radius:999px;box-shadow:none}
 .ck-tx2 .ck-marks{display:grid;grid-template-columns:1fr 1fr}
+/* "What happened?" notes in reviews. */
+.ck-note{margin:12px 0;padding:12px;border-radius:14px;background:var(--card2,#e6eef4);display:flex;flex-direction:column;gap:8px}
+.ck-note textarea,.ck-tx-note input{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:15px;padding:10px}
+.ck-chips{display:flex;flex-wrap:wrap;gap:6px}.ck-chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13.5px;font-weight:700;min-height:36px}.ck-chip.on{background:var(--sea);border-color:var(--sea);color:#fff}
+.ck-past p{margin:0 0 4px;font-size:13.5px;color:var(--ink-soft)}
+.ck-unote{font-size:13px;color:var(--ink);font-style:italic;margin-top:2px}
+.ck-move{min-height:32px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit;font-size:12.5px;font-weight:700;padding:0 8px}
+.ck-tx2 .ck-marks .ck-notebtn{grid-column:1/-1}
+.ck-tx-note{grid-column:1/-1;display:flex;gap:8px}.ck-tx-note[hidden]{display:none}.ck-tx-note .btn{width:auto;min-height:40px}
+.ck-tx2 .ck-marks{grid-template-columns:repeat(2,minmax(0,1fr))}
