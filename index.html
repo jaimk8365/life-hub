@@ -54,6 +54,7 @@
   /* ---- iPad / Mac: left rail ---- */
   nav .nav-label{display:none}
   nav button.routebtn{position:relative}
+  .count-badge[hidden]{display:none!important}
   .count-badge{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#C94F7C;color:#fff;font-size:10px;font-weight:800}
   .mobile-bar{display:none}
   .park-sheet{position:fixed;z-index:40;inset:0;background:#30263D66;display:grid;place-items:center;padding:16px}
@@ -239,7 +240,9 @@
   let inboxTimer = 0;
   let pendingCopilotTask = null;
 
+  let copilotRoute='now';
   function showCopilot(route='now'){
+    copilotRoute=route;
     const f=document.getElementById('f-copilot');
     if(!f.src||!f.src.includes('/copilot/index.html')){
       f.src=SRC.copilot+'#'+encodeURIComponent(route);
@@ -267,7 +270,7 @@
     const inMore = MOBILE_SECTIONS.has(which);
     const mb = document.getElementById('b-more'); if (mb) mb.classList.toggle('active', inMore);
     const mobileMore = document.getElementById('b-mobile-more'); if (mobileMore) mobileMore.classList.toggle('active', inMore);
-    document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===(location.hash.slice(1)||'now')));
+    document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===copilotRoute));
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
   /* ---- More menu (phone) ---- */

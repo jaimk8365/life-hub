@@ -4,13 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 04/11/2026)
-- Branch: feature/categories-notes merged into main and PUSHED 04/11 (f0f72ba); Pages build green; live files match. Rollback tag: pre-categories-notes.
-- What changed last: Categories + payment notes (Finance, Jaimi asked 04/11). (1) New built-in categories: Internet, Phone bill, Car expenses, Pay in 4 / interest free, Travel, Work expenses (no budget set; Rates already existed). (2) Every sinking fund is now its own category ("Christmas (fund)" etc.), kept in step with the Funds list. (3) "＋ New category" in Fix my numbers (category drop-down) and on the Edit transaction screen: name, emoji library (~120, grouped), optional monthly budget. The Budget screen's new-category sheet uses the same library. Saved in fin_custom_categories_v1 (syncs). (4) 📝 note on each payment in Sort out Miscellaneous and an "Your note · what was this?" box on Edit transaction (field userNote, same one reviews use); notes show under payments in the account and category lists. Cache v77.
-- Files touched: finance/categories.js (new), finance/fix-numbers.js, finance/home-redesign.css, src/finance.html (backup src/backups/finance-2026-11-04-2005.html) + rebuilt finance/index.html, tools/finance-phases-patches.mjs (catsPatch), sw.js, tests (new tests/finance-categories.test.mjs; cache pin v77).
-- Half-done: nothing. Existing budget items (e.g. Starlink/Telstra under Subscriptions) were NOT moved to Internet/Phone; Jaimi can change each item's category in Budget.
-- Proof it works: tests 534/534. Browser at phone size, demo data: all new + fund categories listed; made "Kids pocket money" 🪙 with $40 budget from Fix my numbers and it was picked straight away; added a note to a payment and it showed under it; Edit transaction showed the note, + New category and fund categories, moved a payment to Pay in 4 and changed its note, saved. No console errors.
-- Next step: Life Hub request (04/11): Inbox button does nothing, photo of school letters → calendar, Apple Reminders link, simpler Planner, guided Sunday weekly / daily / start-of-month planners. Plan first.
-- Back-ups made: src/backups/finance-2026-11-04-2005.html.
+- Branch: fix/inbox-nav (committed, NOT merged or pushed). Categories + notes were pushed earlier 04/11 (f0f72ba).
+- What changed last: Life Hub part 1 (Inbox). index.html only: (1) the phone bottom bar now highlights the Co-Pilot screen you tapped (it used the shell's own address, so it always showed "Now" and Inbox looked like it did nothing); (2) the Inbox badge no longer shows "0" when empty (its style overrode hidden).
+- Not yet confirmed: Jaimi's exact "nothing happens" case. In an unlocked test copy (temp folder, not in repo) Inbox opened from the bottom bar, the More menu and behind the work-Friday pop-up. Ask her where she taps and what she sees. Known limit: if you move inside Co-Pilot with its own buttons, the bar highlight doesn't follow (Co-Pilot source is encrypted; left alone).
+- Proof: tests 534/534; test copy at phone size: tap Inbox → Inbox screen, bar highlights Inbox, no badge when empty.
+- Next step: Jaimi confirms, then merge + push (ask first). Then Life Hub part 2: guided Sunday weekly / daily / start-of-month planners (plan first).
 
 ## Up next
 - [ ] Life Hub (Jaimi 04/11): fix Inbox button; photo of letters → calendar; Apple Reminders; clearer Planner and sections; guided Sunday weekly, daily and start-of-month planners. Plan first.
@@ -21,6 +19,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 04/11/2026 – Life Hub Inbox: bottom bar highlights the right screen; empty badge hidden. Branch fix/inbox-nav, not pushed. Tests 534/534. – Claude Code
 - 04/11/2026 – Categories + notes: new built-in categories, one per sinking fund, ＋ New category with emoji library, notes on payments. Merged and PUSHED 04/11 (f0f72ba), Pages green, live files match. Tests 534/534. – Claude Code
 - 04/11/2026 – Review tidy-up: merged duplicate actions, Done/Drop on Home, believable limit advice, Past reviews, Do a review now, printable summary. Merged and PUSHED 04/11 (2a2cc4d), Pages green, live files match. Tests 528/528. – Claude Code
 - 04/11/2026 – Weekly plan: Payday Reset ends with a dated plan pinned on Home; tick, change, add with impact on balances, bills and spending money. Merged and PUSHED 04/11 (02e61ca), Pages green, live files match. Tests 522/522. – Claude Code
