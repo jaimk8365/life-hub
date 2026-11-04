@@ -4,13 +4,13 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 04/11/2026)
-- Branch: feature/review-notes merged into main and PUSHED 04/11 (05be362); Pages build green; live files match. Rollback tag: pre-review-notes.
-- What changed last: Review rebuild part 3 (type in what happened). Each over-budget drawer and each leak has a "What happened?" box: your own words plus tags One-off / Emergency / Planned / Wrong category (saved in fin_coach_v1 notes, per area and period). One-off/Emergency/Planned then ask before leaving those payments out of future warnings. Notes from earlier weeks for the same area show at the top next time (🕘). Each payment has "✏️ Add a note" (saved on the transaction as userNote, shown as 📝 everywhere in reviews) and "Move to…" (recategorise, kept on future bank syncs). Cache v74.
-- Files touched: finance/coach.js (addNote, notesFor, noteMark, NOTE_TAGS, notes in state, userNote on detail rows), finance/coach-ui.js, finance/home-redesign.css, sw.js, tests.
-- Half-done: nothing in part 3. Still to do: part 4 dated weekly plan on Home; part 5 tidy duplicate actions, archive and print.
-- Proof it works: tests 517/517. Browser, phone size, made-up data: note with One-off saved, 3 payments marked after confirm and Miscellaneous no longer over; per-payment note saved and shown; Move to changed the category with override; earlier note shown at the top; no console errors.
-- Next step: part 4 (weekly plan on Home).
-- Back-ups made: git tag pre-review-notes.
+- Branch: feature/week-plan, NOT pushed. Rollback tag: pre-week-plan.
+- What changed last: Review rebuild part 4. The Payday Reset's last step now shows "📋 Your plan for this week": steps dated Wednesday to Tuesday (pay in or check it arrived; move money into a short account before the first bill; one step for all regular transfers with the list folded inside, loan transfers not counted twice; savings moves; each bill on its due day; halfway spending check; end-of-week look; your actions under "Any time this week"), plus spending money per day when balances are trusted. "Save my plan" stores it (fin_coach_v1 plans, last 12 weeks) and Home shows a "This week's plan" card: progress bar, the next steps due with tick boxes, "See the whole plan". In the plan you can tick, ✏️ change (day, amount, accounts) or ＋ add a step (move money, pay for something, reminder) or take one off; every money change shows "If you do this": account balances before → after, bills still covered or how short, and the effect on spare spending money and the daily amount. Ticking an action step also completes that action. Nothing moves money. Cache v75.
+- Files touched: finance/coach.js (buildWeekPlan, planImpact, plan item functions, plans in state), finance/coach-ui.js, finance/home-redesign.js/.css, finance/phase-glue.js, sw.js, tests.
+- Half-done: nothing in part 4. Still to do: part 5 tidy duplicate actions, proper Done/Drop buttons, review archive and printable summary.
+- Proof it works: tests 522/522. Browser, phone size, demo data: finish step built the plan (8 steps, transfers grouped, loans once), Save my plan put it on Home, tick updated "1 of 8 done", add step showed impact (with and without spending money worked out), change and take off worked, no console errors.
+- Next step: Jaimi OKs push, then part 5.
+- Back-ups made: git tag pre-week-plan.
 
 ## Up next
 - [ ] Review rebuild (agreed 04/11): (2) every review number tappable to its transactions, budget and why it went over; (3) "What happened?" note + tags (one-off, emergency, planned, wrong category) that the app learns from; (4) last step becomes a dated "Your plan for this week" (pay, bills, transfers, daily limit, tickable actions) pinned on Home, editable with guided impact on budget, bills and balance; (5) merge duplicate actions, proper Done/Drop buttons, no silly limits, archive + printable summary. Then sinking funds split, daily recap, smarter Pip.
@@ -20,6 +20,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 04/11/2026 – Weekly plan: Payday Reset ends with a dated plan pinned on Home; tick, change, add with impact on balances, bills and spending money. Branch feature/week-plan, NOT pushed. Tests 522/522. – Claude Code
 - 04/11/2026 – Review notes: What happened? box with tags, remembered next time; per-payment notes and Move to category. Merged and PUSHED 04/11 (05be362), Pages green, live files match. Tests 517/517. – Claude Code
 - 04/11/2026 – Review detail: over-budget lines, leaks and savings pulls open to the actual payments with dates, budget maths and why. Merged and PUSHED 04/11 (d785ea7), Pages green, live files match. Tests 512/512. – Claude Code
 - 04/11/2026 – Fix my numbers (sort Miscellaneous with remembered shops; Match to my bank with double-ups and start fresh). Merged and PUSHED 04/11 (8002cfd), Pages green, live files match. Tests 507/507. – Claude Code
