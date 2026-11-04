@@ -7,7 +7,7 @@
  const CASH_RE=/\b(atm|cash\s*(out|withdraw\w*|advance)|withdrawal|cashout)\b/i;
  const CASH_TAGS=['Groceries','Kids','Petrol','Gifts','Market or shop','Eating out','Other'];
  const personalIds=()=>((globalThis.FIN_CONFIG||{}).personalAccounts)||[];
- const live=t=>t&&!t.deleted;
+ const live=t=>t&&!t.deleted&&t.src!=='balance-adjustment';
 
  /* Pair a payment out of one account with the matching payment into another (same amount, within two days). */
  function detectMoves(txns,accts,gapDays){

@@ -163,3 +163,24 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
 .ck-opts{display:grid;gap:8px;margin-top:12px}
 .ck-ev{margin:10px 0;background:var(--card2);border-radius:16px;padding:10px 14px}.ck-ev summary{font:800 14px 'Nunito',sans-serif;cursor:pointer;min-height:32px}
 .ck-tx{padding:8px 0;border-top:1px solid var(--line-soft);display:grid;grid-template-columns:1fr auto;gap:4px}.ck-marks{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}.ck-marks .btn{width:auto;min-height:36px;padding:6px 10px;font-size:13px}
+/* Fix my numbers (sort Miscellaneous, match to bank). */
+.fx-job,.fx-acct{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;margin:10px 0;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);font:inherit;cursor:pointer}
+.fx-job b,.fx-acct b{font-size:16px}.fx-job span,.fx-acct small{color:var(--ink-soft);font-size:13.5px}
+.fx-acct{flex-direction:row;justify-content:space-between;align-items:center}.fx-acct span{display:flex;flex-direction:column;gap:3px}.fx-acct em{font-style:normal;font-weight:800;font-size:13.5px;color:var(--warn-ink,var(--warn));white-space:nowrap}.fx-acct.ok em{color:var(--good)}
+.fx-back{background:none;border:0;color:var(--sea);font:inherit;font-weight:700;padding:4px 0;margin-bottom:6px;cursor:pointer}
+.fx-small{font-size:13px;color:var(--ink-soft)}
+.fx-chips{display:flex;gap:8px;margin:10px 0}.fx-chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;min-height:40px}.fx-chip.on{background:var(--sea);border-color:var(--sea);color:#fff}
+.fx-sum{font-size:15px;margin:6px 0 12px}
+.fx-group{border:1px solid var(--line);border-radius:14px;background:var(--card);margin:10px 0;padding:0 14px}
+.fx-group summary{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:14px 0;cursor:pointer;list-style:none}.fx-group summary::-webkit-details-marker{display:none}
+.fx-shop{font-weight:800}.fx-amt{font-weight:800;text-align:right}.fx-count{grid-column:1/-1;font-size:13px;color:var(--ink-soft)}
+.fx-rows{border-top:1px solid var(--line-soft);padding:6px 0}
+.fx-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft)}.fx-row:last-child{border-bottom:0}.fx-row span{flex:1;display:flex;flex-direction:column;font-size:14px}.fx-row small{color:var(--ink-soft);font-size:12.5px;overflow-wrap:anywhere}.fx-row input{width:22px;height:22px}
+.fx-pick{display:flex;flex-direction:column;gap:10px;padding:10px 0 14px}.fx-pick label{display:flex;flex-direction:column;gap:6px;font-weight:700;font-size:14px}.fx-pick select{min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;padding:0 10px}
+.fx-remember{flex-direction:row!important;align-items:center;font-weight:600!important}.fx-remember input{width:20px;height:20px}
+.fx-done{padding:14px;border-radius:14px;background:var(--t-good,#e3f2ee)}
+.fx-note{margin:14px 0;padding:12px 14px;border-radius:14px;background:var(--t-warn,#fbf2e3);font-size:14px;display:flex;flex-direction:column;gap:6px}.fx-note.ok{background:var(--t-good,#e3f2ee)}
+.fx-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}.fx-compare div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}.fx-compare small{display:block;color:var(--ink-soft);font-size:12.5px}.fx-compare b{font-size:18px}
+.fx-pair{border:1px solid var(--line);border-radius:14px;padding:4px 12px 12px;margin:8px 0;background:var(--card)}
+.fx-fresh{margin:16px 0;padding:14px;border-radius:14px;border:2px solid var(--sea);background:var(--card)}
+.fh-fix{border-color:var(--warn,#b87425)}
