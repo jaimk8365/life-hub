@@ -4,13 +4,13 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 04/11/2026)
-- Branch: feature/review-detail merged into main and PUSHED 04/11 (d785ea7); Pages build green; live files match. Rollback tag: pre-review-detail.
-- What changed last: Review rebuild part 2 (tappable detail). In "How last week went" and Month-End "variance", every over-budget area opens to: the budget and how it is worked out (monthly × 12 ÷ 52), why it went over (the payment where it crossed the limit, biggest payment and its share), where it went (top shops), last 5 weeks bars, and every payment with date and account plus Planned/Essential/One-off/Wrong category marks. Areas within the limit open to spent / limit / left. Leak, coach and month-leak steps list all the payments behind them (savings pulls show from/to account and dates). Bills step says how much to move and by which date. Miscellaneous drawer links to the Fix my numbers sorter. Open drawers stay open after marking. Cache v73.
-- Files touched: finance/coach.js (overDetail, weekly history on weekReview, pullIds), finance/coach-ui.js, finance/home-redesign.css, sw.js, tests.
-- Half-done: nothing in part 2. Not done yet: part 3 "What happened?" typed note + tags, part 4 dated weekly plan on Home, part 5 duplicate-action tidy, archive and print.
-- Proof it works: tests 512/512. Browser, phone size, made-up data: all 16 steps of a merged month + payday review render without errors; Miscellaneous drawer shows budget, crossing payment, shops, 5-week bars and 3 payments; marking One-off recalculated and kept the drawer open.
-- Next step: part 3 (typed notes and tags).
-- Back-ups made: git tag pre-review-detail.
+- Branch: feature/review-notes, NOT pushed. Rollback tag: pre-review-notes.
+- What changed last: Review rebuild part 3 (type in what happened). Each over-budget drawer and each leak has a "What happened?" box: your own words plus tags One-off / Emergency / Planned / Wrong category (saved in fin_coach_v1 notes, per area and period). One-off/Emergency/Planned then ask before leaving those payments out of future warnings. Notes from earlier weeks for the same area show at the top next time (🕘). Each payment has "✏️ Add a note" (saved on the transaction as userNote, shown as 📝 everywhere in reviews) and "Move to…" (recategorise, kept on future bank syncs). Cache v74.
+- Files touched: finance/coach.js (addNote, notesFor, noteMark, NOTE_TAGS, notes in state, userNote on detail rows), finance/coach-ui.js, finance/home-redesign.css, sw.js, tests.
+- Half-done: nothing in part 3. Still to do: part 4 dated weekly plan on Home; part 5 tidy duplicate actions, archive and print.
+- Proof it works: tests 517/517. Browser, phone size, made-up data: note with One-off saved, 3 payments marked after confirm and Miscellaneous no longer over; per-payment note saved and shown; Move to changed the category with override; earlier note shown at the top; no console errors.
+- Next step: Jaimi OKs push, then part 4 (weekly plan on Home).
+- Back-ups made: git tag pre-review-notes.
 
 ## Up next
 - [ ] Review rebuild (agreed 04/11): (2) every review number tappable to its transactions, budget and why it went over; (3) "What happened?" note + tags (one-off, emergency, planned, wrong category) that the app learns from; (4) last step becomes a dated "Your plan for this week" (pay, bills, transfers, daily limit, tickable actions) pinned on Home, editable with guided impact on budget, bills and balance; (5) merge duplicate actions, proper Done/Drop buttons, no silly limits, archive + printable summary. Then sinking funds split, daily recap, smarter Pip.
@@ -20,6 +20,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 04/11/2026 – Review notes: What happened? box with tags, remembered next time; per-payment notes and Move to category. Branch feature/review-notes, NOT pushed. Tests 517/517. – Claude Code
 - 04/11/2026 – Review detail: over-budget lines, leaks and savings pulls open to the actual payments with dates, budget maths and why. Merged and PUSHED 04/11 (d785ea7), Pages green, live files match. Tests 512/512. – Claude Code
 - 04/11/2026 – Fix my numbers (sort Miscellaneous with remembered shops; Match to my bank with double-ups and start fresh). Merged and PUSHED 04/11 (8002cfd), Pages green, live files match. Tests 507/507. – Claude Code
 - 03/11/2026 – Soft Ocean colours across Life Hub (day + softer slate night in Finance) and plainer Budget check-in card. Merged and PUSHED 03/11 (3703937), Pages green, live files match. Tests 499/499. – Claude Code
