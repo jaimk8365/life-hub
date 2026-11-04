@@ -4,7 +4,7 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 05/11/2026)
-- Branch: feature/finance-autosort, committed locally, NOT pushed. Jaimi to OK the push. Before that, main = b939141 + progress (letter scan live).
+- Branch: feature/finance-autosort merged into main and PUSHED 05/11 (7a771d4); Pages green; live files match. Rollback tag: pre-finance-autosort.
 - What changed (Finance):
   - Auto-sort (finance/auto-sort.js): bank-feed and CSV payments still in Miscellaneous get a category by themselves, with a "how sure" level. Order: shops she taught it → her own past choices for that shop → well-known shop names (sure) → general words (probably). Sure = sorted quietly. Probably = sorted and listed in Fix my numbers → "✨ Check what I sorted" (✓ Right / Change…, optional "always for this shop"). Not sure = stays in Miscellaneous. Never touches hand-picked, money in, transfers, hand-added or one-off payments. Runs on open, after a bank feed sync and after a CSV import. Home Fix card says "N sorted for you to check". Uses the new Internet, Phone, Pay in 4, Travel, Car categories.
   - Goal money from an account (finance/goal-money.js): "＋ Add money" on trip, shared and private goals asks "From which bank account?", shows each account's free money, warns and refuses if it is more than is free, or "Just record it". Payment saves acct; reservedForAccount now counts that money as set aside, so free/Safe to Spend drop. Nothing moves money.
@@ -12,10 +12,10 @@ Newest at the top. Keep each entry to a few lines.
 - Proof: tests 563/563. Demo Finance in the in-app browser at phone size (made-up payments, no sync on that copy): Woolworths→Groceries, Afterpay→Pay in 4, Starlink→Internet sure; Telstra, café "probably" → shown in Check what I sorted; ✓ Right and Back to Miscellaneous both saved and survived a reload. Goal Add money: $50 more than Sinking Funds' free $21 was refused with a message; $50 from Everyday saved, Everyday free went $1,412 → $1,362. No console errors. NOT tested on Jaimi's phone with her real data.
 - Heads-up: the first time it runs on real data it may sort a lot of older Miscellaneous payments at once (that changes past category totals). The Check list shows 40 at a time.
 - Bug found while testing (fixed): fixSaveTxns in fix-numbers.js is an async function inside a block, so other files cannot see it. New screens save with saveAtomic. Test guards it.
-- Next step: Jaimi OKs push. Then Life Hub part 4 (Apple Reminders both ways) and part 5 (simpler sections mock-up).
+- Next step: Jaimi tries it on her phone (Fix my numbers → Check what I sorted; Goals → ＋ Add money). Then Life Hub part 4 (Apple Reminders both ways) and part 5 (simpler sections mock-up).
 
 ## Up next
-- [ ] Finance auto-sort + goal money from an account: built 05/11 on feature/finance-autosort, waiting for Jaimi's OK to push. Then check on her phone.
+- [ ] Finance auto-sort + goal money: live 05/11. Check on Jaimi's phone with real data.
 - [ ] Life Hub (Jaimi 04/11): fix Inbox button; photo of letters → calendar; Apple Reminders; clearer Planner and sections; guided Sunday weekly, daily and start-of-month planners. Plan first.
 - [ ] Review rebuild (agreed 04/11): (2) every review number tappable to its transactions, budget and why it went over; (3) "What happened?" note + tags (one-off, emergency, planned, wrong category) that the app learns from; (4) last step becomes a dated "Your plan for this week" (pay, bills, transfers, daily limit, tickable actions) pinned on Home, editable with guided impact on budget, bills and balance; (5) DONE and pushed 04/11. Then sinking funds split, daily recap, smarter Pip.
 - [ ] Jaimi 03/11 list, in agreed order: (2) sinking funds: split each automatic savings transfer across funds by their set amounts; (3) reviews: drop-down detail on over-budget categories and patterns, action list on Home with links (max 5, older items roll into next review), Past reviews archive, review-anytime button, printable summary with checklist; (4) daily recap merged with the morning check-in (choose morning or evening) with predictions; (5) Ask Pip: date-range breakdowns, learns from corrections on device.
@@ -24,7 +24,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
-- 05/11/2026 – Finance: payments sort themselves into budgets (sure / probably / not sure, with Check what I sorted); goal Add money asks which bank account and counts it as set aside. Branch feature/finance-autosort, NOT pushed. Tests 563/563. – Claude Code
+- 05/11/2026 – Finance: payments sort themselves into budgets (sure / probably / not sure, with Check what I sorted); goal Add money asks which bank account and counts it as set aside. PUSHED 05/11 (7a771d4), Pages green. Tests 563/563. – Claude Code
 - 04/11/2026 – Scan a letter → Papers → Add to Calendar / tasks; REAL Inbox crash fixed (text date in time formatter). PUSHED 04/11 (b939141), Pages green. Tests 556/556. – Claude Code
 - 04/11/2026 – Calendar fix: job can read Google private calendar links (repeats handled). PUSHED 04/11 (3ae7c60); secret added, first run succeeded, calendar live again. Tests 548/548. – Claude Code
 - 04/11/2026 – Guided planners in Co-Pilot: Sunday Weekly Reset, Daily (morning + evening), Start of the month; Now invites + pinned top 3. PUSHED 04/11 (c9c44c8), Pages green. Tests 543/543. – Claude Code
