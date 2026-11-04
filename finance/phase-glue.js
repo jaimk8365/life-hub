@@ -22,7 +22,7 @@ function finProfileData(d){
   out.funds=(d.funds||[]).filter(f=>P.canSee(p,{name:f.name,owner:f.owner})&&(p==='jaimi'||sharedAcct(f.acct||'savings'))).slice(0,4);
   if(p!=='jaimi'){
     out.safe={hidden:true};
-    const items=attentionChecklist().filter(i=>!i.doneNow&&!P.isPrivateText(i.text)&&(!/^(buf|bal)_/.test(i.id)||P.ownerOfAccount(String(i.id).replace(/^(buf|bal)_/,''))==='shared')&&!/^(bnpl|goal)_/.test(i.id));
+    const items=attentionChecklist().filter(i=>!i.doneNow&&!P.isPrivateText(i.text)&&(!/^(buf|bal)_/.test(i.id)||P.ownerOfAccount(String(i.id).replace(/^(buf|bal)_/,''))==='shared')&&!/^(bnpl|goal|prio)_/.test(i.id));
     out.alert=items.length?{count:items.length,text:items[0].text}:{count:0};
     out.account='Shared';
     out.shop=null;
@@ -173,11 +173,11 @@ function finTripCard(g){
    +'<div style="display:flex;justify-content:space-between;margin-top:8px"><b>'+AUD0(pr.saved)+' saved</b><span>'+(pr.targetLater?'total: set later':'of '+AUD0(pr.target))+'</span></div>'
    +(pr.targetLater?'':'<div class="bar" style="margin-top:6px"><i style="width:'+pr.pct+'%;background:var(--mint)"></i></div>')
    +(g.fundRule?'<p class="f" style="margin:8px 0 0">💸 '+esc(FinGoals.ruleText(g.fundRule))+' into '+esc((acctById(g.fundRule.acct)||{name:'Savings'}).name)+(nx?' · next '+esc(FinDates.longDate(nx)):'')+'</p>':'')
-   +'<div style="margin-top:10px">'+minis+'</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn soft" style="flex:1" onclick="finAddMini(\''+esc(g.id)+'\')">＋ Mini budget</button><button class="btn ghost" style="flex:1" onclick="openSharedGoalPayment(\''+esc(g.id)+'\')">＋ Add money</button></div></div>';
+   +'<div style="margin-top:10px">'+minis+'</div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn soft" style="flex:1" onclick="finAddMini(\''+esc(g.id)+'\')">＋ Mini budget</button><button class="btn ghost" style="flex:1" onclick="openSharedGoalPayment(\''+esc(g.id)+'\')">＋ Add money</button></div>'+(typeof gpPinBtn==='function'?gpPinBtn('shared:'+g.id):'')+'</div>';
 }
 function finPrivGoalCard(g){
   const pr=FinGoals.goalProgress(g);
-  return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>🔒 '+esc(g.emoji||'🎯')+' '+esc(g.name)+'</b><span>'+AUD0(pr.saved)+(pr.targetLater?'':' of '+AUD0(pr.target))+'</span></div>'+(pr.targetLater?'':'<div class="bar" style="margin-top:6px"><i style="width:'+pr.pct+'%;background:var(--mint)"></i></div>')+'<button class="btn soft" style="margin-top:8px" onclick="finPrivAddMoney(\''+esc(g.id)+'\')">＋ Add money</button></div>';
+  return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><b>🔒 '+esc(g.emoji||'🎯')+' '+esc(g.name)+'</b><span>'+AUD0(pr.saved)+(pr.targetLater?'':' of '+AUD0(pr.target))+'</span></div>'+(pr.targetLater?'':'<div class="bar" style="margin-top:6px"><i style="width:'+pr.pct+'%;background:var(--mint)"></i></div>')+'<button class="btn soft" style="margin-top:8px" onclick="finPrivAddMoney(\''+esc(g.id)+'\')">＋ Add money</button>'+(typeof gpPinBtn==='function'?gpPinBtn('priv:'+g.id):'')+'</div>';
 }
 function finGoalsExtra(){
   const host=$('sharedgoals');if(!host)return;
@@ -315,7 +315,7 @@ function finApAnswer(key){
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
-  const map={checkin:'coachOpen',reminders:'coachPrefsOpen',fixnumbers:'fixOpen',plan:'coachPlanOpen',actions:'coachActionsOpen',reviews:'coachReviewsOpen',reviewnow:'coachReviewNowOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap'};
+  const map={checkin:'coachOpen',reminders:'coachPrefsOpen',fixnumbers:'fixOpen',plan:'coachPlanOpen',actions:'coachActionsOpen',reviews:'coachReviewsOpen',reviewnow:'coachReviewNowOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap',comingup:'prioListOpen',pins:'goalPinsPicker'};
   if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }

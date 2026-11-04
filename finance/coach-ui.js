@@ -118,7 +118,7 @@ function coachRow(label,value,note){return '<div class="ck-row"><span>'+esc(labe
 function coachBox(tone,head,lines){return '<div class="fh-meaning fh-t-'+tone+'">'+(head?'<div class="fh-mean-h">'+head+'</div>':'')+lines.map((l,i)=>'<p'+(i===0&&!head?' class="fh-mean-main"':'')+'>'+l+'</p>').join('')+'</div>';}
 
 /* ---------- drawing ---------- */
-const COACH_STEP_TITLE={data:'Is the data right?',position:'Where you stand',leak:'One thing to look at',coach:'What to do now',finish:'All done',
+const COACH_STEP_TITLE={data:'Is the data right?',priority:'Anything coming up that matters most?',position:'Where you stand',leak:'One thing to look at',coach:'What to do now',finish:'All done',
   income:'Did the pay arrive?',protect:'Bills and loans to cover',allocate:'Your spending money this week',savings:'Savings this week',accountability:'How last week went',
   'month-income':'Income this month','month-fixed':'Must-pay spending','month-variance':'Budget areas','month-leaks':'Top money leaks','month-habits':'Better or worse than last month',
   'month-savings':'Savings','month-debt':'Loans','month-next':'Changes for next month'};
@@ -184,7 +184,10 @@ function coachEvidenceBox(f,label){const rows=coachEvidenceRows(f&&f.evidence);i
 function coachRender(){
   const st=coachState(),s=st.session;if(!s){closeSheet();return;}
   const step=s.steps[s.at];let body='',opts={};
-  if(step==='data'){
+  if(step==='priority'){
+    body=typeof prioStepHtml==='function'?prioStepHtml():'<p class="f">Coming-up costs are not available right now.</p>';
+    opts.next='Next ›';
+  }else if(step==='data'){
     const d=coachDataCheck();
     body=d.ok?'<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ Your bank data is up to date and nothing needs checking.</p></div>'
      :'<div class="fh-meaning fh-t-'+d.tone+'"><div class="fh-mean-h">'+coachTag('fact')+' To look at</div>'+d.issues.map(i=>'<p>'+esc(i.text)+'</p>').join('')+'</div>'
@@ -328,6 +331,8 @@ function coachOpen(){
   // a review that became due since you started (for example payday, while a daily check-in was half done) joins in;
   // the same review just carries on where you left off
   if(plan&&(!st.session||st.session.steps.join()!==plan.steps.join())){FinCoach.start(st,plan,Date.now());coachSave(st);}
+  // a check-in started before the priority question existed gets it too: next, if you are already past the data check
+  if(st.session&&!st.session.steps.includes('priority')){const s=st.session,i=s.at>0?s.at:s.steps.indexOf('data')+1;s.steps=s.steps.slice(0,i).concat(['priority'],s.steps.slice(i));coachSave(st);}
   if(!st.session){coachSummary(st);return;}
   coachRender();
 }

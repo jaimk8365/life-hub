@@ -263,3 +263,21 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
 .fs-row{flex-wrap:wrap}.fs-btns{flex-basis:100%;min-width:0;max-width:100%;display:flex;gap:8px;align-items:center}.fs-btns .btn{width:auto;flex:0 0 auto;white-space:nowrap;padding:9px 14px;min-height:44px;margin:0}.fs-btns select{flex:1 1 0;width:auto;min-width:0;max-width:100%;min-height:44px;font-size:15px;border-radius:12px;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);padding:0 10px}
 /* Add money to a goal: from which account (goal-money.js) */
 .gm-free{font-size:13px;color:var(--ink-soft);margin:4px 0 0}.gm-free.over{color:var(--bad);font-weight:700}
+/* Priorities: Coming up (priorities.js) */
+.pr-item{border:1px solid var(--line-soft);border-left:5px solid var(--watch,#E6B855);border-radius:14px;padding:10px 12px;margin:8px 0;background:var(--card,#fff)}
+.pr-must{border-left-color:var(--bad,#C75B45)}.pr-wait{border-left-color:var(--good,#7FB79B)}
+.pr-top{display:flex;gap:10px;align-items:flex-start}.pr-name{flex:1;display:flex;flex-direction:column;font-weight:700;font-size:15px}.pr-name small{font-weight:500;color:var(--ink-soft);font-size:13px}
+.pr-cov{font-size:13.5px;font-weight:700;margin:6px 0}.pr-cov.ok{color:var(--good)}.pr-cov.short{color:var(--bad)}.pr-cov small{display:block;font-weight:500;color:var(--ink-soft)}
+.pr-btns{display:flex;gap:6px;flex-wrap:wrap;min-width:0}.pr-btns select{flex:1 1 140px;min-width:0;min-height:44px;font-size:15px;border-radius:12px;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);padding:0 8px}.pr-btns .btn{width:auto;flex:0 0 auto;min-height:44px;padding:8px 12px;margin:0;white-space:nowrap}
+.pr-idea{display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-size:14px}.pr-idea input{width:22px;height:22px;flex:0 0 auto;margin-top:1px}.pr-idea small{display:block;color:var(--ink-soft)}
+.pr-form label{display:block;font-size:14px;font-weight:700;margin:8px 0 4px}.pr-form input,.pr-form select{width:100%;min-height:44px;box-sizing:border-box}
+.pr-levels{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.pr-lv{margin:0!important}.pr-lv input{position:absolute;opacity:0}.pr-lv span{display:block;text-align:center;padding:10px 4px;border:2px solid var(--line);border-radius:12px;font-size:13px;font-weight:700}.pr-lv input:checked+span{border-color:var(--ink);background:var(--t-plum,#EEE6F3)}.pr-lv input:focus-visible+span{outline:3px solid var(--ink)}
+/* Pinned goals (goal-pins.js) */
+.gp-strip{margin:12px 0;padding:12px;border-radius:18px;background:var(--t-plum,#EEE6F3);border:1px solid var(--t-plum-line,transparent)}
+.gp-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;margin-bottom:6px}
+.gp-goal{display:grid;grid-template-columns:1fr auto;gap:4px 8px;width:100%;text-align:left;background:var(--card,#fff);border:0;border-radius:14px;padding:10px 12px;margin-top:8px;font:inherit;color:var(--ink);cursor:pointer;min-height:44px}
+.gp-name{font-weight:700}.gp-amt{font-weight:700;text-align:right}.gp-bar{grid-column:1/-1;height:8px;border-radius:6px;background:var(--line-soft);overflow:hidden}.gp-bar i{display:block;height:100%;background:var(--mint,#7FB79B)}
+.gp-line{grid-column:1/-1;font-size:13px;color:var(--ink-soft)}.gp-watch .gp-line{color:var(--ink)}
+.gp-pin{margin-top:8px;width:100%;min-height:44px;border-radius:12px;border:1px dashed var(--line);background:transparent;font:inherit;font-weight:700;color:var(--ink);cursor:pointer}.gp-pin.on{border-style:solid;background:var(--t-plum,#EEE6F3)}
+.gp-row{display:flex;justify-content:space-between;width:100%;min-height:48px;align-items:center;padding:10px 12px;margin:6px 0;border-radius:14px;border:1px solid var(--line);background:var(--card,#fff);font:inherit;color:var(--ink);cursor:pointer}.gp-row.on{border:2px solid var(--ink);background:var(--t-plum,#EEE6F3)}
+.gp-hint{display:block;margin-top:8px}

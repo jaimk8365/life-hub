@@ -7,9 +7,9 @@ let n=0;const tx=(date,amount,cat,note,o={})=>({id:'r'+(++n),acct:'everyday',dat
 test('payday plan: data first, coach advice last, no repeated where-you-stand step',()=>{
  const st=C.emptyState(),plan=C.planSession(C.reviewsDue({today:'2026-11-04',state:st}));
  assert.equal(plan.primary,'payday');
- assert.deepEqual(plan.steps,['data','income','protect','allocate','savings','accountability','leak','coach','finish']);
+ assert.deepEqual(plan.steps,['data','priority','income','protect','allocate','savings','accountability','leak','coach','finish']);
  const daily=C.planSession(C.reviewsDue({today:'2026-11-05',state:Object.assign(C.emptyState(),{done:{daily:{},payday:{'2026-11-04':{}},month:{}}})}));
- assert.deepEqual(daily.steps,['data','position','leak','coach','finish'],'daily check-in unchanged');
+ assert.deepEqual(daily.steps,['data','priority','position','leak','coach','finish'],'daily check-in asks about priorities after the data check');
 });
 
 test('pay: never assumed, fortnightly off-weeks are not flagged as missing, early Tuesday pay counts',()=>{
@@ -98,7 +98,7 @@ test('Co-Pilot note says what is due and never carries money details',()=>{
  assert.deepEqual(Object.keys(note).sort(),['date','kind','status','text']);assert.equal(note.kind,'payday');assert.equal(note.status,'due');
  assert.ok(!/\$|\d{3,}/.test(note.text.replace('2026','')),'no amounts');
  C.start(st,C.planSession(C.reviewsDue({today:'2026-11-04',state:st})),1);C.confirm(st);
- note=C.copilotNote([],st,'2026-11-04');assert.equal(note.status,'resume');assert.match(note.text,/step 2 of 9/);
+ note=C.copilotNote([],st,'2026-11-04');assert.equal(note.status,'resume');assert.match(note.text,/step 2 of 10/);
  st.session=null;assert.equal(C.copilotNote([],st,'2026-11-04').status,'done');
  // a half-done daily check-in does not hide a payday reset that is now due
  const st2=C.emptyState();C.start(st2,C.planSession([{kind:'daily',key:'2026-11-04'}]),1);
