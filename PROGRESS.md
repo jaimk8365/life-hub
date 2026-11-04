@@ -4,13 +4,13 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 04/11/2026)
-- Branch: feature/fix-numbers merged into main and PUSHED 04/11 (8002cfd); Pages build green; live files match. Rollback tag: pre-fix-numbers.
-- What changed last: Part 1 of the review rebuild ("fix the numbers"), after Jaimi's first real Payday Reset showed Miscellaneous $5,535 (bank feed files anything unrecognised as 'other') and huge "unexplained differences". New finance/fix-numbers.js: (1) Sort out Miscellaneous: grouped by shop with every payment (date, account, amount), pick a category or "leave as a one-off", "Always put this shop here" rules (fin_cat_rules_v1, applied on open and inside every PocketSmith import). (2) Match to my bank: replaces the old Data and recovery screen; per account Bank vs App, possible double-ups (bank row + hand-added copy, soft remove with undo), transfers with no other side, where history starts, and "Start fresh" (one labelled src balance-adjustment transfer line, undoable; ignored by budgets, income and transfer matching). Home card "🧰 Fix my numbers" + More item (Jaimi only). Cache v72.
-- Files touched: finance/fix-numbers.js (new), finance/home-redesign.js/.css, finance/phase-glue.js, finance/pocketsmith-import.js (apply shop rules before save), finance/money-moves.js (ignore start-fresh lines), tools/finance-phases-patches.mjs (fixHead), finance/index.html (rebuilt), src/finance.html (backup src/backups/finance-pre-fix-numbers-*), sw.js, tests.
-- Half-done: nothing in part 1. Parts 2 to 5 of the review rebuild not started (see Up next).
-- Proof it works: tests 507/507. Browser, phone size, made-up data: Home card shows; sorter groups shops, Save moved 2 payments and remembered the shop; double-up removal changed the gap by exactly its amount; Start fresh took Everyday to $0 difference and balanced=true; start-fresh line not income, not in weekly budget, not paired as a transfer; no console errors.
-- Next step: on her phone: Home → 🧰 Fix my numbers → sort Miscellaneous, then Match to my bank. Then part 2 (tappable detail in reviews).
-- Back-ups made: git tag pre-fix-numbers; src/backups/finance-pre-fix-numbers-*.html
+- Branch: feature/review-detail, NOT pushed. Rollback tag: pre-review-detail.
+- What changed last: Review rebuild part 2 (tappable detail). In "How last week went" and Month-End "variance", every over-budget area opens to: the budget and how it is worked out (monthly × 12 ÷ 52), why it went over (the payment where it crossed the limit, biggest payment and its share), where it went (top shops), last 5 weeks bars, and every payment with date and account plus Planned/Essential/One-off/Wrong category marks. Areas within the limit open to spent / limit / left. Leak, coach and month-leak steps list all the payments behind them (savings pulls show from/to account and dates). Bills step says how much to move and by which date. Miscellaneous drawer links to the Fix my numbers sorter. Open drawers stay open after marking. Cache v73.
+- Files touched: finance/coach.js (overDetail, weekly history on weekReview, pullIds), finance/coach-ui.js, finance/home-redesign.css, sw.js, tests.
+- Half-done: nothing in part 2. Not done yet: part 3 "What happened?" typed note + tags, part 4 dated weekly plan on Home, part 5 duplicate-action tidy, archive and print.
+- Proof it works: tests 512/512. Browser, phone size, made-up data: all 16 steps of a merged month + payday review render without errors; Miscellaneous drawer shows budget, crossing payment, shops, 5-week bars and 3 payments; marking One-off recalculated and kept the drawer open.
+- Next step: Jaimi OKs push, then part 3 (typed notes and tags).
+- Back-ups made: git tag pre-review-detail.
 
 ## Up next
 - [ ] Review rebuild (agreed 04/11): (2) every review number tappable to its transactions, budget and why it went over; (3) "What happened?" note + tags (one-off, emergency, planned, wrong category) that the app learns from; (4) last step becomes a dated "Your plan for this week" (pay, bills, transfers, daily limit, tickable actions) pinned on Home, editable with guided impact on budget, bills and balance; (5) merge duplicate actions, proper Done/Drop buttons, no silly limits, archive + printable summary. Then sinking funds split, daily recap, smarter Pip.
@@ -20,6 +20,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
+- 04/11/2026 – Review detail: over-budget lines, leaks and savings pulls open to the actual payments with dates, budget maths and why. Branch feature/review-detail, NOT pushed. Tests 512/512. – Claude Code
 - 04/11/2026 – Fix my numbers (sort Miscellaneous with remembered shops; Match to my bank with double-ups and start fresh). Merged and PUSHED 04/11 (8002cfd), Pages green, live files match. Tests 507/507. – Claude Code
 - 03/11/2026 – Soft Ocean colours across Life Hub (day + softer slate night in Finance) and plainer Budget check-in card. Merged and PUSHED 03/11 (3703937), Pages green, live files match. Tests 499/499. – Claude Code
 - 02/11/2026 – Money Coach Stages 3 to 5 merged and PUSHED 02/11 (f2a2e97), Pages green, live files match: Wednesday Payday Reset, Month-End Review, reminders with settings, Co-Pilot Money card. Budget Swap ticked off Up next (it was already built as "Fit in a new cost"). Tests 499/499. Checked in the browser with demo data. – Claude Code
