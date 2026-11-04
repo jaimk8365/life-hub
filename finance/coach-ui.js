@@ -131,6 +131,30 @@ function coachFrame(s,body,opts){
    +(opts.noSkip?'':'<button class="fh-link ck-skip" onclick="coachSkip()">Skip this step</button>')
    +'<p class="tiny ck-pause">You can close this any time. Your progress is kept.</p>';
 }
+/* ---------- Detail drawers: every number opens to the payments behind it ---------- */
+const COACH_MARK_LABEL={planned:'Planned',essential:'Essential',exceptional:'One-off',miscategorised:'Wrong category'};
+function coachAcctName(id){return (typeof acctById==='function'&&acctById(id)?.name)||id||'';}
+function coachTxRows(rows,o){o=o||{};return rows.map(t=>'<div class="ck-tx2'+(t.id===o.crossed?' ck-cross':'')+'"><div class="ck-tx2-m"><b>'+esc(t.note||'No description')+'</b><small>'+esc(FinDates.short(t.date))+(t.acct?' · '+esc(coachAcctName(t.acct)):'')+(t.id===o.crossed?' · ⬆ went over here':'')+(t.mark?' · marked '+esc(COACH_MARK_LABEL[t.mark]||t.mark):'')+'</small></div><b class="ck-tx2-a">'+FinCoach.aud(t.amount)+'</b>'
+ +(o.marks?'<div class="ck-marks">'+FinCoach.MARKS.map(m=>'<button class="btn ghost'+(t.mark===m?' on':'')+'" onclick="coachMark(\''+esc(t.id)+'\',\''+m+'\')">'+COACH_MARK_LABEL[m]+'</button>').join('')+'</div>':'')+'</div>').join('');}
+function coachWeeksBars(weeks,limit,start){
+ if(!weeks||!weeks.length)return '';const last=weeks.slice(-5),max=Math.max(limit,...last,1);
+ return '<div class="ck-weeks"><div class="fh-mean-h">Last '+last.length+' weeks</div>'+last.map((v,i)=>{const ws=FinDates.shift(start,-7*(last.length-1-i));return '<div class="ck-wk"><span>'+esc(FinDates.short(ws).replace(/^\S+ /,''))+'</span><i><em class="'+(v>limit?'over':'ok')+'" style="width:'+Math.round(v/max*100)+'%"></em></i><b>'+FinCoach.aud(v)+'</b></div>';}).join('')+'<p class="tiny">Limit '+FinCoach.aud(limit)+' a week. Red weeks went over.</p></div>';
+}
+function coachOverBox(o,from,to,st,scope){
+ const d=FinCoach.overDetail({txns:TXNS,cat:o.cat,from,to,limit:o.limit,marks:st.marks}),month=scope==='month';
+ const budget=month?FinCoach.aud(o.limit)+' for the month':FinCoach.aud(o.limit)+' a week'+(o.monthly?' (your '+FinCoach.aud(o.monthly)+' monthly budget × 12 ÷ 52)':'');
+ return '<details class="ck-over"><summary><span><b>'+esc(o.name)+'</b><small>'+FinCoach.aud(d.total||o.spent)+' of '+FinCoach.aud(o.limit)+(o.repeat?' · over '+o.times+' of the last 5 weeks':'')+'</small></span><em>'+FinCoach.aud(Math.max(0,(d.total||o.spent)-o.limit))+' over ›</em></summary>'
+  +'<p><b>Budget.</b> '+budget+'.</p><p><b>Why it went over.</b> '+esc(d.why)+'</p>'
+  +(d.shops.length?'<p><b>Where it went.</b> '+d.shops.map(x=>esc(x.name)+' '+FinCoach.aud(x.total)+(x.count>1?' ('+x.count+' payments)':'')).join(' · ')+'</p>':'')
+  +(month?'':coachWeeksBars(o.weeks,o.limit,from))
+  +'<div class="fh-mean-h">All '+d.count+' payment'+(d.count===1?'':'s')+', oldest first</div><div class="ck-txs">'+coachTxRows(d.rows,{crossed:d.crossed,marks:true})+'</div>'
+  +(o.cat==='other'&&typeof fixMiscOpen==='function'?'<button class="btn ghost" onclick="fixMiscOpen(\''+(month?'month':'week')+'\')">🧰 Sort these into the right categories</button><p class="tiny">Your review is saved. Come back with Carry on.</p>':'')
+  +'<p class="tiny">Mark a payment Planned, Essential or One-off and it is left out of future warnings.</p></details>';
+}
+function coachKeptBox(list){if(!list.length)return '';return '<details class="ck-ev"><summary>Within the limit ('+list.length+')</summary><div class="ck-rows">'+list.map(k=>coachRow(k.name,FinCoach.aud(k.spent)+' of '+FinCoach.aud(k.limit),FinCoach.aud(k.limit-k.spent)+' left')).join('')+'</div></details>';}
+/* Leak evidence: plain transactions, or the two sides of a transfer ("outId>inId"). */
+function coachEvidenceRows(ids){const out=[];(ids||[]).forEach(id=>{const parts=String(id).split('>');if(parts.length===2){const a=TXNS.find(t=>String(t.id)===parts[0]),b=TXNS.find(t=>String(t.id)===parts[1]);if(a||b){const x=a||b;out.push({id,date:x.date,acct:null,note:'From '+coachAcctName(a&&a.acct)+' to '+coachAcctName(b&&b.acct)+(x.note?' · '+x.note:''),amount:Math.abs(+x.amount||0)});}}else{const t=TXNS.find(x=>String(x.id)===String(id));if(t)out.push({id:t.id,date:t.date,acct:t.acct,note:t.note,amount:Math.abs(+t.amount||0),mark:(coachState().marks||{})[t.id]||null});}});return out.sort((a,b)=>b.date.localeCompare(a.date));}
+function coachEvidenceBox(f,label){const rows=coachEvidenceRows(f&&f.evidence);if(!rows.length)return '';const first=rows[rows.length-1].date,last=rows[0].date;return '<details class="ck-ev"'+(label?' open':'')+'><summary>'+(label||'Show the payments')+' ('+rows.length+')</summary><p class="tiny">'+esc(FinDates.short(first))+' to '+esc(FinDates.short(last))+' · total '+FinCoach.aud(rows.reduce((s,t)=>s+t.amount,0))+'</p><div class="ck-txs">'+coachTxRows(rows,{marks:rows.every(r=>r.acct)})+'</div></details>';}
 function coachRender(){
   const st=coachState(),s=st.session;if(!s){closeSheet();return;}
   const step=s.steps[s.at];let body='',opts={};
@@ -152,14 +176,12 @@ function coachRender(){
     if(!f)body='<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ No money leaks stand out right now.</p></div>';
     else{
       s.leak=f;coachSaveSession(st);
-      const ev=(f.evidence||[]).map(id=>TXNS.find(t=>t.id===id)).filter(Boolean).slice(0,5);
-      body='<div class="fh-meaning fh-t-act"><div class="fh-mean-h">'+coachTag('fact')+' '+esc(f.name)+'</div><p class="fh-mean-main">'+esc(FinCoach.message(f).happened)+'</p></div>'
-       +(ev.length?'<details class="ck-ev"><summary>Show the transactions ('+ev.length+')</summary>'+ev.map(t=>'<div class="ck-tx"><span>'+esc(FinDates.short(t.date))+' · '+esc(t.note||'')+'</span><b>'+FinCoach.aud(-t.amount)+'</b><div class="ck-marks">'+FinCoach.MARKS.map(m=>'<button class="btn ghost" onclick="coachMark(\''+esc(t.id)+'\',\''+m+'\')">'+{planned:'Planned',essential:'Essential',exceptional:'One-off',miscategorised:'Wrong category'}[m]+'</button>').join('')+'</div></div>').join('')+'<p class="tiny">Marked items are left out of future checks.</p></details>':'');
+      body='<div class="fh-meaning fh-t-act"><div class="fh-mean-h">'+coachTag('fact')+' '+esc(f.name)+'</div><p class="fh-mean-main">'+esc(FinCoach.message(f).happened)+'</p></div>'+coachEvidenceBox(f,'The payments behind this');
     }
   }else if(step==='coach'){
     let f=s.leak||null;if(!f&&s.kinds.includes('month')){const r=coachMonth(st);f=r&&r.leaks[0]||null;if(f){s.leak=f;coachSaveSession(st);}}
     const rc=f?FinCoach.realityCheck({weekly:coachWeeklyFor(f)}):null,m=FinCoach.message(f,rc);
-    body='<div class="ck-coach"><p><b>What happened.</b> '+esc(m.happened)+'</p><p><b>Why it matters.</b> '+esc(m.matters)+'</p><p><b>What to do now.</b> '+esc(m.todo)+'</p></div>';
+    body='<div class="ck-coach"><p><b>What happened.</b> '+esc(m.happened)+'</p><p><b>Why it matters.</b> '+esc(m.matters)+'</p><p><b>What to do now.</b> '+esc(m.todo)+'</p></div>'+coachEvidenceBox(f);
     if(rc&&rc.weekly>0)body+='<details class="ck-ev"><summary>'+(rc.proven?coachTag('fact'):coachTag('estimate'))+' If this carries on</summary><div class="ck-rows"><div class="ck-row"><span>A month</span><b>'+FinCoach.aud(rc.monthly)+'</b></div><div class="ck-row"><span>Six months</span><b>'+FinCoach.aud(rc.sixMonths)+'</b></div><div class="ck-row"><span>A year</span><b>'+FinCoach.aud(rc.annual)+'</b></div></div><p class="tiny">'+esc(rc.label)+'. '+esc(rc.basis)+' '+esc(rc.saving.text)+'</p></details>';
     if(f&&m.options.length){
       body+='<div class="ck-opts"><div class="fh-mean-h">'+coachTag('suggestion')+' Choose one</div>'+m.options.map((o,i)=>'<button class="btn '+(i===0?'dark':'ghost')+'" onclick="coachChoose('+i+')">'+esc(o)+'</button>').join('')
@@ -177,7 +199,7 @@ function coachRender(){
   }else if(step==='protect'){
     const p=coachProtect();
     body=p.rows.length?'<div class="ck-rows">'+p.groups.map(g=>'<div class="ck-row"><span><b>'+esc(g.label)+'</b></span><b>'+FinCoach.aud(g.due)+'</b></div>'+g.rows.map(r=>'<div class="ck-row tiny"><span>'+esc(r.name)+' · '+esc(FinDates.short(r.due))+'</span><span>'+FinCoach.aud(r.amount)+'</span></div>').join('')
-       +'<p class="tiny ck-why">'+(g.have==null?'Comes out of Everyday. It is taken off your spending money in the next step.':g.covered?'✅ Covered: '+esc(g.label)+' already holds '+FinCoach.aud(g.have)+'.':'⚠️ '+esc(g.label)+' holds '+FinCoach.aud(g.have)+'. It is short by '+FinCoach.aud(g.short)+'.')+'</p>').join('')+'</div>'
+       +'<p class="tiny ck-why">'+(g.have==null?'Comes out of Everyday. It is taken off your spending money in the next step.':g.covered?'✅ Covered: '+esc(g.label)+' already holds '+FinCoach.aud(g.have)+'.':'⚠️ '+esc(g.label)+' holds '+FinCoach.aud(g.have)+'. It is short by '+FinCoach.aud(g.short)+'. Move '+FinCoach.aud(g.short)+' into '+esc(g.label)+' before '+esc(FinDates.short(g.rows.map(r=>r.due).sort()[0]||todayISO()))+', when the first one is due.')+'</p>').join('')+'</div>'
       +coachBox(p.groups.some(g=>g.have!=null&&!g.covered)?'act':'good',coachTag('fact')+' What this means',['Before next Wednesday: '+FinCoach.aud(p.bills)+' in bills and '+FinCoach.aud(p.loans)+' in loan repayments.',p.groups.some(g=>g.have!=null&&!g.covered)?'Top up the short account from this week\'s pay before spending money is worked out.':'Every bill and loan account already has enough in it.'])
       +'<p class="tiny">Each bill counts once. A loan listed as a bill too is not counted twice.</p>'
      :coachBox('good','',['✅ No bills or loan repayments are due before next Wednesday.']);
@@ -205,8 +227,8 @@ function coachRender(){
   }else if(step==='accountability'){
     const r=coachWeekReview(st),open=FinCoach.followUps(st,coachEvidence());
     body='<p class="f">Week of '+esc(FinDates.short(r.week.start))+' to '+esc(FinDates.short(r.week.end))+': spent '+FinCoach.aud(r.spent)+' of '+FinCoach.aud(r.limit)+'.</p>'
-     +(r.over.length?coachBox(r.repeats.length?'act':'watch',coachTag('fact')+' Over the limit',r.over.slice(0,4).map(o=>esc(o.name)+': '+FinCoach.aud(o.spent)+' of '+FinCoach.aud(o.limit)+(o.repeat?' · over '+o.times+' of the last 5 weeks':''))):coachBox('good','',['✅ Every area stayed within its limit last week.']))
-     +(r.kept.length?'<p class="tiny">Within the limit: '+esc(r.kept.slice(0,6).map(k=>k.name).join(', '))+'.</p>':'')
+     +(r.over.length?'<div class="fh-mean-h">'+coachTag('fact')+' Over the limit ('+r.over.length+') · tap one to see why</div>'+r.over.map(o=>coachOverBox(o,r.week.start,r.week.end,st,'week')).join(''):coachBox('good','',['✅ Every area stayed within its limit last week.']))
+     +coachKeptBox(r.kept)
      +(open.length?coachBox('watch','Actions from before',open.slice(0,4).map(a=>esc(a.text)+(a.verdict==='kept'?' · ✅ on track':a.verdict==='missed'?' · ⚠️ not kept':'')+' <button class="fh-link" onclick="coachActionDone(\''+esc(a.id)+'\')">Done</button> <button class="fh-link" onclick="coachActionDrop(\''+esc(a.id)+'\')">Drop it</button>')):'<p class="tiny">No open actions from before.</p>');
   }else if(step.indexOf('month-')===0){
     const r=coachMonth(st);
@@ -215,14 +237,14 @@ function coachRender(){
     else if(step==='month-fixed')body='<div class="ck-rows">'+Object.keys(COACH_SPLIT).map(k=>coachRow(COACH_SPLIT[k],FinCoach.aud(r.split[k]))).join('')+coachRow('Total spent',FinCoach.aud(r.totalSpent))+'</div>'
       +(r.essentials.length?'<details class="ck-ev"><summary>Must-pay areas ('+r.essentials.length+')</summary><div class="ck-rows">'+r.essentials.slice(0,8).map(e=>coachRow(e.name,FinCoach.aud(e.amount))).join('')+'</div></details>':'')
       +'<p class="tiny">'+coachTag('fact')+' Necessary is groceries, bills, loans, kids and health, plus anything you marked essential or planned. One-off is anything you marked one-off. Could change is the rest.</p>';
-    else if(step==='month-variance')body=(r.variance.length?'<div class="ck-rows">'+r.variance.slice(0,10).map(v=>coachRow(v.name,FinCoach.aud(v.spent)+' / '+FinCoach.aud(v.budget),v.diff<0?'Over by '+FinCoach.aud(-v.diff):'')).join('')+'</div>':'<p class="f">No budget areas are set.</p>')
-      +coachBox(r.overCats.length?'watch':'good',coachTag('fact')+' What this means',[r.overCats.length?r.overCats.length+' area'+(r.overCats.length===1?' was':'s were')+' over budget.':'Every budgeted area stayed within its limit.']);
-    else if(step==='month-leaks')body=r.leaks.length?r.leaks.map((f,i)=>coachBox(i===0?'act':'watch',coachTag('fact')+' '+(i+1)+'. '+esc(f.name),[esc(FinCoach.message(f).happened)])).join('')+'<p class="tiny">Essentials, transfers and anything you marked are left out.</p>':coachBox('good','',['✅ No money leaks stand out this month.']);
+    else if(step==='month-variance'){const mFrom=r.month+'-01',mTo=FinCoach.lastDayOfMonth(r.month),ov=r.variance.filter(v=>v.diff<0),ok=r.variance.filter(v=>v.diff>=0);body=(ov.length?'<div class="fh-mean-h">Over budget · tap one to see why</div>'+ov.map(v=>coachOverBox({cat:v.cat,name:v.name,limit:v.budget,spent:v.spent},mFrom,mTo,st,'month')).join(''):'')+(ok.length?coachKeptBox(ok.map(v=>({name:v.name,spent:v.spent,limit:v.budget}))):'')+(r.variance.length?'':'<p class="f">No budget areas are set.</p>')
+      +coachBox(r.overCats.length?'watch':'good',coachTag('fact')+' What this means',[r.overCats.length?r.overCats.length+' area'+(r.overCats.length===1?' was':'s were')+' over budget.':'Every budgeted area stayed within its limit.']);}
+    else if(step==='month-leaks')body=r.leaks.length?r.leaks.map((f,i)=>coachBox(i===0?'act':'watch',coachTag('fact')+' '+(i+1)+'. '+esc(f.name),[esc(FinCoach.message(f).happened)])+coachEvidenceBox(f)).join('')+'<p class="tiny">Essentials, transfers and anything you marked are left out.</p>':coachBox('good','',['✅ No money leaks stand out this month.']);
     else if(step==='month-habits')body=(r.habits.better.length?coachBox('good','Better than last month',r.habits.better.slice(0,4).map(h=>esc(h.name)+': '+FinCoach.aud(h.before)+' → '+FinCoach.aud(h.now))):'')
       +(r.habits.worse.length?coachBox('watch','Worse than last month',r.habits.worse.slice(0,4).map(h=>esc(h.name)+': '+FinCoach.aud(h.before)+' → '+FinCoach.aud(h.now))):'')
       +(!r.habits.better.length&&!r.habits.worse.length?coachBox('good','',['Spending was about the same as last month.']):'')+'<p class="tiny">Only changes of at least 15% and $30 are shown. Essentials are left out.</p>';
     else if(step==='month-savings')body='<div class="ck-rows">'+coachRow('Put into savings',FinCoach.aud(r.savings.in))+coachRow('Taken out of savings',FinCoach.aud(r.savings.out))+coachRow('Net',FinCoach.aud(r.savings.net))+'</div>'
-      +(r.savings.pulls?coachBox('watch',coachTag('fact')+' Savings used for spending',['Money came out of savings into a spending account '+r.savings.pulls+' time'+(r.savings.pulls===1?'':'s')+'.']):'')
+      +(r.savings.pulls?coachBox('watch',coachTag('fact')+' Savings used for spending',['Money came out of savings into a spending account '+r.savings.pulls+' time'+(r.savings.pulls===1?'':'s')+'.'])+coachEvidenceBox({evidence:(r.savings.pullIds||[])}):'')
       +(r.savings.goals.length?'<div class="ck-rows">'+r.savings.goals.map(g=>coachRow(g.name,FinCoach.aud(g.saved)+' of '+FinCoach.aud(g.target)+(g.pct!=null?' · '+g.pct+'%':''))).join('')+'</div>':'');
     else if(step==='month-debt')body=r.debt.length?'<div class="ck-rows">'+r.debt.map(d=>coachRow(d.name,FinCoach.aud(d.balance),(d.verified?'Balance confirmed by the bank. ':'Balance not confirmed for the end of the month. ')+(d.paid?'Paid in '+FinCoach.aud(d.paid)+', interest '+FinCoach.aud(d.interest)+'.':''))).join('')+'</div><p class="tiny">'+coachTag('fact')+' Only confirmed balances count as progress.</p>':coachBox('good','',['No loans are set up.']);
     else if(step==='month-next'){
@@ -238,7 +260,10 @@ function coachRender(){
      +(s.chosen?'<p>Your action: '+esc(s.chosen)+'</p>':'')+(d.ok?'':'<p>Still open: '+esc(d.issues.map(i=>i.text).join(' '))+'</p>')+'</div>';
     opts.next='Finish';opts.noSkip=true;
   }
-  $('sheet').innerHTML=coachFrame(s,body,opts);openSheet();
+  const sh=$('sheet'),key=s.at+'|'+step,keep=sh.dataset.ckStep===key?[...sh.querySelectorAll('details')].map(d=>d.open):null,top=sh.scrollTop;
+  sh.innerHTML=coachFrame(s,body,opts);sh.dataset.ckStep=key;
+  if(keep){sh.querySelectorAll('details').forEach((d,i)=>{if(keep[i])d.open=true;});sh.scrollTop=top;}
+  openSheet();
 }
 function coachSaveSession(st){coachSave(st);}
 function coachEvidence(){const out={};try{cycleRows().filter(r=>r.accountId==='everyday').forEach(r=>{out[r.category]=(out[r.category]||0)+(+r.spent||0);});}catch(e){}return{weekSpend:out};}
