@@ -13,6 +13,7 @@ export const STORAGE_KEYS = Object.freeze({
   rewards: 'cp_rewards_v1',
   inboxCount: 'cp_inbox_count_v1',
   guides: 'cp_guides_v1',
+  papers: 'cp_papers_v1',
   tasks: 'hq_task_engine_v1',
 });
 
@@ -75,6 +76,7 @@ const EMPTY = Object.freeze({
   reminders: {},
   brief: null,
   guides: { week: {}, month: {}, morning: {}, dismissed: {} },
+  papers: [],
   rewards: { total: 0, byDate: {}, stickers: [], unlockedThemes: [], kindStreak: { count: 0, lastDate: null, graceUsed: false } },
 });
 
@@ -142,6 +144,7 @@ export function readCollection(name, storage = globalThis.localStorage) {
     brief: value => value === null || isObject(value),
     rewards: isObject,
     guides: isObject,
+    papers: Array.isArray,
   }[name];
   return readRaw(storage, STORAGE_KEYS[name], fallback, valid);
 }
@@ -236,6 +239,7 @@ export function readAll(storage = globalThis.localStorage) {
     brief: readCollection('brief', storage),
     rewards: readCollection('rewards', storage),
     guides: readCollection('guides', storage),
+    papers: readCollection('papers', storage),
     tasks: readTaskEngine(storage).tasks,
   };
 }
