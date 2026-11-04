@@ -53,7 +53,7 @@ export function renderWeek(ctx) {
   if (id === 'ahead') body = `<p>Here’s your week from your calendar and Reminders.</p>${days.map(d => dayBlock(ctx, d)).join('')}${prepForm(ctx, entry, days)}`;
   if (id === 'family') {
     const fam = G.familyItems(days);
-    body = `${fam.length ? fam.map(f => `<span class="g-li">${f.kind === 'reminder' ? '🔔' : '📅'} ${esc(f.label)}${f.time ? ' ' + esc(f.time) : ''} · ${esc(f.title)}</span>`).join('') : '<p>Nothing school, sport or birthday related in your calendar this week.</p>'}<p class="hint">Got a school letter or note? Add what to prep below.</p>${prepForm(ctx, entry, days)}`;
+    body = `${fam.length ? fam.map(f => `<span class="g-li">${f.kind === 'reminder' ? '🔔' : '📅'} ${esc(f.label)}${f.time ? ' ' + esc(f.time) : ''} · ${esc(f.title)}</span>`).join('') : '<p>Nothing school, sport or birthday related in your calendar this week.</p>'}<p class="hint">Got a school letter or note?</p><div class="g-btns"><button class="soft-button" data-action="letter-new">📸 Scan a letter</button></div><p class="hint">Or add what to prep below.</p>${prepForm(ctx, entry, days)}`;
   }
   if (id === 'money') body = `<p>Check bills due this week and move money for the week.</p>${ctx.moneyCard || ''}<div class="g-btns"><a class="soft-button" href="../finance/app.html" target="_top">Open My Finance</a></div>`;
   if (id === 'meals') body = `<p>Plan dinners and the shopping list.</p><div class="g-btns"><button class="soft-button" data-action="guide-open" data-section="kitchen">🍳 Open Kitchen</button></div><label class="g-check"><input type="checkbox" id="g-meals" ${entry.meals ? 'checked' : ''}> Dinners are sorted for this week</label>`;
@@ -115,6 +115,7 @@ export function renderGuides(ctx) {
   return `<div class="header"><div><p class="eyebrow">PLAN</p><h1>Guided planners</h1><p class="subtle">One step at a time. Skip anything that doesn’t fit.</p></div></div>
   ${pin ? pinCard(ctx, pin) : ''}
   <article class="card"><h2>☀️ Daily</h2><p>Morning: check in, see today, pick 1 to 3 musts and fit them in. Evening: close the day.</p><div class="g-btns"><button class="primary" data-route="morning">☀️ Morning</button><button class="soft-button" data-route="shutdown">🌙 Evening</button></div></article>
+  <article class="card"><h2>📸 Scan a letter</h2><p>Photo of a school letter or appointment card → dates for your calendar and tasks.</p><div class="g-btns"><button class="primary" data-action="letter-new">📸 Scan a letter</button><button class="soft-button" data-action="letter-papers">🗂️ Papers</button></div></article>
   ${card('guide-week', '🧭', 'Sunday Weekly Reset', 'Empty your head, look back, see the week ahead, kids and family, money, meals, then your top 3.', wk?.done ? 'Done for this week ✓' : wk?.step ? `Up to step ${wk.step + 1} of 8` : '')}
   ${card('guide-month', '🗓️', 'Start of the month', 'Last month, this month’s calendar, bills and funds, appointments to book, 3 goals.', mo?.done ? 'Done for this month ✓' : mo?.step ? `Up to step ${mo.step + 1} of 6` : '')}`;
 }
