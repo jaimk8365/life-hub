@@ -194,14 +194,28 @@
    if(!(c.weekly>0))continue;
    const w=weeklyTotals(spend,id,today,6),last=w[w.length-2],before=w.slice(0,-2);
    limit+=c.weekly;spent+=last;
-   if(last>c.weekly){const times=before.filter(x=>x>c.weekly).length+1;over.push({cat:id,name:c.name,limit:c.weekly,spent:last,amount:round(last-c.weekly),times,repeat:times>=3});}
-   else kept.push({cat:id,name:c.name,limit:c.weekly,spent:last});
+   if(last>c.weekly){const times=before.filter(x=>x>c.weekly).length+1;over.push({cat:id,name:c.name,limit:c.weekly,monthly:c.monthly||null,spent:last,amount:round(last-c.weekly),times,repeat:times>=3,weeks:w.slice(0,-1)});}
+   else kept.push({cat:id,name:c.name,limit:c.weekly,monthly:c.monthly||null,spent:last,weeks:w.slice(0,-1)});
   }
   over.sort((a,b)=>b.amount-a.amount);
   const lw=D.shift(D.budgetWeek(today).start,-7);
   return{week:{start:lw,end:D.shift(lw,6)},over,kept,limit:round(limit),spent:round(spent),diff:round(limit-spent),repeats:over.filter(x=>x.repeat)};
  }
 
+ /* Detail behind one "over the limit" line: every payment in date order, where it crossed the limit,
+    the biggest payments and the shops most of it went to. Facts only, from the transactions themselves. */
+ function overDetail(o){
+  const marks=o.marks||{},limit=+o.limit||0;
+  const rows=(o.txns||[]).filter(t=>!t.deleted&&t.amount<0&&t.cat===o.cat&&t.date>=o.from&&t.date<=o.to&&t.cat!=='transfer'&&marks[t.id]!=='exceptional').slice().sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
+  let run=0,crossed=null;const list=rows.map(t=>{run=round(run-t.amount);if(crossed==null&&limit>0&&run>limit)crossed=t.id;return {id:t.id,date:t.date,note:t.note||'',acct:t.acct,amount:round(-t.amount),running:run,mark:marks[t.id]||null};});
+  const total=run,biggest=list.slice().sort((a,b)=>b.amount-a.amount).slice(0,3),bigTotal=round(biggest.reduce((s,t)=>s+t.amount,0));
+  const by=new Map();for(const t of list){const k=merchant(t.note)||'no description';if(!by.has(k))by.set(k,{name:t.note||'No description',count:0,total:0});const g=by.get(k);g.count++;g.total=round(g.total+t.amount);}
+  const shops=[...by.values()].sort((a,b)=>b.total-a.total).slice(0,3);
+  const cross=list.find(t=>t.id===crossed)||null;
+  const why=!list.length?'No payments were found for this area in that time.':limit<=0?'There is no limit set for this area.':total<=limit?'It stayed within the limit.':
+   'It went over on '+D.short(cross.date)+' with '+(cross.note||'a payment')+' ('+aud(cross.amount)+'). '+(list.length>1?'The biggest payment was '+(biggest[0].note||'one payment')+' ('+aud(biggest[0].amount)+'), '+Math.round(biggest[0].amount/total*100)+'% of the total.'+(list.length>3?' The 3 biggest make up '+Math.round(bigTotal/total*100)+'%.':''):'');
+  return {rows:list,count:list.length,total,limit,over:round(Math.max(0,total-limit)),crossed,biggest,bigShare:total>0?Math.round(bigTotal/total*100):0,shops,why};
+ }
  /* ---------- money leaks ---------- */
  const ESSENTIAL=['groceries','health','medical','kids','children','school','childcare','bills','rates','insurance','utilities','rent','mortgage','loan','fuel','transfer','income','savings'];
  const isEssential=cat=>ESSENTIAL.includes(String(cat||'').toLowerCase());
@@ -358,7 +372,7 @@
   }
   habits.better.sort((x,y)=>x.change-y.change);habits.worse.sort((x,y)=>y.change-x.change);
   // 6) savings
-  const sv=o.savings||{},savings={in:round(sv.in||0),out:round(sv.out||0),net:round((sv.in||0)-(sv.out||0)),pulls:(sv.pulls||[]).length,goals:(o.goals||[]).map(g=>({name:g.name,saved:round(g.saved),target:round(g.target),pct:g.target>0?Math.min(100,Math.round(g.saved/g.target*100)):null}))};
+  const sv=o.savings||{},savings={in:round(sv.in||0),out:round(sv.out||0),net:round((sv.in||0)-(sv.out||0)),pulls:(sv.pulls||[]).length,pullIds:(sv.pulls||[]).map(p=>p.id),goals:(o.goals||[]).map(g=>({name:g.name,saved:round(g.saved),target:round(g.target),pct:g.target>0?Math.min(100,Math.round(g.saved/g.target*100)):null}))};
   // 7) debt: only balances that are confirmed are compared
   const debt=(o.loans||[]).map(l=>{const paid=round(live.filter(t=>t.acct===l.id&&inM(t,ym)&&t.amount>0).reduce((s,t)=>s+t.amount,0)),interest=round(live.filter(t=>t.acct===l.id&&inM(t,ym)&&t.amount<0).reduce((s,t)=>s-t.amount,0));
    return{name:l.name,balance:round(Math.abs(l.balance||0)),verified:!!l.verified,paid,interest,principal:round(paid-interest)};});
@@ -404,7 +418,7 @@
   return{date:today,kind:first.kind,status:'due',text:{month:'Your Month-End Review is ready (15 to 20 minutes).',payday:'Your Payday Reset is ready (10 to 15 minutes).',daily:'Your 2-minute money check-in is ready.'}[first.kind]};
  }
 
- return{available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
+ return{overDetail,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
   ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud,
   defaultPrefs,setPrefs,copilotNote,payWindow,expectedPays,receivedPays,protectPlan,weekReview,monthReview,lastDayOfMonth,prevMonth};
 });
