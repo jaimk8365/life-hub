@@ -149,6 +149,22 @@ function phase5(s){
   s=once(s,"else if(a==='search')openAcctSearch();};","else if(a==='search')openAcctSearch();else finAct(a);};",'act');
   return s;
 }
+/* Your own categories, one per sinking fund, new built-ins, and payment notes (finance/categories.js). */
+function catsPatch(s){
+  const fx='<script src="../finance/fix-numbers.js?v='+V+'"></script>';
+  s=once(s,fx,fx+'\n<script src="../finance/categories.js?v=20261104"></script>','cats head');
+  s=once(s,"\nconst catOf=(id)=>","\nFinCats.sync(CATS,CUSTOM_CATS,[]);\nconst catOf=(id)=>",'cats sync');
+  s=once(s,"let FUNDS=load(K_FUNDS,[]);      // sinking funds","let FUNDS=load(K_FUNDS,[]);FinCats.sync(CATS,CUSTOM_CATS,FUNDS);      // sinking funds",'cats funds');
+  s=once(s,"function render(){ finNavSync();","function render(){ FinCats.sync(CATS,CUSTOM_CATS,FUNDS);finNavSync();",'cats render');
+  s=once(s,"<div class=\"tm\">${fmtDate(t.date)} · ${esc(c.n)}</div></div>","<div class=\"tm\">${fmtDate(t.date)} · ${esc(c.n)}</div>${t.userNote?`<div class=\"tm tnote\">📝 ${esc(t.userNote)}</div>`:''}</div>",'note acct list');
+  s=once(s,"<div class=\"tm\">${fmtDate(t.date)} · ${a?a.name:''}</div></div>","<div class=\"tm\">${fmtDate(t.date)} · ${a?a.name:''}</div>${t.userNote?`<div class=\"tm tnote\">📝 ${esc(t.userNote)}</div>`:''}</div>",'note cat list');
+  s=once(s,"<div class=\"catgrid\" id=\"e_cats\"></div></div>","<div class=\"catgrid\" id=\"e_cats\"></div><div class=\"cn-host\" id=\"cn_edit\"></div></div>",'edit host');
+  s=once(s,"<div class=\"field\"><label>Note</label><input id=\"e_note\" type=\"text\" value=\"${esc(t.note||'')}\"></div>","<div class=\"field\"><label>Description</label><input id=\"e_note\" type=\"text\" value=\"${esc(t.note||'')}\"></div>\n    <div class=\"field\"><label>📝 Your note · what was this?</label><textarea id=\"e_unote\" maxlength=\"200\" rows=\"2\" placeholder=\"e.g. school shoes + phone case\">${esc(t.userNote||'')}</textarea></div>",'edit note');
+  s=once(s,"${esc(c.n)}</button>`).join(''); }\nasync function saveEdit","${esc(c.n)}</button>`).join('')+`<button type=\"button\" onclick=\"catNewShow('edit')\"><span class=\"ce\">＋</span>New category</button>`; }\nasync function saveEdit",'edit new cat');
+  s=once(s,"cat:edit.cat,note:($('e_note').value||'').trim(),date};","cat:edit.cat,note:($('e_note').value||'').trim(),date};{const un=String(($('e_unote')||{}).value||'').trim().slice(0,200);if(un)next.userNote=un;else delete next.userNote;}",'edit save note');
+  s=once(s,"<div class=\"icon-library\">${CATEGORY_ICONS.map(x=>`<button class=\"icon-choice ${x===selectedCategoryIcon?'on':''}\" onclick=\"selectedCategoryIcon='${x}';document.querySelectorAll('.icon-choice').forEach(b=>b.classList.toggle('on',b.textContent==='${x}'))\">${x}</button>`).join('')}</div>","${catEmojiPicker(selectedCategoryIcon)}",'budget emoji');
+  return s;
+}
 export function patchPhasesFinance(source){
   let s=source;
   s=phase3(s);
@@ -169,5 +185,6 @@ export function patchPhasesFinance(source){
   s=meaningHead(s);
   s=coachHead(s);
   s=fixHead(s);
+  s=catsPatch(s);
   return bump(s);
 }

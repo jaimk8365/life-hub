@@ -248,3 +248,14 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
  #ck-print ul{margin:0;padding-left:16pt}#ck-print ul.cb{list-style:none;padding-left:0}#ck-print li{margin:3pt 0;break-inside:avoid}
  #ck-print .lines{height:60mm;background:repeating-linear-gradient(#fff 0 9mm,#bbb 9mm calc(9mm + 1px))}
 }
+/* Your own categories + payment notes */
+.fx-row .fx-unote,.tnote{color:var(--ink);font-style:italic}
+.fx-notebtn{border:1px solid var(--line);background:var(--card);border-radius:10px;min-width:40px;min-height:40px;font-size:17px;padding:0}
+.cn-panel{margin:10px 0;padding:12px;border-radius:14px;background:var(--card2,#e6eef4);display:flex;flex-direction:column;gap:9px}
+.cn-panel h3{margin:0;font-size:16px}
+.cn-panel label{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:14px}
+.cn-panel input#cn_name{border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:16px;padding:10px}
+.cn-emoji{max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.cn-g small{display:block;color:var(--ink-soft);font-size:12px;font-weight:700;margin-bottom:4px}
+.cn-btns{display:flex;gap:8px}.cn-btns .btn{flex:1}
+.cn-emoji .icon-library{grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:6px}.cn-emoji .icon-choice{min-width:0;font-size:19px;padding:4px 0}
