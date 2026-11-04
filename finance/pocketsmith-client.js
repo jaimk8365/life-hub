@@ -66,6 +66,8 @@
     if (!result || result.status !== 'ok') {
       throw new Error(result?.detail || 'PocketSmith data could not be applied to Finance.');
     }
+    /* Sort new payments into budgets (remembered shops, then auto-sort). */
+    try { if (typeof window.finApplyCatRules === 'function') { const n = await window.finApplyCatRules(); if (n && typeof window.render === 'function') window.render(); } } catch (_) {}
     return result;
   }
 

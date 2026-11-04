@@ -93,8 +93,11 @@ async function fixSaveTxns(extra){await saveAtomic(Object.assign({[K_TXNS]:TXNS}
 /* Applied after every bank sync and when Finance opens. */
 async function finApplyCatRules(){
  if(typeof TXNS==='undefined')return 0;const r=FinFix.applyRules(TXNS,fixRules());
- if(r.changed){TXNS.length=0;r.txns.forEach(t=>TXNS.push(t));try{await fixSaveTxns();}catch(e){}}
- return r.changed;
+ if(r.changed){TXNS.length=0;r.txns.forEach(t=>TXNS.push(t));}
+ /* Then sort the rest by itself (auto-sort.js): sure ones quietly, probably ones go to "Check what I sorted". */
+ let s={changed:0};if(typeof FinSort!=='undefined'){s=FinSort.run(TXNS,fixRules(),CATS.map(c=>c.id),fixNow());if(s.changed){TXNS.length=0;s.txns.forEach(t=>TXNS.push(t));}}
+ if(r.changed||s.changed){try{await fixSaveTxns();}catch(e){}}
+ return r.changed+s.changed;
 }
 window.finApplyCatRules=finApplyCatRules;
 
@@ -103,16 +106,18 @@ function fixHome(){
  try{
   const wk=FinDates.budgetWeek(todayISO()),m=FinFix.miscGroups(TXNS,FinDates.shift(wk.start,-28),todayISO());
   const off=ACCTS.filter(a=>!a.hidden&&a.sourceBalance).map(a=>FinFix.gap(a,TXNS)).filter(g=>g&&Math.abs(g.difference)>=.01).length;
-  if(!m.count&&!off)return null;
-  return {misc:m.count,miscTotal:m.total,off};
+  const check=typeof FinSort!=='undefined'?FinSort.toCheck(TXNS).length:0;
+  if(!m.count&&!off&&!check)return null;
+  return {misc:m.count,miscTotal:m.total,off,check};
  }catch(e){return null;}
 }
 window.fixHome=fixHome;
 
 /* Screen 1: the starting point. */
 function fixOpen(){
- const h=fixHome()||{misc:0,miscTotal:0,off:0};
+ const h=fixHome()||{misc:0,miscTotal:0,off:0,check:0};
  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🧰 Fix my numbers</h2><p>Two jobs make every other number in the app right. Do them in order.</p>'
+  +(h.check?'<button class="fx-job" onclick="sortCheckOpen()"><b>✨ Check what I sorted</b><span>'+h.check+(h.check===1?' payment I was not sure about':' payments I was not sure about')+'</span></button>':'')
   +'<button class="fx-job" onclick="fixMiscOpen()"><b>1. Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
   +'<button class="fx-job" onclick="fixMatchOpen()"><b>2. Match to my bank</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
   +'<p class="fx-small">Nothing moves money. Every change can be undone.</p>';
