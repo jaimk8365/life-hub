@@ -7,7 +7,9 @@ var K_COACH='fin_coach_v1';
 function coachOn(){try{return FinCoach.available(typeof FIN_PROFILE==='string'?FIN_PROFILE:'jaimi');}catch(e){return false;}}
 /* Kept in memory while the page is open: the encrypted store saves in the background, so reading straight back could miss the latest step. */
 var _coachSt=null;
-function coachState(){if(!_coachSt)_coachSt=Object.assign(FinCoach.emptyState(),load(K_COACH,{}));return _coachSt;}
+function coachState(){if(!_coachSt){_coachSt=Object.assign(FinCoach.emptyState(),load(K_COACH,{}));try{if(FinCoach.tidyActions(_coachSt,todayISO()))coachSave(_coachSt);}catch(e){}}return _coachSt;}
+/* Actions made during a review remember which review they came from, so Past reviews and Home can link back to it. */
+function coachAdd(st,o){const s=st.session;return FinCoach.addAction(st,Object.assign({},o,s?{reviewId:s.id}:{}),todayISO());}
 function coachSave(st){_coachSt=st;try{const r=save(K_COACH,JSON.parse(JSON.stringify(st)));if(r&&r.catch)r.catch(()=>toastMsg('Could not save your check-in progress.'));}catch(e){toastMsg('Could not save your check-in progress.');}}
 /* The month-end review is only offered once the bank data reaches the last day of that month. */
 function coachLastDataDate(){let m='';for(const t of TXNS)if(!t.deleted&&t.date>m&&t.date<=todayISO())m=t.date;return m||null;}
@@ -295,6 +297,13 @@ function coachEvidence(){const out={};try{cycleRows().filter(r=>r.accountId==='e
 
 /* The closing summary for the Payday Reset and Month-End Review. */
 function coachPlanSummary(st,s){
+  const d=coachSummaryData(st,s);
+  return '<div class="ck-rows">'+d.lines.map(l=>coachRow(l[0],esc(l[1]))).join('')+'</div>'
+   +(d.warn.length?coachBox('watch','Important',d.warn.slice(0,4).map(esc)):'')
+   +coachBox('good','Your actions this week',d.acts.length?d.acts.map(a=>esc(a.text)):['No new actions. That is fine.'])
+   +'<p class="tiny">Confirming saves this review. It does not change any budget, limit or account, and no money moves. You can look back at it, or print it, in Past reviews.</p>';
+}
+function coachSummaryData(st,s){
   const lines=[],warn=[];
   if(s.kinds.includes('payday')){
     const p=coachPayCheck(),pr=coachProtect(),a=coachAllocate(),sug=(s.sug||[]).filter(g=>g.ok);
@@ -305,15 +314,12 @@ function coachPlanSummary(st,s){
   }
   if(s.kinds.includes('month')){const r=coachMonth(st);if(r){lines.push(['Spent in '+coachMonthName(r.month),FinCoach.aud(r.totalSpent)]);r.score.filter(x=>x.tone==='act').forEach(x=>warn.push(x.text));}}
   const d=coachDataCheck();if(!d.ok)d.issues.forEach(i=>warn.push(i.text));
-  const acts=st.actions.filter(a=>a.created===todayISO()&&(a.status==='accepted'||a.status==='changed')).slice(0,3);
-  return '<div class="ck-rows">'+lines.map(l=>coachRow(l[0],esc(l[1]))).join('')+'</div>'
-   +(warn.length?coachBox('watch','Important',warn.slice(0,4).map(esc)):'')
-   +coachBox('good','Your actions this week',acts.length?acts.map(a=>esc(a.text)):['No new actions. That is fine.'])
-   +'<p class="tiny">Confirming saves this review. It does not change any budget, limit or account, and no money moves.</p>';
+  const open=FinCoach.openActions(st),acts=open.filter(a=>a.reviewId===s.id||(!a.reviewId&&a.created===todayISO()));
+  return{lines,warn,acts,others:open.filter(a=>acts.indexOf(a)<0)};
 }
-function coachSaveAction(i){const st=coachState(),s=st.session,g=s&&s.sug&&s.sug[i];if(!g)return;FinCoach.addAction(st,{text:'Move '+FinCoach.aud(g.amount)+' to '+g.name},todayISO());coachSave(st);toastMsg('Added to your actions. Move it in your bank app.');coachRender();}
-function coachMonthAction(i){const st=coachState(),r=coachMonth(st),x=r&&r.next[i];if(!x)return;FinCoach.addAction(st,{text:x.text},todayISO());coachSave(st);toastMsg('Added to your actions.');}
-function coachActionDrop(id){const why=prompt('Why are you dropping this action?');if(!why||!why.trim())return;const st=coachState();try{FinCoach.setStatus(st,id,'dismissed',why,todayISO());coachSave(st);}catch(e){}coachRender();}
+function coachSaveAction(i){const st=coachState(),s=st.session,g=s&&s.sug&&s.sug[i];if(!g)return;coachAdd(st,{text:'Move '+FinCoach.aud(g.amount)+' to '+g.name});coachSave(st);toastMsg('Added to your actions. Move it in your bank app.');coachRender();}
+function coachMonthAction(i){const st=coachState(),r=coachMonth(st),x=r&&r.next[i];if(!x)return;coachAdd(st,{text:x.text});coachSave(st);toastMsg('Added to your actions.');}
+function coachActionDrop(id){coachActionDropOpen(id,'session');}
 
 /* ---------- actions ---------- */
 function coachOpen(){
@@ -325,14 +331,14 @@ function coachOpen(){
   if(!st.session){coachSummary(st);return;}
   coachRender();
 }
-function coachNext(){const st=coachState(),s=st.session;if(!s)return;if(s.steps[s.at]==='finish'){if(s.plan){const old=FinCoach.planOf(st,s.plan.week);if(old)s.plan.items=s.plan.items.concat(old.items.filter(x=>x.added&&!x.removed));FinCoach.savePlan(st,s.plan);}const sum=FinCoach.finish(st,todayISO());coachSave(st);coachDone(sum);return;}FinCoach.confirm(st);coachSave(st);coachRender();}
+function coachNext(){const st=coachState(),s=st.session;if(!s)return;if(s.steps[s.at]==='finish'){if(s.plan){const old=FinCoach.planOf(st,s.plan.week);if(old)s.plan.items=s.plan.items.concat(old.items.filter(x=>x.added&&!x.removed));FinCoach.savePlan(st,s.plan);}let rec=null;try{rec=coachArchive(st,s);}catch(e){}const sum=FinCoach.finish(st,todayISO());coachSave(st);coachDone(sum,rec);return;}FinCoach.confirm(st);coachSave(st);coachRender();}
 function coachBack(){const st=coachState();if(!st.session)return;FinCoach.back(st);coachSave(st);coachRender();}
 function coachSkip(){const st=coachState();if(!st.session)return;FinCoach.skip(st);coachSave(st);coachRender();}
 function coachMark(id,kind){const st=coachState();FinCoach.mark(st,id,kind);coachSave(st);toastMsg('Got it. It will be left out of future checks.');coachRender();}
 function coachChoose(i){
   const st=coachState(),s=st.session,f=s&&s.leak;if(!f)return;
   const m=FinCoach.message(f),text=i<0?m.todo:m.options[i];
-  const a=FinCoach.addAction(st,{text,findingKey:f.key,check:i===0&&f.kind==='over'?{type:'category-limit',cat:f.cat,limit:f.limit}:null},todayISO());
+  const a=coachAdd(st,{text,findingKey:f.key,check:i===0&&f.kind==='over'?{type:'category-limit',cat:f.cat,limit:f.limit}:null});
   if(i<0)FinCoach.setStatus(st,a.id,'later','',todayISO());
   FinCoach.markRaised(st,f,todayISO());s.chosen=text;FinCoach.confirm(st);coachSave(st);coachRender();
 }
@@ -342,7 +348,7 @@ function coachDismiss(){
   const a=FinCoach.addAction(st,{text:FinCoach.message(f).todo,findingKey:f.key},todayISO());FinCoach.setStatus(st,a.id,'dismissed',why,todayISO());
   FinCoach.markRaised(st,f,todayISO());FinCoach.confirm(st);coachSave(st);coachRender();
 }
-function coachActionDone(id){const st=coachState();try{FinCoach.setStatus(st,id,'completed','',todayISO());coachSave(st);}catch(e){}coachRender();}
+function coachActionDone(id,where){coachActionSet(id,'completed','');toastMsg('Done ✓');coachActionBack(where);}
 function coachDo(what){
   if(what==='sync'&&typeof finSyncNow==='function'){finSyncNow().then(()=>coachRender());return;}
   if(what==='review'){closeSheet();try{openDataReview();}catch(e){}}
@@ -350,17 +356,18 @@ function coachDo(what){
   const other={health:'finOpenCoach',pip:'finOpenPip',quests:'finOpenQuests'}[what];
   if(other&&typeof window[other]==='function'){closeSheet();window[other]();}
 }
-function coachDone(sum){
+function coachDone(sum,rec){
   try{const d=dailyState();d.done.coach=true;save(K_DAILY,d);}catch(e){}   // also ticks "Tick one daily check-in" in Daily wins
   const nm=sum.kinds[0]==='daily'?'Check-in':(COACH_KIND[sum.kinds[0]]||{}).name||'Review';
-  closeSheet();toastMsg('✅ '+nm+' done'+(sum.skipped.length?'. Skipped steps stay on your list.':'.'));coachPublish();try{render();}catch(e){}
+  toastMsg('✅ '+nm+' done'+(sum.skipped.length?'. Skipped steps stay on your list.':'.'));coachPublish();try{render();}catch(e){}
+  if(rec&&sum.kinds[0]!=='daily')coachReviewView(rec.id,{fresh:true});else closeSheet();
 }
 function coachSummary(st){
   const today=todayISO(),rec=st.done.daily[today],open=FinCoach.followUps(st,coachEvidence());
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>✅ Today\'s check-in is done</h2>'
    +(rec&&rec.skipped&&rec.skipped.length?'<p class="f">You skipped: '+esc(rec.skipped.map(x=>COACH_STEP_TITLE[x]||x).join(', '))+'.</p>':'')
    +(open.length?'<div class="fh-meaning fh-t-watch"><div class="fh-mean-h">Your actions</div>'+open.map(a=>'<p>'+esc(a.text)+'</p>').join('')+'</div>':'<p class="f">No open actions.</p>')
-   +'<button class="btn ghost" onclick="coachRedo()">Do it again</button><button class="btn ghost" style="margin-top:8px" onclick="coachPrefsOpen()">🔔 Reminder settings</button>';
+   +'<button class="btn dark" onclick="coachReviewNowOpen()">⏱️ Do a review now</button><button class="btn ghost" style="margin-top:8px" onclick="coachReviewsOpen()">🗂️ Past reviews</button><button class="btn ghost" style="margin-top:8px" onclick="coachRedo()">Do today\'s check-in again</button><button class="btn ghost" style="margin-top:8px" onclick="coachPrefsOpen()">🔔 Reminder settings</button>';
   openSheet();
 }
 /* ---------- reminders (Stage 5) ---------- */
@@ -429,7 +436,7 @@ function coachPlanList(plan,o){
 function coachPlanHead(plan){return '<div class="pl-head">'+(plan.held?'<p>Spending money is held back until your balances match the bank (🧰 Fix my numbers).</p>':plan.dailyLimit!=null?'<p><b>Spending money:</b> '+FinCoach.aud(plan.allowance)+' this week, about <b>'+FinCoach.aud(plan.dailyLimit)+' a day</b>.'+(plan.spare!=null?' Spare after that: '+FinCoach.aud(plan.spare)+'.':'')+'</p>':'')+'</div>';}
 function coachPlanHome(){
   try{if(!coachOn())return null;const plan=FinCoach.planOf(coachState(),coachPlanWeek());if(!plan)return null;const pg=FinCoach.planProgress(plan),t=todayISO();
-    return{done:pg.done,total:pg.total,daily:plan.dailyLimit,next:pg.next.filter(x=>!x.date||x.date<=FinDates.shift(t,2)).slice(0,3).map(x=>({id:x.id,text:x.text,amount:x.amount,day:x.date?coachPlanDay(x.date):'This week',late:!!(x.date&&x.date<t)}))};}catch(e){return null;}
+    return{done:pg.done,total:pg.total,daily:plan.dailyLimit,next:pg.next.filter(x=>x.kind!=='action'&&(!x.date||x.date<=FinDates.shift(t,2))).slice(0,3).map(x=>({id:x.id,text:x.text,amount:x.amount,day:x.date?coachPlanDay(x.date):'This week',late:!!(x.date&&x.date<t)}))};}catch(e){return null;}
 }
 function coachPlanOpen(){
   const st=coachState(),plan=FinCoach.planOf(st,coachPlanWeek());
@@ -441,7 +448,7 @@ function coachPlanOpen(){
   openSheet();
 }
 async function coachPlanTick(id,done){
-  const st=coachState(),week=coachPlanWeek();try{const it=FinCoach.tickPlanItem(st,week,id,done,new Date().toISOString());if(it.actionId&&done){try{FinCoach.setStatus(st,it.actionId,'completed','',todayISO());}catch(e){}}}catch(e){toastMsg(e.message);return;}
+  const st=coachState(),week=coachPlanWeek();try{const it=FinCoach.tickPlanItem(st,week,id,done,new Date().toISOString());if(it.actionId&&done){try{const a=st.actions.find(x=>x.id===it.actionId);if(a&&a.status!=='completed')FinCoach.setStatus(st,it.actionId,'completed','',todayISO());}catch(e){}}}catch(e){toastMsg(e.message);return;}
   coachSave(st);if(done)toastMsg('Done ✓');if($('sheet')&&/This week's plan/.test($('sheet').textContent))coachPlanOpen();try{render();}catch(e){}
 }
 function coachPlanCtx(){
@@ -484,3 +491,116 @@ function coachPlanSaveEdit(){
   coachSave(st);toastMsg(_plEdit.id?'Plan updated ✓':'Added to your plan ✓');coachPlanOpen();try{render();}catch(e){}
 }
 function coachPlanRemove(id){const st=coachState();try{FinCoach.removePlanItem(st,coachPlanWeek(),id);}catch(e){toastMsg(e.message);return;}coachSave(st);toastMsg('Taken off the plan');coachPlanOpen();try{render();}catch(e){}}
+
+/* ---------- your actions: Done / Drop, on Home and in one list ---------- */
+const COACH_DROP_WHY=['Already sorted','Not needed any more','Not realistic right now','It was a one-off'];
+/* Finishing or dropping an action also ticks or takes off the same step in this week's plan, so the two never disagree. */
+function coachActionSet(id,status,why){
+  const st=coachState();try{FinCoach.setStatus(st,id,status,why,todayISO());}catch(e){toastMsg(e.message);return false;}
+  try{const week=coachPlanWeek(),plan=FinCoach.planOf(st,week);if(plan)plan.items.filter(x=>x.actionId===id&&!x.removed).forEach(x=>{if(status==='completed')FinCoach.tickPlanItem(st,week,x.id,true,new Date().toISOString());else FinCoach.removePlanItem(st,week,x.id);});}catch(e){}
+  coachSave(st);return true;
+}
+function coachActionBack(where){
+  try{render();}catch(e){}
+  if(where==='home'){closeSheet();return;}
+  if(where==='list')return coachActionsOpen();
+  if(where&&where.indexOf('review:')===0)return coachReviewView(where.slice(7));
+  if(coachState().session)coachRender();else closeSheet();
+}
+function coachActionDropOpen(id,where){
+  const st=coachState(),a=st.actions.find(x=>x.id===id);if(!a)return;
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>Drop this action?</h2><p class="f">'+esc(a.text)+'</p><div class="fh-mean-h">Why? Tap one, or say it in your own words</div>'
+   +'<div class="ck-chips">'+COACH_DROP_WHY.map(w=>'<button class="ck-chip" onclick="coachActionDropSave(\''+esc(id)+'\',\''+esc(where||'')+'\',\''+esc(w)+'\')">'+esc(w)+'</button>').join('')+'</div>'
+   +'<div class="ck-note" style="margin:8px 0 10px"><textarea id="ck_drop_why" rows="2" maxlength="200" placeholder="Something else, in your own words"></textarea></div>'
+   +'<button class="btn dark" onclick="coachActionDropSave(\''+esc(id)+'\',\''+esc(where||'')+'\',null)">Drop it</button><button class="btn ghost" style="margin-top:8px" onclick="coachActionBack(\''+esc(where||'')+'\'||\'list\')">Keep it</button>'
+   +'<p class="f" style="margin-top:10px">Dropped actions are kept with your reason. Nothing is deleted.</p>';
+  openSheet();
+}
+function coachActionDropSave(id,where,why){
+  why=why||($('ck_drop_why')&&$('ck_drop_why').value||'').trim();if(!why){toastMsg('Tap a reason or type one.');return;}
+  if(coachActionSet(id,'dismissed',why))toastMsg('Dropped. Reason kept.');
+  if(where==='home'){closeSheet();try{render();}catch(e){}return;}coachActionBack(where);
+}
+function coachActionRow(a,where){
+  const r=a.reviewId?FinCoach.reviewOf(coachState(),a.reviewId):null;
+  return '<div class="ck-act"><div class="ck-act-t">'+esc(a.text)+'<small>'+(a.created?'Since '+esc(FinDates.short(a.created)):'')+(a.seen>1?' · came up '+a.seen+' times':'')+(a.verdict==='kept'?' · ✅ on track':a.verdict==='missed'?' · ⚠️ not yet':'')+'</small>'
+   +(r?'<button class="fh-link" onclick="coachReviewView(\''+esc(r.id)+'\')">From your '+esc(r.title)+' on '+esc(FinDates.short(r.on))+' ›</button>':'')+'</div>'
+   +'<div class="ck-act-b"><button class="ck-done" onclick="coachActionDone(\''+esc(a.id)+'\',\''+where+'\')">✓ Done</button><button class="ck-drop" onclick="coachActionDropOpen(\''+esc(a.id)+'\',\''+where+'\')">Drop</button></div></div>';
+}
+function coachActionsHome(){
+  try{if(!coachOn())return null;const st=coachState(),open=FinCoach.followUps(st,coachEvidence());if(!open.length)return null;
+    return{count:open.length,items:open.slice(0,5).map(a=>({id:a.id,text:a.text,since:a.created?FinDates.short(a.created):'',seen:a.seen||1,verdict:a.verdict||null,review:a.reviewId&&FinCoach.reviewOf(st,a.reviewId)?a.reviewId:null}))};}catch(e){return null;}
+}
+function coachActionsOpen(){
+  const st=coachState(),open=FinCoach.followUps(st,coachEvidence()),done=st.actions.filter(a=>a.status==='completed'||a.status==='dismissed').slice(0,8);
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>✅ Your actions</h2>'
+   +(open.length?open.map(a=>coachActionRow(a,'list')).join(''):'<p class="f">No open actions. Nice.</p>')
+   +(done.length?'<details class="ck-ev"><summary>Recently finished or dropped ('+done.length+')</summary>'+done.map(a=>'<p class="tiny">'+(a.status==='completed'?'✅ ':'✖ ')+esc(a.text)+(a.reason?' · '+esc(a.reason):'')+'</p>').join('')+'</details>':'')
+   +'<button class="btn ghost" style="margin-top:10px" onclick="coachReviewsOpen()">🗂️ Past reviews</button>';
+  openSheet();
+}
+
+/* ---------- past reviews, review any time, printable summary ---------- */
+function coachReviewTitle(s){return s.primary==='daily'?'Check-in':(COACH_KIND[s.primary]||{}).name||'Review';}
+function coachArchive(st,s){
+  const d=coachSummaryData(st,s),today=todayISO();
+  if(s.primary==='daily'){d.lines=[];if(s.leak)d.lines.push(['Looked at',s.leak.name||'']);}
+  const notes=Object.values(st.notes||{}).filter(n=>String(n.at||'').slice(0,10)===today).map(n=>(n.name?n.name+(n.period?' ('+n.period+')':'')+': ':'')+(n.tags||[]).map(t=>FinCoach.NOTE_TAGS[t]||t).join(', ')+(n.text?(n.tags&&n.tags.length?'. ':'')+n.text:''));
+  const rec=FinCoach.archiveReview(st,{id:s.id,on:today,at:new Date().toISOString(),kinds:s.kinds,primary:s.primary,anytime:!!s.anytime,title:coachReviewTitle(s),
+    lines:d.lines,warn:d.warn,actions:d.acts,open:d.others,plan:s.plan?s.plan.items.filter(x=>!x.removed):[],notes});
+  d.acts.forEach(a=>{if(!a.reviewId)a.reviewId=rec.id;});
+  return rec;
+}
+function coachReviewsOpen(){
+  const st=coachState(),h=st.history||[];
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🗂️ Past reviews</h2>'
+   +'<button class="btn dark" onclick="coachReviewNowOpen()">⏱️ Do a review now</button>'
+   +(h.length?'<div class="ck-hist">'+h.map(r=>'<button class="ck-hist-i" onclick="coachReviewView(\''+esc(r.id)+'\')"><span>'+({payday:'💸',month:'📅',daily:'🧭'}[r.primary]||'🧭')+'</span><span><b>'+esc(r.title)+(r.anytime?' (any time)':'')+'</b><small>'+esc(FinDates.short(r.on))+' · '+r.actions.length+' action'+(r.actions.length===1?'':'s')+(r.plan.length?' · plan of '+r.plan.length+' steps':'')+'</small></span><span>›</span></button>').join('')+'</div>'
+     :'<p class="f">Reviews you finish are kept here, newest first, so you can look back or print them.</p>');
+  openSheet();
+}
+function coachReviewNowOpen(){
+  const st=coachState(),half=st.session?coachReviewTitle(st.session):null;
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="coachReviewsOpen()">‹ Past reviews</button><h2>⏱️ Do a review now</h2><p class="f">Any time you like. Pick how big.</p>'
+   +(half?'<p class="tiny">⚠️ You have a '+esc(half)+' half done. Starting a different one replaces it.</p>':'')
+   +'<div class="ck-opts"><button class="btn ghost" onclick="coachReviewNow(\'daily\')">🧭 Quick check-in<br><small>About 2 minutes: where you stand and one thing to look at</small></button>'
+   +'<button class="btn ghost" onclick="coachReviewNow(\'payday\')">💸 This week\'s review<br><small>10 to 15 minutes: pay, bills, spending money, savings and your plan</small></button>'
+   +'<button class="btn ghost" onclick="coachReviewNow(\'month\')">📅 Last month\'s review<br><small>15 to 20 minutes: how '+esc(coachMonthName(FinCoach.prevMonth(todayISO())))+' went and what to change</small></button></div>'
+   +'<p class="tiny">This week\'s review counts as your Wednesday Payday Reset for this week.</p>';
+  openSheet();
+}
+function coachReviewNow(kind){
+  const st=coachState(),plan=FinCoach.planSession(FinCoach.anytimeDue(kind,todayISO()));if(!plan)return;
+  if(st.session&&st.session.steps.join()!==plan.steps.join())st.session=null;
+  const s=FinCoach.start(st,plan,Date.now());s.anytime=true;coachSave(st);coachRender();
+}
+function coachReviewBody(r,o){
+  o=o||{};const st=coachState(),now=id=>st.actions.find(a=>a.id===id);
+  const actRow=a=>{const cur=now(a.id),stt=cur?cur.status:'accepted',open=stt==='accepted'||stt==='changed'||stt==='later';
+    return o.print?'<li>'+(stt==='completed'?'☑':'☐')+' '+esc(cur?cur.text:a.text)+(stt==='dismissed'?' (dropped)':'')+'</li>'
+     :open?coachActionRow(Object.assign({},cur||a,{reviewId:null}),'review:'+r.id):'<p class="tiny">'+(stt==='completed'?'✅ ':stt==='merged'?'↪ ':'✖ ')+esc(cur?cur.text:a.text)+(cur&&cur.reason?' · '+esc(cur.reason):'')+'</p>';};
+  const sec=(h,inner)=>inner?(o.print?'<h3>'+h+'</h3>'+inner:'<div class="fh-mean-h" style="margin-top:12px">'+h+'</div>'+inner):'';
+  return (r.lines.length?(o.print?'<table>'+r.lines.map(l=>'<tr><td>'+esc(l[0])+'</td><td>'+esc(l[1])+'</td></tr>').join('')+'</table>':'<div class="ck-rows">'+r.lines.map(l=>coachRow(l[0],esc(l[1]))).join('')+'</div>'):'')
+   +(r.warn.length?(o.print?sec('Important','<ul>'+r.warn.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul>'):coachBox('watch','Important',r.warn.map(esc))):'')
+   +sec('Actions from this review',r.actions.length?(o.print?'<ul class="cb">'+r.actions.map(actRow).join('')+'</ul>':r.actions.map(actRow).join('')):(o.print?'<p>No new actions.</p>':'<p class="tiny">No new actions.</p>'))
+   +sec('Still open from before',r.open.length?(o.print?'<ul class="cb">'+r.open.map(actRow).join('')+'</ul>':r.open.map(actRow).join('')):'')
+   +sec('The week\'s plan',r.plan.length?(o.print?'<ul class="cb">':'<div class="ck-rows">')+r.plan.map(x=>o.print?'<li>☐ '+esc(x.date?FinDates.short(x.date):'Any time')+': '+esc(x.text)+(x.amount!=null?' · '+FinCoach.aud(x.amount):'')+'</li>':coachRow((x.date?FinDates.short(x.date):'Any time')+' · '+x.text,x.amount!=null?FinCoach.aud(x.amount):'')).join('')+(o.print?'</ul>':'</div>'):'')
+   +sec('Your notes',r.notes.length?(o.print?'<ul>':'')+r.notes.map(n=>o.print?'<li>'+esc(n)+'</li>':'<p class="tiny">📝 '+esc(n)+'</p>').join('')+(o.print?'</ul>':''):'');
+}
+function coachReviewView(id,o){
+  o=o||{};const r=FinCoach.reviewOf(coachState(),id);if(!r){coachReviewsOpen();return;}
+  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="coachReviewsOpen()">‹ Past reviews</button>'
+   +(o.fresh?'<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ '+esc(r.title)+' done and saved.</p><p>Here is your summary. It is kept in Past reviews.</p></div>':'')
+   +'<h2>'+esc(r.title)+(r.anytime?' (any time)':'')+'</h2><p class="f">'+esc(FinDates.short(r.on))+'</p>'+coachReviewBody(r)
+   +'<button class="btn dark" style="margin-top:12px" onclick="coachPrint(\''+esc(r.id)+'\')">🖨️ Print or save as PDF</button>'+(o.fresh?'<button class="btn ghost" style="margin-top:8px" onclick="closeSheet()">Close</button>':'');
+  openSheet();
+}
+/* Printing puts a plain black-and-white copy in its own box and hides the rest of the page while the print dialog is open. */
+function coachPrint(id){
+  const r=FinCoach.reviewOf(coachState(),id);if(!r)return;
+  let box=document.getElementById('ck-print');if(!box){box=document.createElement('div');box.id='ck-print';document.body.appendChild(box);}
+  box.innerHTML='<h1>'+esc(r.title)+(r.anytime?' (any time)':'')+'</h1><p class="sub">'+esc(FinDates.short(r.on))+' · My Finance</p>'+coachReviewBody(r,{print:true})+'<h3>My notes</h3><div class="lines"></div>';
+  document.body.classList.add('ck-printing');
+  const done=()=>{document.body.classList.remove('ck-printing');window.removeEventListener('afterprint',done);};
+  window.addEventListener('afterprint',done);setTimeout(()=>{try{window.print();}catch(e){toastMsg('Printing is not available here. Use Share › Print.');}setTimeout(done,1500);},50);
+}

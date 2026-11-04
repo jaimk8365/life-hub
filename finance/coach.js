@@ -14,7 +14,7 @@
  /* The coach looks at private spending, so it belongs to the owner's profile only. */
  function available(profile){return profile==='jaimi';}
  function storeKey(profile){if(!available(profile))throw Error('The money coach is only for the owner profile.');return 'fin_coach_v1';}
- function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs(),notes:{},plans:{}};}
+ function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs(),notes:{},plans:{},history:[]};}
  /* Reminder settings: which reviews to invite you to, and not before what hour (Brisbane time). */
  function defaultPrefs(){return{daily:true,payday:true,month:true,fromHour:7};}
 
@@ -385,13 +385,28 @@
  }
 
  /* ---------- actions and follow-up ---------- */
- const STATUSES=['accepted','changed','dismissed','completed','later'];
+ const STATUSES=['accepted','changed','dismissed','completed','later','merged'];
+ const OPEN=a=>a.status==='accepted'||a.status==='changed'||a.status==='later';
+ /* Two actions are the same when they come from the same finding, or say the same thing (ignoring case and punctuation). */
+ const actionWords=t=>String(t||'').toLowerCase().replace(/\.(?!\d)/g,' ').replace(/[^a-z0-9$.]+/g,' ').trim();
+ const sameAction=(a,b)=>(a.findingKey&&a.findingKey===b.findingKey)||actionWords(a.text)===actionWords(b.text);
+ /* Adding an action you already have keeps one: the newest wording, a count of how often it came up, and its old id. */
  function addAction(st,o,today){
-  const a={id:'a'+today.replace(/-/g,'')+'-'+(st.actions.length+1),text:String(o.text||'').trim(),findingKey:o.findingKey||null,status:'accepted',reason:'',created:today,updated:today,check:o.check||null};
-  if(!a.text)throw Error('An action needs some words.');
+  const text=String(o&&o.text||'').trim();if(!text)throw Error('An action needs some words.');
+  const want={text,findingKey:o.findingKey||null},dup=st.actions.find(a=>OPEN(a)&&sameAction(a,want));
+  if(dup){dup.text=text;dup.updated=today;dup.seen=(dup.seen||1)+1;if(o.check)dup.check=o.check;if(o.reviewId)dup.reviewId=o.reviewId;dup.merged=true;return dup;}
+  let n=st.actions.length+1,id;do{id='a'+today.replace(/-/g,'')+'-'+(n++);}while(st.actions.some(a=>a.id===id));
+  const a={id,text,findingKey:want.findingKey,status:'accepted',reason:'',created:today,updated:today,check:o.check||null,reviewId:o.reviewId||null};
   st.actions.unshift(a);st.actions=st.actions.slice(0,50);
   return a;
  }
+ /* One-off tidy for duplicates saved before merging existed: the newest copy stays, the others are marked merged (kept, not deleted). */
+ function tidyActions(st,today){
+  let n=0;const keep=[];
+  for(const a of st.actions){if(!OPEN(a))continue;const k=keep.find(x=>sameAction(x,a));if(k){a.status='merged';a.reason='Same as a newer action';a.mergedInto=k.id;a.updated=today;k.seen=(k.seen||1)+(a.seen||1);n++;}else keep.push(a);}
+  return n;
+ }
+ function openActions(st){return st.actions.filter(OPEN);}
  function setStatus(st,id,status,reason,today){
   if(!STATUSES.includes(status))throw Error('Unknown status.');
   const a=st.actions.find(x=>x.id===id);if(!a)throw Error('Action not found.');
@@ -400,7 +415,7 @@
  }
  /* Open actions to revisit. If the evidence already answers it, the coach says so instead of asking. */
  function followUps(st,evidence){
-  return st.actions.filter(a=>a.status==='accepted'||a.status==='changed'||a.status==='later').map(a=>{
+  return st.actions.filter(OPEN).map(a=>{
    let verdict=null;
    if(a.check&&a.check.type==='category-limit'&&evidence&&evidence.weekSpend){const s=evidence.weekSpend[a.check.cat];if(Number.isFinite(s))verdict=s<=a.check.limit?'kept':'missed';}
    return{...a,verdict};
@@ -452,7 +467,7 @@
   // 8) realistic changes for next month (at most three, each labelled)
   const next=[];
   const repeatOver=overCats.filter(v=>(priorCat[v.cat]||0)>v.budget);
-  repeatOver.slice(0,1).forEach(v=>next.push({kind:'avoidable',text:v.name+' has been over budget two months running. Either set a realistic limit of about '+aud(Math.ceil(((priorCat[v.cat]||0)+v.spent)/2/10)*10)+' a month, or choose one thing to cut.'}));
+  repeatOver.slice(0,1).forEach(v=>next.push(limitAdvice(v,priorCat[v.cat]||0)));
   if(top[0])next.push({kind:'avoidable',text:'Biggest leak: '+message(top[0]).happened+' Pick one change for next month, for example a weekly limit.'});
   if(savings.pulls)next.push({kind:'necessary',text:'Savings were used to cover everyday spending '+savings.pulls+' time'+(savings.pulls===1?'':'s')+'. Plan for what ran short on Wednesday instead.'});
   if(split.oneoff>0&&next.length<3)next.push({kind:'oneoff',text:aud(split.oneoff)+' was one-off spending. It is not counted as a habit, so no change is needed for it.'});
@@ -466,6 +481,37 @@
    {label:'Habits',tone:habits.worse.length>habits.better.length?'watch':'good',text:(habits.better.length?habits.better.length+' better than last month':'None better than last month')+', '+(habits.worse.length?habits.worse.length+' worse':'none worse')+'.'}
   ];
   return{month:ym,start,end,income,split,totalSpent,essentials,variance,overCats,leaks:top,habits,savings,debt,next:next.slice(0,3),score};
+ }
+
+ /* A new limit is only suggested when it is believable: a spending area you can change (not bills, rent, loans or
+    Miscellaneous), and no more than half again its current budget. Otherwise it says to check the payments first,
+    because a big jump usually means one-offs or payments in the wrong category, not a habit. */
+ function limitAdvice(v,prior){
+  const avg=Math.ceil((prior+v.spent)/2/10)*10,both=aud(prior)+' last month, then '+aud(v.spent);
+  if(!isEssential(v.cat)&&v.cat!=='other'&&v.budget>0&&avg<=v.budget*1.5)
+   return{kind:'avoidable',text:v.name+' has been over its '+aud(v.budget)+' budget two months running ('+both+'). Either set a realistic limit of about '+aud(avg)+' a month, or choose one thing to cut.'};
+  return{kind:'avoidable',text:v.name+' has been over its '+aud(v.budget)+' budget two months running ('+both+'). Before changing the budget, open the payments and mark any one-offs or wrong categories.'};
+ }
+
+ /* ---------- past reviews ---------- */
+ /* Each finished review is kept as a short record: the key numbers, warnings, the actions it made, other open actions and
+    the plan steps. Newest first, the last 60 kept. Records are only ever added; nothing here changes money or budgets. */
+ function archiveReview(st,r){
+  if(!r||!r.id)throw Error('A review record needs an id.');
+  st.history=Array.isArray(st.history)?st.history:[];
+  const rec={id:String(r.id),on:r.on,at:r.at||null,kinds:r.kinds||[],primary:r.primary||null,anytime:!!r.anytime,title:r.title||'Review',
+   lines:(r.lines||[]).slice(0,12),warn:(r.warn||[]).slice(0,8),actions:(r.actions||[]).map(a=>({id:a.id,text:a.text})),open:(r.open||[]).map(a=>({id:a.id,text:a.text})),
+   plan:(r.plan||[]).map(x=>({date:x.date||null,text:x.text,amount:x.amount==null?null:x.amount})),notes:(r.notes||[]).slice(0,10)};
+  st.history=[rec].concat(st.history.filter(h=>h.id!==rec.id)).slice(0,60);
+  return rec;
+ }
+ function reviewOf(st,id){return (st.history||[]).find(h=>h.id===id)||null;}
+ /* "Do a review now": any review at any time. The week and month reviews use this week's and last month's keys, so doing one
+    early simply counts as that week's or month's review. */
+ function anytimeDue(kind,today){
+  if(kind==='payday')return[{kind:'payday',key:D.budgetWeek(today).start}];
+  if(kind==='month')return[{kind:'month',key:prevMonth(today)}];
+  return[{kind:'daily',key:today}];
  }
 
  /* ---------- reminders: one at a time, no pile-up ---------- */
@@ -491,7 +537,7 @@
   return{date:today,kind:first.kind,status:'due',text:{month:'Your Month-End Review is ready (15 to 20 minutes).',payday:'Your Payday Reset is ready (10 to 15 minutes).',daily:'Your 2-minute money check-in is ready.'}[first.kind]};
  }
 
- return{buildWeekPlan,planOf,savePlan,tickPlanItem,updatePlanItem,addPlanItem,removePlanItem,planProgress,planImpact,overDetail,NOTE_TAGS,addNote,notesFor,noteMark,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
+ return{limitAdvice,archiveReview,reviewOf,anytimeDue,tidyActions,openActions,buildWeekPlan,planOf,savePlan,tickPlanItem,updatePlanItem,addPlanItem,removePlanItem,planProgress,planImpact,overDetail,NOTE_TAGS,addNote,notesFor,noteMark,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
   ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud,
   defaultPrefs,setPrefs,copilotNote,payWindow,expectedPays,receivedPays,protectPlan,weekReview,monthReview,lastDayOfMonth,prevMonth};
 });

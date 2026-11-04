@@ -45,6 +45,6 @@ test('impact shows balances, bills still covered or short, and the effect on spe
 test('plan is saved at the end of the Payday Reset and pinned on Home for Jaimi only',()=>{
  const ui=readFileSync(new URL('../finance/coach-ui.js',import.meta.url),'utf8'),home=readFileSync(new URL('../finance/home-redesign.js',import.meta.url),'utf8'),glue=readFileSync(new URL('../finance/phase-glue.js',import.meta.url),'utf8');
  assert.match(ui,/if\(s\.kinds\.includes\('payday'\)\)\{s\.plan=coachBuildPlan\(st,s\)/);assert.match(ui,/FinCoach\.savePlan\(st,s\.plan\)/);
- assert.match(home,/fixCard\(d\.fix\)\+planCard\(d\.plan\)\+coachCard/);assert.match(home,/\{t:'This week\\'s plan',e:'📋',a:'plan'\}/);
+ assert.match(home,/fixCard\(d\.fix\)\+planCard\(d\.plan\)\+actionsCard\(d\.actions\)\+coachCard/);assert.match(home,/\{t:'This week\\'s plan',e:'📋',a:'plan'\}/);
  assert.match(glue,/plan:'coachPlanOpen'/);assert.ok(glue.indexOf('out.plan=')>glue.indexOf('}else{'));
 });

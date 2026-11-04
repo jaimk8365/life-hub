@@ -225,3 +225,26 @@ body.fin-redesign:not(.fin-partner) .fab{display:none!important}
 .pl-f[hidden],#pl_move[hidden],#pl_spend[hidden]{display:none}
 .pl-impact{margin:12px 0;padding:12px;border-radius:14px;background:var(--card2,#e6eef4)}.pl-impact:empty{display:none}.pl-impact p{margin:6px 0;font-size:14px}.pl-act{color:var(--bad)}
 .pl-parts summary{font-size:12.5px;font-weight:700;color:var(--sea);cursor:pointer}.pl-parts small{display:block;margin-top:3px}
+/* Your actions: Done / Drop, on Home and in the lists (review rebuild part 5) */
+.fh-act,.ck-act{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line-soft)}
+.fh-act-t,.ck-act-t{display:flex;flex-direction:column;align-items:flex-start;font-size:14.5px;min-width:0;overflow-wrap:anywhere}
+.fh-act-t small,.ck-act-t small{color:var(--ink-soft);font-size:12.5px}
+.fh-act-t .fh-link,.ck-act-t .fh-link{margin-top:2px;font-size:13px;padding:0;text-align:left}
+.fh-act-b,.ck-act-b{display:flex;flex-direction:column;gap:6px}
+.fh-act-done,.ck-done{border:0;background:var(--sea);color:#fff;border-radius:10px;padding:8px 12px;font:inherit;font-weight:800;font-size:13.5px;min-height:38px;min-width:78px}
+.fh-act-drop,.ck-drop{border:1px solid var(--line);background:var(--card);color:var(--ink-soft);border-radius:10px;padding:6px 12px;font:inherit;font-weight:700;font-size:13px;min-height:34px;min-width:78px}
+.ck-hist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.ck-hist-i{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:12px;font:inherit}
+.ck-hist-i span:nth-child(2){display:flex;flex-direction:column}.ck-hist-i small{color:var(--ink-soft);font-size:12.5px}
+.ck-opts .btn small{display:block;font-weight:600;font-size:12.5px;opacity:.8;margin-top:2px}
+#ck-print{display:none}
+@media print{
+ body.ck-printing>*:not(#ck-print){display:none!important}
+ body.ck-printing{background:#fff!important}
+ body.ck-printing #ck-print{display:block;color:#000;font:12pt/1.45 Nunito,Arial,sans-serif;padding:0 8mm}
+ #ck-print h1{font-size:20pt;margin:0}#ck-print .sub{color:#444;margin:2pt 0 10pt}
+ #ck-print h3{font-size:13pt;margin:14pt 0 4pt;border-bottom:1px solid #999}
+ #ck-print table{width:100%;border-collapse:collapse}#ck-print td{padding:3pt 0;border-bottom:1px solid #ddd}#ck-print td+td{text-align:right;font-weight:700}
+ #ck-print ul{margin:0;padding-left:16pt}#ck-print ul.cb{list-style:none;padding-left:0}#ck-print li{margin:3pt 0;break-inside:avoid}
+ #ck-print .lines{height:60mm;background:repeating-linear-gradient(#fff 0 9mm,#bbb 9mm calc(9mm + 1px))}
+}
