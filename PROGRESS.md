@@ -4,12 +4,12 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 04/11/2026)
-- Branch: feature/fix-numbers (commit f1df873), NOT pushed. Rollback tag: pre-fix-numbers.
+- Branch: feature/fix-numbers merged into main and PUSHED 04/11 (8002cfd); Pages build green; live files match. Rollback tag: pre-fix-numbers.
 - What changed last: Part 1 of the review rebuild ("fix the numbers"), after Jaimi's first real Payday Reset showed Miscellaneous $5,535 (bank feed files anything unrecognised as 'other') and huge "unexplained differences". New finance/fix-numbers.js: (1) Sort out Miscellaneous: grouped by shop with every payment (date, account, amount), pick a category or "leave as a one-off", "Always put this shop here" rules (fin_cat_rules_v1, applied on open and inside every PocketSmith import). (2) Match to my bank: replaces the old Data and recovery screen; per account Bank vs App, possible double-ups (bank row + hand-added copy, soft remove with undo), transfers with no other side, where history starts, and "Start fresh" (one labelled src balance-adjustment transfer line, undoable; ignored by budgets, income and transfer matching). Home card "🧰 Fix my numbers" + More item (Jaimi only). Cache v72.
 - Files touched: finance/fix-numbers.js (new), finance/home-redesign.js/.css, finance/phase-glue.js, finance/pocketsmith-import.js (apply shop rules before save), finance/money-moves.js (ignore start-fresh lines), tools/finance-phases-patches.mjs (fixHead), finance/index.html (rebuilt), src/finance.html (backup src/backups/finance-pre-fix-numbers-*), sw.js, tests.
 - Half-done: nothing in part 1. Parts 2 to 5 of the review rebuild not started (see Up next).
 - Proof it works: tests 507/507. Browser, phone size, made-up data: Home card shows; sorter groups shops, Save moved 2 payments and remembered the shop; double-up removal changed the gap by exactly its amount; Start fresh took Everyday to $0 difference and balanced=true; start-fresh line not income, not in weekly budget, not paired as a transfer; no console errors.
-- Next step: Jaimi OKs push, then on her phone: Home → 🧰 Fix my numbers → sort Miscellaneous, then Match to my bank. Then part 2 (tappable detail in reviews).
+- Next step: on her phone: Home → 🧰 Fix my numbers → sort Miscellaneous, then Match to my bank. Then part 2 (tappable detail in reviews).
 - Back-ups made: git tag pre-fix-numbers; src/backups/finance-pre-fix-numbers-*.html
 
 ## Up next
@@ -20,7 +20,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
-- 04/11/2026 – Fix my numbers (sort Miscellaneous with remembered shops; Match to my bank with double-ups and start fresh). Branch feature/fix-numbers, NOT pushed. Tests 507/507. – Claude Code
+- 04/11/2026 – Fix my numbers (sort Miscellaneous with remembered shops; Match to my bank with double-ups and start fresh). Merged and PUSHED 04/11 (8002cfd), Pages green, live files match. Tests 507/507. – Claude Code
 - 03/11/2026 – Soft Ocean colours across Life Hub (day + softer slate night in Finance) and plainer Budget check-in card. Merged and PUSHED 03/11 (3703937), Pages green, live files match. Tests 499/499. – Claude Code
 - 02/11/2026 – Money Coach Stages 3 to 5 merged and PUSHED 02/11 (f2a2e97), Pages green, live files match: Wednesday Payday Reset, Month-End Review, reminders with settings, Co-Pilot Money card. Budget Swap ticked off Up next (it was already built as "Fit in a new cost"). Tests 499/499. Checked in the browser with demo data. – Claude Code
 - 01/11/2026 – Money Coach Stage 2 on feature/money-coach (NOT pushed): finance/coach-ui.js, the daily check-in (5 steps: data, where you stand, one leak with its transactions and planned/essential/one-off/wrong-category marks, what to do now with choices and follow-ups, done). Progress dots, Back/Next/Skip, close any time and carry on later. Home button (Start / Carry on / done) and More > Money check-in. Owner profile only. Fixed during testing: progress could be lost while the encrypted store was still saving (now kept in memory). Ticks Daily wins' check-in quest. Tests 490/490. Checked in the browser on phone and Mac with demo data. – Claude Code
