@@ -4,7 +4,7 @@ import {readFileSync,existsSync} from 'node:fs';
 const V='20261018-phases1';
 const must=(cond,msg)=>{if(!cond)throw new Error('Phases patch: '+msg)};
 const once=(s,a,b,label)=>{if(s.includes(b))return s;must(s.includes(a),label+' anchor');return s.replace(a,b);};
-const bump=t=>t.replace(/(profiles|meaning|coach|coach-ui|goals-funds|autopilot|money-moves|files-inbox|pip|game|swap|phase-glue|autopilot|money-moves|goals-funds|files-inbox|pip|game|swap)\.(js|css)\?v=[^"']+/g,'$1.$2?v='+V);
+const bump=t=>t.replace(/(profiles|meaning|coach|coach-ui|fix-numbers|goals-funds|autopilot|money-moves|files-inbox|pip|game|swap|phase-glue|autopilot|money-moves|goals-funds|files-inbox|pip|game|swap)\.(js|css)\?v=[^"']+/g,'$1.$2?v='+V);
 
 function phase3(s){
   const head='<script src="../finance/home-redesign.js?v=20261018-redesign1"></script>';
@@ -133,6 +133,11 @@ function meaningHead(s){
   const a='<script src="../finance/swap.js?v='+V+'"></script>';
   return once(s,a,a+'\n<script src="../finance/meaning.js?v='+V+'"></script>','meaning head');
 }
+/* Fix my numbers: sort Miscellaneous and match accounts to the bank. */
+function fixHead(s){
+  const a='<script src="../finance/coach-ui.js?v='+V+'"></script>';
+  return once(s,a,a+'\n<script src="../finance/fix-numbers.js?v='+V+'"></script>','fix head');
+}
 /* Money Coach: engine and the daily check-in screens. */
 function coachHead(s){
   const a='<script src="../finance/meaning.js?v='+V+'"></script>';
@@ -163,5 +168,6 @@ export function patchPhasesFinance(source){
   s=explain(s);
   s=meaningHead(s);
   s=coachHead(s);
+  s=fixHead(s);
   return bump(s);
 }

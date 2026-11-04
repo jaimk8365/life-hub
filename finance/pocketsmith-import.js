@@ -230,6 +230,7 @@
           balanceResults.push({financeId:acct.id,target:Number(b.balance),calculated:Number(b.balance),ledger,difference:acct.reconciliation.difference});
         }
 
+        if(typeof FinFix!=="undefined"&&typeof load==="function"){try{const r=FinFix.applyRules(TXNS,load("fin_cat_rules_v1",[]));if(r.changed){TXNS.length=0;r.txns.forEach(t=>TXNS.push(t));}}catch(_){}}
         const accountsKey=typeof K_ACCTS!=="undefined"?K_ACCTS:"fin_accounts_v3";
         const txnsKey=typeof K_TXNS!=="undefined"?K_TXNS:"fin_txns_v3";
         if(typeof saveAtomic!=="function")throw new Error("Refresh Finance before importing: safe storage is not ready.");
