@@ -125,8 +125,8 @@ function fixMiscOpen(range){
  if(range)_fixRange=range;
  const r=fixRangeDates(),m=FinFix.miscGroups(TXNS,r.from,r.to),opts=fixCatOptions(),chip=(k,l)=>'<button class="fx-chip'+(_fixRange===k?' on':'')+'" onclick="fixMiscOpen(\''+k+'\')">'+l+'</button>';
  const group=(g,i)=>'<details class="fx-group"'+(i<3?' open':'')+'><summary><span class="fx-shop">'+esc(g.name)+'</span><span class="fx-amt">'+FinFix.money(g.total)+'</span><span class="fx-count">'+g.count+(g.count===1?' payment':' payments')+'</span></summary>'
-  +'<div class="fx-rows">'+g.txns.map(t=>'<label class="fx-row"><input type="checkbox" checked data-fx-group="'+i+'" value="'+esc(t.id)+'"><span>'+esc(fixDay(t.date))+' · '+esc(acctById(t.acct)?.name||t.acct)+'<small>'+esc(t.note||'')+'</small></span><b>'+FinFix.money(-t.amount)+'</b></label>').join('')+'</div>'
-  +'<div class="fx-pick"><label>Where does this belong?<select id="fx_cat_'+i+'"><option value="">Choose…</option>'+opts+'<option value="__oneoff">Leave as a one-off</option></select></label>'
+  +'<div class="fx-rows">'+g.txns.map(t=>'<label class="fx-row"><input type="checkbox" checked data-fx-group="'+i+'" value="'+esc(t.id)+'"><span>'+esc(fixDay(t.date))+' · '+esc(acctById(t.acct)?.name||t.acct)+'<small>'+esc(t.note||'')+'</small>'+(t.userNote?'<small class="fx-unote">📝 '+esc(t.userNote)+'</small>':'')+'</span><b>'+FinFix.money(-t.amount)+'</b><button type="button" class="fx-notebtn" aria-label="'+(t.userNote?'Edit note':'Add a note')+'" onclick="event.preventDefault();fixNoteOpen(\''+esc(t.id)+'\')">📝</button></label>').join('')+'</div>'
+  +'<div class="fx-pick"><label>Where does this belong?<select id="fx_cat_'+i+'" onchange="if(this.value===\'__new\')catNewShow(\'fx'+i+'\')"><option value="">Choose…</option>'+opts+'<option value="__new">＋ New category…</option><option value="__oneoff">Leave as a one-off</option></select></label><div class="cn-host" id="cn_fx'+i+'"></div>'
   +'<label class="fx-remember"><input type="checkbox" id="fx_rule_'+i+'" checked> Always put '+esc(g.name)+' here</label>'
   +'<button class="btn dark" onclick="fixMiscSave('+i+')">Save</button></div></details>';
  window._fixGroups=m.groups;
@@ -158,6 +158,52 @@ async function fixMiscSave(i){
  if(typeof render==='function')render();fixMiscOpen();
 }
 window.fixMiscSave=fixMiscSave;
+/* Notes on a payment: "what was this?" Saved on the payment as userNote (the same note reviews use). */
+function fixNoteOpen(id){
+ const t=TXNS.find(x=>String(x.id)===String(id));if(!t)return;
+ $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixMiscOpen()">‹ Sort out Miscellaneous</button><h2>📝 What was this?</h2>'
+  +'<p class="fx-sum"><b>'+FinFix.money(-t.amount)+'</b> · '+esc(fixDay(t.date))+' · '+esc(t.note||'No description')+'</p>'
+  +'<div class="ck-note"><textarea id="fx_note" maxlength="200" rows="3" placeholder="e.g. school shoes + phone case">'+esc(t.userNote||'')+'</textarea></div>'
+  +'<button class="btn dark" onclick="fixNoteSave(\''+esc(t.id)+'\')">Save note</button>';
+ openSheet();setTimeout(()=>{const x=$('fx_note');if(x)x.focus();},50);
+}
+async function fixNoteSave(id){
+ const before=TXNS.slice(),v=String($('fx_note').value||'').trim(),next=FinCats.setNote(TXNS,id,v);
+ TXNS.length=0;next.forEach(t=>TXNS.push(t));
+ try{await fixSaveTxns();}catch(e){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
+ toastMsg(v?'Note saved ✓':'Note removed');fixMiscOpen();
+}
+window.fixNoteOpen=fixNoteOpen;window.fixNoteSave=fixNoteSave;
+/* Make your own category, with an emoji library. Used in Fix my numbers, Edit transaction and Budget. */
+let _catNewEmoji='🧾';
+function catEmojiPicker(sel){return '<div class="cn-emoji">'+FinCats.EMOJI.map(g=>'<div class="cn-g"><small>'+esc(g.g)+'</small><div class="icon-library">'+g.e.map(x=>'<button type="button" class="icon-choice'+(x===sel?' on':'')+'" data-e="'+x+'" onclick="catPickEmoji(this)">'+x+'</button>').join('')+'</div></div>').join('')+'</div>';}
+function catPickEmoji(b){_catNewEmoji=b.dataset.e;b.closest('.cn-emoji').querySelectorAll('.icon-choice').forEach(x=>x.classList.toggle('on',x===b));try{selectedCategoryIcon=_catNewEmoji;}catch(e){}}
+function catNewShow(where){
+ document.querySelectorAll('.cn-host').forEach(h=>{h.innerHTML='';});_catNewEmoji='🧾';
+ const host=$('cn_'+where);if(!host)return;
+ host.innerHTML='<div class="cn-panel"><h3>＋ New category</h3><label>Name<input id="cn_name" maxlength="40" placeholder="e.g. Kids pocket money"></label><label>Pick an emoji</label>'+catEmojiPicker(_catNewEmoji)
+  +'<label>Monthly budget · optional<div class="amt-in"><span>$</span><input id="cn_budget" inputmode="decimal" placeholder="0"></div></label>'
+  +'<div class="cn-btns"><button type="button" class="btn dark" onclick="catNewSave(\''+where+'\')">Add category</button><button type="button" class="btn ghost" onclick="catNewCancel(\''+where+'\')">Cancel</button></div></div>';
+ const n=$('cn_name');if(n)n.focus();
+}
+function catNewCancel(where){const h=$('cn_'+where);if(h)h.innerHTML='';const s=where.startsWith('fx')&&$('fx_cat_'+where.slice(2));if(s&&s.value==='__new')s.value='';}
+function catNewSave(where){
+ const made=FinCats.makeCustom($('cn_name').value,_catNewEmoji,CATS);
+ if(!made){toastMsg('Type a name first');return;}
+ let cat=made.exists;
+ if(!cat){
+  const amt=Math.round((parseFloat(String($('cn_budget').value||'').replace(/[^0-9.]/g,''))||0)*100)/100;
+  cat=made;CUSTOM_CATS.push(cat);save(K_CUSTOM_CATS,CUSTOM_CATS);
+  if(amt>0){let sec=BUDGET.find(g=>g.sec==='J · Miscellaneous / one-offs');if(!sec){sec={sec:'J · Miscellaneous / one-offs',acct:'bills',items:[]};BUDGET.push(sec);}sec.items.push({n:cat.n,mo:amt,freq:'monthly',acct:'everyday',category:cat.id});saveBudget();}
+  FinCats.sync(CATS,CUSTOM_CATS,typeof FUNDS!=='undefined'?FUNDS:[]);toastMsg('Added '+cat.e+' '+cat.n+' ✓');
+ }else toastMsg('You already have '+cat.n+'. Picked it for you.');
+ const h=$('cn_'+where);if(h)h.innerHTML='';
+ if(where==='edit'){edit.cat=cat.id;renderEditCats();return;}
+ const s=$('fx_cat_'+where.slice(2));if(!s)return;
+ if(![...s.options].some(o=>o.value===cat.id))s.querySelector('option[value="__new"]').insertAdjacentHTML('beforebegin','<option value="'+esc(cat.id)+'">'+esc(cat.e+' '+cat.n)+'</option>');
+ s.value=cat.id;
+}
+Object.assign(window,{catEmojiPicker,catPickEmoji,catNewShow,catNewCancel,catNewSave});
 async function fixRuleForget(key){const rules=FinFix.removeRule(fixRules(),key);try{await saveAtomic({[K_CAT_RULES]:rules});}catch(e){toastMsg('Could not save.');return;}toastMsg('Forgotten. Past payments keep their category.');fixMiscOpen();}
 window.fixRuleForget=fixRuleForget;
 
