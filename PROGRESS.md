@@ -4,11 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 04/11/2026)
-- Branch: fix/calendar-links (committed, NOT merged or pushed). Guided planners were pushed earlier 04/11 (c9c44c8).
+- Branch: fix/calendar-links merged into main and PUSHED 04/11 (3ae7c60); files confirmed on GitHub. Rollback tag: pre-calendar-links. Secret CALENDAR_ICS_URLS NOT added yet (only HUB_KEY exists).
 - Cause found: the twice-daily "Refresh Life Hub" workflow (since 18/10, 33 runs) has never succeeded: "Missing required secret: GOOGLE_CLIENT_ID" (only HUB_KEY exists). Calendar last came in 14/09 via the old Claude 6am task. Reminders use a separate workflow and are fine.
 - What changed: tools/ics-calendar.mjs (new, no add-ons) reads Google "Secret address in iCal format" files and expands repeats (daily/weekly/fortnightly/monthly incl. 2nd Tuesday and last day/yearly, COUNT/UNTIL, removed and moved dates, other time zones). tools/refresh-lifehub.mjs uses it when the CALENDAR_ICS_URLS secret has lines "Label | https://…ics"; otherwise falls back to the Google API. One bad link only warns; all bad = nothing changed. Links are never printed. Workflow passes the new secret.
 - Proof: tests 548/548 (new tests/ics-calendar.test.mjs). Local dry run of the real job with a fake link: 7 events gathered, appeared in decrypted plan feed, automation-refresh tests 3/3, then hub/plan restored with git checkout.
-- Next step: Jaimi OK to push; Jaimi adds secret CALENDAR_ICS_URLS on GitHub herself (never paste the links in chat); then run "Refresh Life Hub" manually and check Planner/Co-Pilot show this week. Known: the public tools/refresh-lifehub.mjs already contains calendar email addresses and kids' names in its old Google list (pre-existing) — ask Jaimi about removing once links work.
+- Next step: Jaimi adds secret CALENDAR_ICS_URLS on GitHub herself (never paste the links in chat); then run "Refresh Life Hub" manually and check Planner/Co-Pilot show this week. Known: the public tools/refresh-lifehub.mjs already contains calendar email addresses and kids' names in its old Google list (pre-existing) — ask Jaimi about removing once links work.
 
 ## Up next
 - [ ] Calendar feed stale since 14/09 (Co-Pilot + Planner): find why the calendar refresh stopped and fix it.
@@ -20,7 +20,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
-- 04/11/2026 – Calendar fix: job can read Google private calendar links (repeats handled). Branch fix/calendar-links, not pushed. Tests 548/548. – Claude Code
+- 04/11/2026 – Calendar fix: job can read Google private calendar links (repeats handled). PUSHED 04/11 (3ae7c60); waiting on Jaimi to add the secret. Tests 548/548. – Claude Code
 - 04/11/2026 – Guided planners in Co-Pilot: Sunday Weekly Reset, Daily (morning + evening), Start of the month; Now invites + pinned top 3. PUSHED 04/11 (c9c44c8), Pages green. Tests 543/543. – Claude Code
 - 04/11/2026 – Wrote research/notion-lifehub-chatgpt-brief.md: a phase-by-phase brief to paste into ChatGPT to rebuild Life Hub as a sellable Notion template (fake sample data only; Night Court quests themed on someone else's books, so replaced with an original theme). No app code changed, nothing committed. – Claude Code
 - 04/11/2026 – Life Hub Inbox: bottom bar highlights the right screen; empty badge hidden. PUSHED 04/11 (60e3dba), Pages green. Tests 534/534. – Claude Code
