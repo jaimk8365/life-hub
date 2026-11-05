@@ -110,7 +110,8 @@ const now = new Date();
 const localMidnight = new Date(`${isoDate(now)}T00:00:00+10:00`);
 const daysSinceMonday = (localMidnight.getUTCDay() + 6) % 7;
 const from = new Date(localMidnight.getTime() - daysSinceMonday * 86400000);
-const until = new Date(now.getTime() + 45 * 86400000);
+const until = new Date(now.getTime() + 400 * 86400000); // about 13 months, for the Planner's Month and Year views
+const hubEnd = isoDate(new Date(now.getTime() + 45 * 86400000)); // the Hub keeps its usual 45 days
 const gathered = useIcs
   ? await (async () => {
       const results = await Promise.allSettled(icsCalendars.map(c => icsEvents(c, from.toISOString(), until.toISOString())));
@@ -151,12 +152,12 @@ try {
     if (Array.isArray(prev.starred)) keepStarred = prev.starred;
   }
 } catch { /* first run / unparsable: fall back to empty, no worse than before */ }
-const hubBlock = `const LIVE_SYNCED_AT = ${JSON.stringify(displayTime(now))};\nconst LIVE_SYNCED_ISO = ${JSON.stringify(localIso(now))};\nconst LIVE = ${JSON.stringify({calendar:gathered, reminders, emails:keepEmails, starred:keepStarred}, null, 2)};`;
+const hubBlock = `const LIVE_SYNCED_AT = ${JSON.stringify(displayTime(now))};\nconst LIVE_SYNCED_ISO = ${JSON.stringify(localIso(now))};\nconst LIVE = ${JSON.stringify({calendar:gathered.filter(e => e.start.slice(0,10) <= hubEnd), reminders, emails:keepEmails, starred:keepStarred}, null, 2)};`;
 hub = replaceBetween(hub, 'const LIVE_SYNCED_AT', '\n\n\n/* ============================================================\n   STATE', `${hubBlock}\n\n\n/* ============================================================\n   STATE`);
 
 const feed = {
   updatedAt: plannerLabel(now),
-  events: gathered.filter(e => { const d=e.start.slice(0,10); return d >= today && d <= plannerEnd; }).map(e => ({
+  events: gathered.filter(e => { const d=e.start.slice(0,10); return d >= today && d <= isoDate(until); }).map(e => ({
     date:e.start.slice(0,10), start:e.end === null ? null : e.start.slice(11,16), end:e.end ? e.end.slice(11,16) : null, title:e.title, cal:e.calendar,
   })),
   reminders: reminders.filter(r => r.due && r.due <= plannerEnd).map(r => ({date:r.due, title:r.title, list:r.list, due:dateAndTime(snapshot.reminders.find(x => x.title === r.title && x.list === r.list)?.due).time})),
