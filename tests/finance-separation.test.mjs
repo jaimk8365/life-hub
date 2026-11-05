@@ -21,10 +21,10 @@ test('Life Hub offers a separate Finance link without embedding its finance page
 });
 test('old saved Finance selection safely boots Hub without opening another tab',()=>{
  const page=rootPage('finance');page.boot();assert.equal(page.elements.get('f-hub').classList.contains('active'),true);assert.equal(page.elements.get('f-hub').src,'./hub/index.html');assert.equal(page.opened.length,0);
- assert.equal(page.initial.get('lifehub_tab'),'hub');assert.equal(page.initial.get('fin_accounts_v3'),'dummy-account-data');assert.equal(page.initial.get('hub_key'),'dummy-key-not-a-real-secret');assert.ok(page.writes.every(([key])=>key==='lifehub_tab'));
+ assert.equal(page.initial.get('lifehub_tab'),'hub');assert.equal(page.initial.get('fin_accounts_v3'),'dummy-account-data');assert.equal(page.initial.get('hub_key'),'dummy-key-not-a-real-secret');assert.ok(page.writes.every(([key])=>key==='lifehub_tab'||key==='lifehub_last_opened'));
 });
 test('legacy explicit Finance navigation opens the standalone app and preserves the active Hub section',()=>{
- const page=rootPage('plan');page.boot();page.show('finance');assert.deepEqual(page.opened,[['./finance/app.html']]);assert.equal(page.elements.get('f-plan').classList.contains('active'),true);assert.equal(page.initial.get('lifehub_tab'),'plan');assert.ok(page.writes.every(([key])=>key==='lifehub_tab'));
+ const page=rootPage('plan');page.boot();page.show('finance');assert.deepEqual(page.opened,[['./finance/app.html']]);assert.equal(page.elements.get('f-plan').classList.contains('active'),true);assert.equal(page.initial.get('lifehub_tab'),'plan');assert.ok(page.writes.every(([key])=>key==='lifehub_tab'||key==='lifehub_last_opened'));
 });
 test('invalid, prototype and unavailable saved navigation fall back to Hub',()=>{
  for(const saved of ['unknown','toString','__proto__']){const page=rootPage(saved);page.boot();assert.equal(page.elements.get('f-hub').classList.contains('active'),true);assert.equal(page.opened.length,0);}

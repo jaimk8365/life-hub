@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Our Family</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Our Family">
+<meta name="theme-color" content="#F1F5F8">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="icon" href="../icons/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<!--
+  Family board for the kitchen iPad. This page holds NO family data itself: everything arrives through
+  the encrypted family channel (../family-sync.js), unlocked with the family passcode on this device.
+  Day look from 6:00am, night look from 6:30pm (Brisbane time).
+-->
+<style>
+:root{
+  --bg:#F1F5F8;--card:#FBFCFD;--card2:#E8EEF5;--ink:#34404A;--soft:#5B6B78;--faint:#6B7A87;--line:#D6E0E8;
+  --teal:#3F8F7F;--teal-soft:#E3F2EE;--lilac-soft:#E8EEF5;--sun:#B8862A;--sun-soft:#FBF3DC;--coral:#BF5E55;--coral-soft:#F8E6E3;--on-teal:#FFFFFF;
+  --display:'Fraunces',Georgia,serif;--body:'Hanken Grotesk',system-ui,-apple-system,sans-serif;--r:18px;
+}
+:root[data-theme="dark"]{
+  --bg:#1C2329;--card:#252E36;--card2:#2D3740;--ink:#E6ECF1;--soft:#B3C0CB;--faint:#94A3B0;--line:#3A4651;
+  --teal:#7CC7B5;--teal-soft:#23403B;--lilac-soft:#2F3650;--sun:#E8C26B;--sun-soft:#3D3523;--coral:#E89A90;--coral-soft:#45302D;--on-teal:#14201D;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.45;-webkit-font-smoothing:antialiased;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(110px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));transition:background .4s,color .4s}
+h1,h2,h3{margin:0;text-wrap:balance}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.head small{display:block;color:var(--soft);font-size:1.05rem}
+.head h1{font-family:var(--display);font-weight:600;font-size:2.4rem;line-height:1.05}
+.head .clock{color:var(--teal);font-variant-numeric:tabular-nums;margin-left:10px}
+.status{font-size:.85rem;color:var(--faint)}
+.grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card h3{font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lnk{border:0;background:none;color:var(--teal);font-weight:700;letter-spacing:0;text-transform:none;font-size:.9rem;padding:6px 0}
+.row{display:flex;gap:12px;align-items:center;min-height:52px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .t{font-variant-numeric:tabular-nums;font-weight:700;width:70px;flex:none;color:var(--soft)}
+.row .what{flex:1;min-width:0}
+.row .what b{display:block;font-weight:600}
+.row .what span{font-size:.85rem;color:var(--soft)}
+.row.busy .what b{color:var(--faint);font-weight:500}
+.empty{color:var(--faint);font-size:.95rem}
+.tick{display:flex;gap:12px;align-items:center;min-height:52px;border:0;background:transparent;text-align:left;padding:4px 0;width:100%}
+.tick i{width:30px;height:30px;border-radius:9px;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-style:normal;font-weight:700;color:var(--on-teal)}
+.tick[aria-pressed="true"] i{background:var(--teal);border-color:var(--teal)}
+.tick[aria-pressed="true"] span{text-decoration:line-through;color:var(--faint)}
+.dinner b{font-family:var(--display);font-size:1.5rem;font-weight:600}
+.notes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sticky{background:var(--sun-soft);border-radius:12px;padding:10px 12px;font-size:.95rem;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;gap:6px;overflow-wrap:anywhere}
+.sticky:nth-child(4n+2){background:var(--lilac-soft)}.sticky:nth-child(4n+3){background:var(--teal-soft)}.sticky:nth-child(4n+4){background:var(--coral-soft)}
+.sticky button{align-self:flex-end;border:0;background:transparent;color:var(--soft);font-size:.8rem;font-weight:700;padding:4px}
+.kid{display:flex;align-items:center;gap:8px;font-weight:700}
+.coins{margin-left:auto;background:var(--sun-soft);border-radius:999px;padding:3px 10px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-weight:600;min-height:52px;display:flex;align-items:center;gap:6px}
+.chip.done{background:var(--teal-soft);border-color:var(--teal)}
+.chip.wait{background:var(--sun-soft)}
+.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:700;min-height:52px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.go{background:var(--teal);color:var(--on-teal)}
+.btn.soft{background:var(--card2);color:var(--ink)}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:8px max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;justify-content:space-between}
+.nav .tabs{display:flex;gap:6px;flex-wrap:wrap;min-width:0}
+.nav .tabs button{border:0;background:transparent;border-radius:14px;padding:10px 16px;font-weight:700;min-height:56px;font-size:1rem;color:var(--soft)}
+.nav .tabs button[aria-current="page"]{background:var(--teal-soft);color:var(--ink)}
+.nav .side{display:flex;gap:8px}
+.lockbtn{border:1px solid var(--line);background:var(--card);border-radius:14px;min-width:56px;min-height:56px;font-size:1.2rem}
+/* calendar */
+.cal{display:flex;flex-direction:column;gap:12px}
+.cal-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.cal-nav{display:flex;gap:6px;align-items:center;min-width:0}
+.arr{border:1px solid var(--line);background:var(--card);border-radius:12px;width:52px;height:52px;font-size:1.4rem;font-weight:700;flex:none}
+.lbl{font-family:var(--display);font-weight:600;font-size:1.35rem;padding:0 6px}
+.seg{display:flex;gap:6px;background:var(--card2);padding:4px;border-radius:14px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:10px 16px;font-weight:700;min-height:48px}
+.seg button[aria-pressed="true"]{background:var(--card)}
+.tdy{border:0;background:var(--teal-soft);border-radius:12px;padding:0 16px;height:52px;font-weight:700}
+.c-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.c-day{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px;min-height:260px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.c-day.is-today,.mcell.is-today,.ymon.is-now{border:2px solid var(--teal)}
+.dh{display:flex;justify-content:space-between;font-weight:700;font-size:.95rem}
+.dh span{color:var(--faint);font-weight:600}
+.ev{border-radius:8px;padding:4px 7px;font-size:.82rem;line-height:1.25;background:var(--teal-soft);overflow:hidden;text-overflow:ellipsis}
+.ev.busy{background:var(--card2);color:var(--faint)}
+.ev b{font-variant-numeric:tabular-nums}
+.c-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wdh{font-size:.75rem;font-weight:700;color:var(--faint);text-align:center;letter-spacing:.06em;text-transform:uppercase;padding:4px 0}
+.mcell{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:5px;min-height:108px;display:flex;flex-direction:column;gap:3px;text-align:left;min-width:0}
+.mcell.out{opacity:.45}
+.mcell .n{font-weight:700;font-size:.9rem}
+.mcell .ev{font-size:.72rem;padding:2px 5px;white-space:nowrap}
+.more{font-size:.72rem;color:var(--faint);font-weight:600}
+.c-year{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ymon{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:left;display:flex;flex-direction:column;gap:6px;min-width:0}
+.ymon h4{margin:0;font-family:var(--display);font-weight:600;font-size:1.05rem}
+.ygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.ygrid i{font-style:normal;font-size:.7rem;text-align:center;padding:2px 0;border-radius:5px;font-variant-numeric:tabular-nums}
+.ygrid i.e{background:var(--teal);color:var(--on-teal);font-weight:700}
+.ygrid i.b{background:var(--card2)}
+.ygrid i.t{outline:2px solid var(--ink)}
+/* sheets */
+.sheet-bg{position:fixed;inset:0;z-index:20;background:rgba(20,30,40,.45);display:grid;place-items:center;padding:16px}
+.sheet{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--card);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.sheet h2{font-family:var(--display);font-weight:600;font-size:1.5rem}
+.sheet input,.sheet textarea{width:100%;min-height:52px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)}
+.sheet .hint{font-size:.88rem;color:var(--soft)}
+.sheet .err{color:var(--coral);font-weight:700;min-height:1.2em}
+.btns{display:flex;gap:8px;flex-wrap:wrap}.btns .btn{flex:1}
+.setup{max-width:560px;margin:8vh auto 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:14px;font-weight:700;max-width:calc(100% - 32px);text-align:center}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:980px){.grid{grid-template-columns:1fr 1fr}.grid .wide{grid-column:1/-1}.c-year{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.grid,.two{grid-template-columns:1fr}.head h1{font-size:1.8rem}.c-week{grid-template-columns:1fr}.c-day{min-height:0}.c-year{grid-template-columns:repeat(2,minmax(0,1fr))}.mcell{min-height:60px}.mcell .ev{display:none}.nav .tabs button{padding:8px 10px;font-size:.88rem}}
+@media (prefers-reduced-motion:reduce){body{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<nav class="nav" id="nav" hidden aria-label="Family board">
+  <div class="tabs">
+    <button data-tab="today" aria-current="page">☀️ Today</button>
+    <button data-tab="cal">🗓️ Calendar</button>
+    <button data-tab="meals">🍳 Meals &amp; shopping</button>
+    <button data-tab="quests">🐉 Quests</button>
+  </div>
+  <div class="side"><button class="btn go" data-act="add">＋ Add</button><button class="lockbtn" data-act="lock" aria-label="Grown-up settings">🔒</button></div>
+</nav>
+<div id="sheet"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="../family-sync.js"></script>
+<script type="module">
+import * as QW from '../copilot/questworld.mjs';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} sync && sync.markDirty(); };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+let tt; const toast = m => { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); };
+
+/* ---------- Brisbane time, day/night look ---------- */
+const TZ = 'Australia/Brisbane', DAY = 864e5;
+const D = (y, m, d) => new Date(Date.UTC(y, m, d, 12)), iso = d => d.toISOString().slice(0, 10), add = (d, n) => new Date(d.getTime() + n * DAY);
+const MN = ['January','February','March','April','May','June','July','August','September','October','November','December'], WD = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const wdi = d => (d.getUTCDay() + 6) % 7, monday = d => add(d, -wdi(d));
+function todayD() { const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date()).split('-').map(Number); return D(y, m - 1, d); }
+const todayISO = () => iso(todayD());
+const to12 = t => { if (!t) return 'All day'; const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''}${h < 12 ? 'am' : 'pm'}`; };
+function tick() {
+  const now = new Date(), mins = +new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' }).format(now) * 60 + +new Intl.DateTimeFormat('en-AU', { timeZone: TZ, minute: 'numeric' }).format(now);
+  const night = mins < 360 || mins >= 1110;
+  document.documentElement.setAttribute('data-theme', night ? 'dark' : 'light');
+  document.querySelector('meta[name=theme-color]').content = night ? '#1C2329' : '#F1F5F8';
+  const c = $('clock'); if (c) c.textContent = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true }).format(now).replace(' ', '').toLowerCase();
+  const day = $('hdDay'); if (day && day.dataset.iso !== todayISO()) render();
+}
+
+/* ---------- data from the family channel ---------- */
+const calFeed = () => load('board_cal', { events: [] });
+const eventsOn = k => (calFeed().events || []).filter(e => e.date === k).sort((a, b) => (a.start ? 1 : 0) - (b.start ? 1 : 0) || String(a.start || '').localeCompare(String(b.start || '')));
+function dinners() {
+  const plans = load('kit_plans', {}), mon = monday(todayD());
+  for (const key of [iso(mon), iso(add(mon, -1)), iso(add(mon, 1))]) if (plans[key]?.dinners) return plans[key].dinners;
+  return {};
+}
+const DKEY = ['mon','tue','wed','thu','fri','sat','sun'];
+
+/* ---------- screens ---------- */
+let tab = 'today', sync = null;
+const CAL = { view: 'month', at: todayD() };
+function statusText() {
+  const st = sync ? sync.state() : {};
+  const last = st.last ? new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(new Date(st.last)) : 'not yet';
+  const fresh = calFeed().updatedISO ? new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(calFeed().updatedISO)) : '';
+  return (st.status === 'err' ? '⚠️ ' + st.detail : st.status === 'busy' ? 'Updating…' : '✓ Updated ' + last) + (fresh ? ' · calendar from ' + fresh : '');
+}
+function header() {
+  const t = todayD();
+  return `<div class="head"><div><small id="hdDay" data-iso="${iso(t)}">${new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'long' }).format(new Date())}</small>
+    <h1>${t.getUTCDate()} ${MN[t.getUTCMonth()]}<span class="clock" id="clock"></span></h1></div>
+    <div class="status" id="status" aria-live="polite">${esc(statusText())}</div></div>`;
+}
+const evRow = e => `<div class="row${e.busy ? ' busy' : ''}"><span class="t">${esc(to12(e.start))}</span><div class="what"><b>${esc(e.title)}</b>${e.end && e.start ? `<span>until ${esc(to12(e.end))}</span>` : ''}</div></div>`;
+function shopList(limit) {
+  const shop = load('kit_shop', []), open = shop.filter(s => !s.done), list = limit ? open.slice(0, limit) : open;
+  return (list.map(s => `<button class="tick" aria-pressed="false" data-shop="${esc(s.id)}"><i>✓</i><span>${esc(s.n)}${s.qty ? ` <small style="color:var(--faint)">· ${esc(s.qty)}</small>` : ''}</span></button>`).join('')
+    || '<p class="empty">Nothing on the list.</p>') + (limit && open.length > limit ? `<p class="empty">+${open.length - limit} more on the list</p>` : '');
+}
+function notesHtml() {
+  const notes = load('board_notes', []);
+  return `<div class="notes">${notes.map(n => `<div class="sticky"><span>${esc(n.text)}</span><button data-unpin="${esc(n.id)}" aria-label="Take this note down">✕ Done</button></div>`).join('') || '<p class="empty">No notes. Tap ＋ Add to pin one.</p>'}</div>`;
+}
+function qwCards(full) {
+  const st = QW.readState(localStorage);
+  if (st.none) return `<div class="card"><h3>🐉 QuestWorld</h3><p class="empty">A grown-up can connect QuestWorld in 🔒 settings.</p></div>`;
+  if (st.error === 'key') return `<div class="card"><h3>🐉 QuestWorld</h3><p class="empty">The QuestWorld key needs replacing (🔒 settings).</p></div>`;
+  if (!st.kids) return `<div class="card"><h3>🐉 QuestWorld</h3><p class="empty">Loading quests…</p></div>`;
+  return st.kids.map(k => `<div class="card"><h3>${esc(k.name)}'s quests <span style="text-transform:none;letter-spacing:0">${k.done} of ${k.quests.length} done</span></h3>
+    <div class="kid">${esc(k.name)}${k.waiting ? ` · ⏳ ${k.waiting} waiting for a grown-up` : ''}<span class="coins">🪙 ${k.coins}</span></div>
+    <div class="chips">${(full ? k.quests : k.quests.slice(0, 6)).map(q => `<span class="chip ${q.status === 'Completed' ? 'done' : q.status === 'PendingApproval' ? 'wait' : ''}">${q.status === 'Completed' ? '✅' : q.status === 'PendingApproval' ? '⏳' : esc(q.icon)} ${esc(q.title)}</span>`).join('') || '<span class="empty">No quests today.</span>'}</div>
+    <a class="btn soft" href="${QW.APP_URL}" target="_blank" rel="noopener">🐉 Open QuestWorld</a></div>`).join('');
+}
+function todayHtml() {
+  const t = todayD(), ev = eventsOn(iso(t)), tm = eventsOn(iso(add(t, 1))), dn = dinners()[DKEY[wdi(t)]];
+  return `<div class="grid">
+    <div class="card wide"><h3>Today</h3>${ev.map(evRow).join('') || '<p class="empty">Nothing on the calendar today.</p>'}</div>
+    <div class="card"><h3>Tonight → tomorrow</h3>${tm.map(evRow).join('') || '<p class="empty">Nothing on tomorrow yet.</p>'}</div>
+    <div class="card dinner"><h3>Dinner tonight <button class="lnk" data-tab="meals">Week ›</button></h3><b>${dn?.t ? esc(dn.t) : 'Not planned yet'}</b>
+      <h3 style="margin-top:8px">Shopping list</h3>${shopList(5)}</div>
+    ${qwCards(false)}
+    <div class="card"><h3>Notice board</h3>${notesHtml()}</div>
+  </div>`;
+}
+function mealsHtml() {
+  const dn = dinners(), mon = monday(todayD());
+  return `<div class="two"><div class="card"><h3>This week's dinners</h3>${DKEY.map((k, i) => `<div class="row"><span class="t">${WD[i]} ${add(mon, i).getUTCDate()}</span><div class="what"><b>${dn[k]?.t ? esc(dn[k].t) : '—'}</b></div></div>`).join('')}</div>
+    <div class="card"><h3>Shopping list · same list as Kitchen</h3>
+      <form id="shopForm" style="display:flex;gap:8px"><input id="shopIn" aria-label="Add to the shopping list" placeholder="Add milk, bread…" style="flex:1;min-height:52px;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--bg)"><button class="btn go" type="submit">Add</button></form>
+      ${shopList(0)}</div></div>`;
+}
+function questsHtml() { return `<div class="two">${qwCards(true)}</div>`; }
+
+/* calendar: Week / Month / Year with arrows */
+function calLabel() {
+  const a = CAL.at;
+  if (CAL.view === 'week') { const m = monday(a), e = add(m, 6); return `${m.getUTCDate()} ${MN[m.getUTCMonth()].slice(0, 3)} – ${e.getUTCDate()} ${MN[e.getUTCMonth()].slice(0, 3)} ${e.getUTCFullYear()}`; }
+  return CAL.view === 'month' ? `${MN[a.getUTCMonth()]} ${a.getUTCFullYear()}` : String(a.getUTCFullYear());
+}
+const chip = e => `<span class="ev${e.busy ? ' busy' : ''}">${e.start ? `<b>${esc(to12(e.start))}</b> ` : ''}${esc(e.title)}</span>`;
+function calHtml() {
+  const t = todayD(); let h = `<div class="cal"><div class="cal-bar"><div class="cal-nav"><button class="arr" data-cal="prev" aria-label="Back">‹</button><span class="lbl" aria-live="polite">${calLabel()}</span><button class="arr" data-cal="next" aria-label="Forward">›</button></div><button class="tdy" data-cal="today">Today</button></div>
+    <div class="seg" role="group" aria-label="Calendar view">${['week', 'month', 'year'].map(v => `<button aria-pressed="${CAL.view === v}" data-cal="v:${v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div>`;
+  if (CAL.view === 'week') { const m = monday(CAL.at); h += '<div class="c-week">' + [...Array(7)].map((_, i) => { const d = add(m, i), e = eventsOn(iso(d)); return `<div class="c-day${iso(d) === iso(t) ? ' is-today' : ''}"><span class="dh">${WD[i]} ${d.getUTCDate()}<span>${iso(d) === iso(t) ? 'Today' : ''}</span></span>${e.map(chip).join('') || '<span class="empty" style="font-size:.85rem">Free</span>'}</div>`; }).join('') + '</div>'; }
+  else if (CAL.view === 'month') {
+    const y = CAL.at.getUTCFullYear(), mo = CAL.at.getUTCMonth(), first = D(y, mo, 1), start = monday(first), last = D(y, mo + 1, 0), cells = Math.ceil((wdi(first) + last.getUTCDate()) / 7) * 7;
+    h += '<div class="c-month">' + WD.map(w => `<span class="wdh">${w}</span>`).join('');
+    for (let i = 0; i < cells; i++) { const d = add(start, i), e = eventsOn(iso(d)); h += `<button class="mcell${d.getUTCMonth() !== mo ? ' out' : ''}${iso(d) === iso(t) ? ' is-today' : ''}" data-cal="d:${iso(d)}" aria-label="${d.getUTCDate()} ${MN[d.getUTCMonth()]}: ${e.length} things"><span class="n">${d.getUTCDate()}</span>${e.slice(0, 3).map(chip).join('')}${e.length > 3 ? `<span class="more">+${e.length - 3} more</span>` : ''}</button>`; }
+    h += '</div>';
+  } else {
+    const y = CAL.at.getUTCFullYear(); h += '<div class="c-year">';
+    for (let mo = 0; mo < 12; mo++) { const first = D(y, mo, 1), last = D(y, mo + 1, 0); let g = '';
+      for (let i = 0; i < wdi(first); i++) g += '<i></i>';
+      for (let dd = 1; dd <= last.getUTCDate(); dd++) { const d = D(y, mo, dd), e = eventsOn(iso(d)); g += `<i class="${e.some(x => !x.busy) ? 'e' : e.length ? 'b' : ''}${iso(d) === iso(t) ? ' t' : ''}">${dd}</i>`; }
+      h += `<button class="ymon${y === t.getUTCFullYear() && mo === t.getUTCMonth() ? ' is-now' : ''}" data-cal="m:${iso(first)}"><h4>${MN[mo]}</h4><span class="ygrid">${g}</span></button>`; }
+    h += '</div><p class="empty">Green days have family things on. Grey days are busy. Tap a month to open it. The calendar shows about a year ahead.</p>';
+  }
+  return h + '</div>';
+}
+function calGo(a) {
+  if (a === 'today') CAL.at = todayD();
+  else if (a === 'prev' || a === 'next') { const f = a === 'next' ? 1 : -1, d = CAL.at; CAL.at = CAL.view === 'week' ? add(d, 7 * f) : CAL.view === 'month' ? D(d.getUTCFullYear(), d.getUTCMonth() + f, 1) : D(d.getUTCFullYear() + f, d.getUTCMonth(), 1); }
+  else if (a.startsWith('v:')) CAL.view = a.slice(2);
+  else if (a.startsWith('d:') || a.startsWith('m:')) { const [y, m, d] = a.slice(2).split('-').map(Number); CAL.at = D(y, m - 1, d); CAL.view = a[0] === 'd' ? 'week' : 'month'; }
+  render();
+}
+
+function render() {
+  if (!sync || !sync.on()) { $('nav').hidden = true; $('app').innerHTML = setupHtml(); return; }
+  $('nav').hidden = false;
+  document.querySelectorAll('.nav [data-tab]').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  $('app').innerHTML = header() + (tab === 'cal' ? calHtml() : tab === 'meals' ? mealsHtml() : tab === 'quests' ? questsHtml() : todayHtml());
+  tick();
+}
+
+/* ---------- setup + grown-up lock ---------- */
+function setupHtml() {
+  return `<div class="card setup"><h2 style="font-family:var(--display);font-size:1.8rem">👨‍👩‍👧‍👦 Our Family board</h2>
+    <p>A grown-up sets this up once on this iPad. First, turn on <b>Sync → Family board</b> in Life Hub on your phone.</p>
+    <label for="sPass"><b>Family passcode</b> (the one you picked in Life Hub)</label><input id="sPass" type="password" autocomplete="off" style="min-height:52px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)">
+    <label for="sTok"><b>GitHub key for this iPad</b></label><input id="sTok" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…" style="min-height:52px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)">
+    <p class="empty"><a href="https://github.com/settings/tokens/new?scopes=gist&description=Family%20board%20iPad" target="_blank" rel="noopener">Make a key</a> (gist access only, already ticked). It stays on this iPad.</p>
+    <p class="err" id="sErr" style="color:var(--coral);font-weight:700"></p>
+    <button class="btn go" data-act="connect">Unlock the board</button></div>`;
+}
+function openSheet(html) { $('sheet').innerHTML = `<div class="sheet-bg" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`; const f = $('sheet').querySelector('input,textarea'); if (f) f.focus(); }
+const closeSheet = () => { $('sheet').innerHTML = ''; };
+function lockSheet() {
+  openSheet(`<h2>🔒 Grown-ups only</h2><label for="lPass">Family passcode</label><input id="lPass" type="password" autocomplete="off"><p class="err" id="lErr"></p>
+    <div class="btns"><button class="btn soft" data-act="close">Cancel</button><button class="btn go" data-act="unlock">Open settings</button></div>`);
+}
+function settingsSheet() {
+  const qw = QW.readState(localStorage);
+  openSheet(`<h2>Settings</h2>
+    <p class="hint">QuestWorld: ${qw.none ? 'not connected' : qw.error ? 'key needs replacing' : 'connected ✓'}. Paste a <b>read-only</b> key for questworld-sync (GitHub → Fine-grained tokens → only questworld-sync → Contents: Read-only).</p>
+    <input id="qwTok" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+    <div class="btns"><button class="btn go" data-act="qw-save">Save QuestWorld key</button>${qw.none ? '' : '<button class="btn soft" data-act="qw-forget">Remove it</button>'}</div>
+    <div class="btns"><button class="btn soft" data-act="sync-now">Update now</button><button class="btn soft" data-act="disconnect">Lock this iPad</button></div>
+    <p class="hint">"Lock this iPad" removes the family passcode and keys from this iPad. Nothing is deleted from Life Hub.</p>
+    <button class="btn soft" data-act="close">Done</button>`);
+}
+function addSheet() {
+  openSheet(`<h2>＋ Add</h2>
+    <label for="aShop"><b>🛒 Shopping item</b></label><div class="btns"><input id="aShop" placeholder="e.g. milk"><button class="btn go" data-act="add-shop">Add</button></div>
+    <label for="aNote"><b>📌 Note for the board</b></label><textarea id="aNote" rows="2" placeholder="e.g. Bin night tonight"></textarea><button class="btn go" data-act="add-note">Pin note</button>
+    <a class="btn soft" href="https://calendar.google.com/calendar/r/eventedit" target="_blank" rel="noopener">📅 Add an event in Google Calendar</a>
+    <p class="hint">New events show here after the next calendar update.</p>
+    <button class="btn soft" data-act="close">Close</button>`);
+}
+function addShop(name) {
+  const n = String(name || '').trim(); if (!n) return false;
+  const shop = load('kit_shop', []);
+  if (!shop.some(s => !s.done && String(s.n).toLowerCase() === n.toLowerCase())) shop.push({ id: uid(), n, qty: '', sec: 'pantry', done: false, src: 'board' });
+  save('kit_shop', shop); return true;
+}
+
+document.addEventListener('submit', e => { if (e.target.id === 'shopForm') { e.preventDefault(); if (addShop($('shopIn').value)) { toast('Added to the list ✓'); render(); } } });
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-tab],[data-cal],[data-shop],[data-unpin],[data-act]'); if (!t) return;
+  if (t.dataset.tab) { tab = t.dataset.tab; if (tab === 'cal') CAL.at = CAL.at || todayD(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.cal) { calGo(t.dataset.cal); return; }
+  if (t.dataset.shop) { const shop = load('kit_shop', []), s = shop.find(x => String(x.id) === t.dataset.shop); if (s) { s.done = true; save('kit_shop', shop); toast(`Got it: ${s.n} ✓`); render(); } return; }
+  if (t.dataset.unpin) { save('board_notes', load('board_notes', []).filter(n => String(n.id) !== t.dataset.unpin)); render(); return; }
+  const a = t.dataset.act;
+  if (a === 'close' || (a === 'close-bg' && e.target === t)) closeSheet();
+  else if (a === 'add') addSheet();
+  else if (a === 'lock') lockSheet();
+  else if (a === 'unlock') { if (await sync.checkPasscode($('lPass').value)) settingsSheet(); else $('lErr').textContent = "That's not the family passcode."; }
+  else if (a === 'add-shop') { if (addShop($('aShop').value)) { closeSheet(); toast('Added to the list ✓'); render(); } }
+  else if (a === 'add-note') { const v = $('aNote').value.trim(); if (v) { save('board_notes', [...load('board_notes', []), { id: uid(), text: v.slice(0, 200), at: new Date().toISOString() }]); closeSheet(); toast('Pinned ✓'); render(); } }
+  else if (a === 'connect') {
+    $('sErr').textContent = 'Checking…';
+    try { await sync.connect($('sPass').value, $('sTok').value); $('sErr').textContent = ''; sync.startPolling(90000); render(); toast('The board is ready ✓'); }
+    catch (err) { $('sErr').textContent = err.message; }
+  }
+  else if (a === 'qw-save') { if (QW.saveToken(localStorage, $('qwTok').value)) { closeSheet(); toast('QuestWorld connected ✓'); refreshQW(true); } else toast("That doesn't look like a key."); }
+  else if (a === 'qw-forget') { QW.forget(localStorage); closeSheet(); render(); }
+  else if (a === 'sync-now') { closeSheet(); await sync.syncNow(); refreshQW(true); render(); }
+  else if (a === 'disconnect') { sync.disconnect(); QW.forget(localStorage); closeSheet(); render(); }
+});
+
+let qwAt = 0;
+async function refreshQW(force) { if (!force && Date.now() - qwAt < 180000) return; qwAt = Date.now(); const s = await QW.refresh({ ls: localStorage, fetchFn: (...a) => fetch(...a), today: todayISO() }); if (!s.none) render(); }
+
+sync = window.FamilySync ? FamilySync.init({ onRemoteChange: render }) : null;
+document.addEventListener('family-sync-state', () => { const st = $('status'); if (st) st.textContent = statusText(); });
+if (sync && sync.on()) sync.startPolling(90000);
+render();
+setInterval(tick, 20000);
+setInterval(() => { if (sync && sync.on()) refreshQW(false); }, 60000);
+if (sync && sync.on()) refreshQW(true);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+</script>
+</body>
+</html>
