@@ -4,17 +4,17 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 - Baton: free (last: Claude Code, 05/11/2026)
-- Branch: feature/finance-priorities, committed locally, NOT pushed. Jaimi to OK the push. main = finance auto-sort live (7a771d4 + b000dc0).
+- PUSHED 05/11 (404cce1), Pages green, live files match. Rollback tag: pre-finance-priorities. Baton: free.
 - What changed (Finance):
   - Priorities in every check-in (finance/priorities.js): daily, Payday Reset and Month-End all have a new step 2 "Anything coming up that matters most?". Coming-up costs are the existing Upcoming one-offs (fin_upcoming_oneoffs_v1) with a level: 🔴 Must pay / 🟠 Important / 🟢 Can wait (old ones count as Important). Each shows ✅ Covered or ⚠️ $X short today (free money in that account, minus bills due first, minus higher-ranked costs; pay before the date not counted). If Must/Important are short: "What could wait" (push Can wait costs a week, hold off flexible budgets, skip a week of goal top-ups), tick → "Add to my plan" (Your actions). Paid ✓ keeps the item (active:false), +1 week pushes back. Bell: Must pay due within 3 days. More → ⭐ Coming up opens the list (Upcoming one-offs now opens it too). A half-done check-in from before gets the step added.
   - Pinned goals (finance/goal-pins.js): 📌 Pin to Home on trip, shared and private goals (max 2, per profile, fin_pinned_goals_v1). Small "Pinned goals" strip on Home under Safe to Spend: bar, saved of total, "✅ On track" / "About $X a week to finish in time" / no date. More → 📌 Pinned goals picker; hint in Saving for card when none pinned. Partner only sees shared goals; priority bells hidden from partner.
 - Files: finance/priorities.js, finance/goal-pins.js (new), coach.js (step), coach-ui.js (step screen), home-redesign.js/.css, phase-glue.js, tools/finance-phases-patches.mjs (prioPatch), src/finance.html (backup src/backups/finance-2026-11-05-*-pre-priorities.html) → finance/index.html, sw.js v81, tests/finance-priorities.test.mjs (new), coach tests updated for the extra step.
 - Proof: tests 570/570. Demo Finance in the in-app browser at phone size (made-up data, no sync): check-in step 2 shows the question; added "Car service $1,800 Must pay" through the form → "$438 short today" + 2 ideas; "Add the ticked ones" put them in Your actions; a Must pay due in 2 days appeared in the bell list; pinned a goal → strip on Home; Coming up list ranked correctly. No console errors. NOT tested on Jaimi's phone.
 - Note for testing: the local test server lets the browser keep old copies of finance/*.js (their ?v= tag never changes). On GitHub Pages this lasts at most 10 minutes. If the new step is missing on the phone, wait 10 minutes and reopen.
-- Next step: Jaimi OKs push. Then Life Hub part 4 (Apple Reminders both ways) and part 5 (simpler sections mock-up).
+- Next step: Jaimi tries it on her phone. Then Life Hub part 4 (Apple Reminders both ways) and part 5 (simpler sections mock-up).
 
 ## Up next
-- [ ] Finance priorities in every check-in + pinned goals: built 05/11 on feature/finance-priorities, waiting for Jaimi's OK to push. Then check on her phone.
+- [ ] Finance priorities in every check-in + pinned goals: PUSHED 05/11 (404cce1). Check on her phone.
 - [ ] Finance auto-sort + goal money: live 05/11. Check on Jaimi's phone with real data.
 - [ ] Life Hub (Jaimi 04/11): fix Inbox button; photo of letters → calendar; Apple Reminders; clearer Planner and sections; guided Sunday weekly, daily and start-of-month planners. Plan first.
 - [ ] Review rebuild (agreed 04/11): (2) every review number tappable to its transactions, budget and why it went over; (3) "What happened?" note + tags (one-off, emergency, planned, wrong category) that the app learns from; (4) last step becomes a dated "Your plan for this week" (pay, bills, transfers, daily limit, tickable actions) pinned on Home, editable with guided impact on budget, bills and balance; (5) DONE and pushed 04/11. Then sinking funds split, daily recap, smarter Pip.
@@ -24,7 +24,7 @@ Newest at the top. Keep each entry to a few lines.
 - [ ] Ask Jaimi before pushing; after a push, check the GitHub Pages run finished and the Actions run is green.
 
 ## Done
-- 05/11/2026 – Finance: priority question in every check-in (Must pay / Important / Can wait, Covered or Short, what could wait, bell for Must pay), pinned goals strip on Home. Branch feature/finance-priorities, NOT pushed. Tests 570/570. – Claude Code
+- 05/11/2026 – Finance: priority question in every check-in (Must pay / Important / Can wait, Covered or Short, what could wait, bell for Must pay), pinned goals strip on Home. PUSHED 05/11 (404cce1), Pages green, live files match. Tests 570/570. – Claude Code
 - 05/11/2026 – Finance: payments sort themselves into budgets (sure / probably / not sure, with Check what I sorted); goal Add money asks which bank account and counts it as set aside. PUSHED 05/11 (7a771d4), Pages green. Tests 563/563. – Claude Code
 - 04/11/2026 – Scan a letter → Papers → Add to Calendar / tasks; REAL Inbox crash fixed (text date in time formatter). PUSHED 04/11 (b939141), Pages green. Tests 556/556. – Claude Code
 - 04/11/2026 – Calendar fix: job can read Google private calendar links (repeats handled). PUSHED 04/11 (3ae7c60); secret added, first run succeeded, calendar live again. Tests 548/548. – Claude Code
