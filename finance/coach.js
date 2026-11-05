@@ -47,6 +47,8 @@
   // the coach's advice always comes last, after every number has been looked at
   const c=steps.indexOf('coach');if(c>=0)steps.splice(c,1);
   steps.push('coach','finish');
+  // every check-in, any frequency, asks what is coming up that has to come first (right after the data check)
+  steps.splice(steps.indexOf('data')+1,0,'priority');
   return{primary:order[0],kinds:order,keys:Object.fromEntries(due.map(d=>[d.kind,d.key])),steps};
  }
 

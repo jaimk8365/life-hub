@@ -174,6 +174,15 @@ function autoSortPatch(s){
   s=once(s,"  if(persist)reconcileObligations();\n  pendingImport=null;","  if(persist){reconcileObligations();try{if(typeof finApplyCatRules==='function')await finApplyCatRules();}catch(e){}}\n  pendingImport=null;",'autosort csv');
   return s;
 }
+/* Priorities in every check-in, and pinned goals on Home (finance/priorities.js, finance/goal-pins.js). */
+function prioPatch(s){
+  const gm='<script src="../finance/goal-money.js?v=20261105"></script>';
+  s=once(s,gm,gm+'\n<script src="../finance/priorities.js?v=20261105"></script>\n<script src="../finance/goal-pins.js?v=20261105"></script>','prio head');
+  s=once(s,"function openUpcomingOneoffs(){","function openUpcomingOneoffs(){if(typeof prioListOpen==='function')return prioListOpen();",'prio list');
+  s=once(s,"  if(OBLREVIEW.length) items.push(","  try{if(typeof prioBellItems==='function')prioBellItems().forEach(i=>items.push(i));}catch(e){}\n  if(OBLREVIEW.length) items.push(",'prio bell');
+  s=once(s,"<button class=\"btn ghost\" style=\"flex:1;padding:9px;color:var(--good)\" onclick=\"markSharedGoalComplete('${g.id}')\">✓ Complete</button></div></div>`;}","<button class=\"btn ghost\" style=\"flex:1;padding:9px;color:var(--good)\" onclick=\"markSharedGoalComplete('${g.id}')\">✓ Complete</button></div>${typeof gpPinBtn==='function'?gpPinBtn('shared:'+g.id):''}</div>`;}",'pin shared card');
+  return s;
+}
 export function patchPhasesFinance(source){
   let s=source;
   s=phase3(s);
@@ -196,5 +205,6 @@ export function patchPhasesFinance(source){
   s=fixHead(s);
   s=catsPatch(s);
   s=autoSortPatch(s);
+  s=prioPatch(s);
   return bump(s);
 }
