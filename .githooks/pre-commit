@@ -1,0 +1,22 @@
+#!/bin/sh
+# Life Hub pre-commit guard. This repo is PUBLIC.
+# Blocks: plaintext sources, backups, keys, statements, recovery exports. Then runs the tests.
+# Install once:  git config core.hooksPath .githooks
+set -e
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+bad=$(printf '%s\n' "$staged" | grep -E '^(src/|\.lifehub-backups/|\.hub-key|\.partner-key|statements/|tmp/|research/)|\.enc\.json$|recovery-.*\.json$|\.DS_Store$' || true)
+if [ -n "$bad" ]; then
+  echo "pre-commit: refusing to commit private or scratch files:" >&2
+  printf '  %s\n' $bad >&2
+  echo "Unstage them (git restore --staged <file>) and commit again." >&2
+  exit 1
+fi
+# Plaintext personal pages must never land in an encrypted slot.
+for f in $(printf '%s\n' "$staged" | grep -E '^(hub|copilot|course|finance|plan|partner)/index\.html$' || true); do
+  if ! grep -q 'const DATA' "$f"; then
+    echo "pre-commit: $f does not look encrypted (no DATA block). Rebuild it before committing." >&2
+    exit 1
+  fi
+done
+echo "pre-commit: running tests…"
+node --test --test-reporter=./tests/quiet-reporter.mjs tests/*.test.mjs

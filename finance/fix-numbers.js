@@ -67,12 +67,79 @@
   return {id,acct:acct.id,date:g.date,amount:g.difference,cat:'transfer',note:'Start fresh: matched to bank balance',src:'balance-adjustment',startFresh:true,needsReview:false,categoryOverride:true,createdAt:at||null};
  }
  function money(n){const v=Math.abs(+n||0);return (n<0?'−':'')+'$'+v.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+ /* ---------- Can I trust my numbers? ----------
+    Every check compares the app with something outside it (the bank's own balance, a bank statement, the other side
+    of a transfer) or looks for records that cannot be right (copies, bad dates, unsorted payments).
+    Tones: good (passed), warn (worth a look, numbers mostly right), bad (a number on screen is wrong until fixed),
+    note (information only, never changes the verdict). */
+ const dayMs=864e5,ageDays=(from,to)=>Math.round((Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/dayMs);
+ const validISO=d=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(d||''))return false;const t=Date.parse(d+'T12:00:00Z');return Number.isFinite(t)&&new Date(t).toISOString().slice(0,10)===d;};
+ const WORST={good:0,note:0,warn:1,bad:2};
+ function balanceOn(acct,txns,date){
+  return round((+acct.openBal||0)+(txns||[]).filter(t=>live(t)&&t.acct===acct.id&&t.date<=date).reduce((s,t)=>s+(+t.amount||0),0));
+ }
+ /* A bank statement's closing balance against the app's own balance on the same date. Nothing is changed. */
+ function statementCheck(acct,txns,date,closing,at){
+  if(!acct)throw Error('Choose an account.');
+  if(!validISO(date))throw Error('Enter the statement date.');
+  const c=Number(String(closing??'').replace(/[$,\s]/g,''));if(String(closing??'').trim()===''||!Number.isFinite(c))throw Error('Enter the closing balance from the statement.');
+  const app=balanceOn(acct,txns,date),difference=round(c-app);
+  return{acct:acct.id,date,closing:round(c),app,difference,ok:Math.abs(cents(difference))<1,at:at||null};
+ }
+ function accountChecks(acct,txns,o){
+  const today=o.today,out=[],sb=acct.sourceBalance;
+  // 1) a recent balance straight from the bank
+  if(!sb||!validISO(sb.date)||!Number.isFinite(+sb.amount))out.push({key:'fresh',tone:'bad',text:'No balance from the bank yet, so nothing can be compared.',fix:'feed'});
+  else{const age=ageDays(sb.date,today);out.push(age<=3?{key:'fresh',tone:'good',text:'Bank balance from '+(age===0?'today':age===1?'yesterday':age+' days ago')+'.'}:age<=14?{key:'fresh',tone:'warn',text:'Bank balance is '+age+' days old. Sync to bring it up to date.',fix:'sync'}:{key:'fresh',tone:'bad',text:'Bank balance is '+age+' days old, so this account cannot be checked properly.',fix:'sync'});}
+  // 2) the app's balance equals the bank's balance on the bank's date
+  const g=gap(acct,txns);
+  if(g)out.push(Math.abs(cents(g.difference))<1?{key:'match',tone:'good',text:'Matches the bank exactly ('+money(g.bank)+').'}:{key:'match',tone:'bad',text:'The app says '+money(g.app)+', the bank says '+money(g.bank)+'. '+money(Math.abs(g.difference))+' is missing or extra.',fix:'match',amount:g.difference});
+  // 3) the same payment recorded twice
+  const d=doubleUps(txns,acct.id).length;
+  if(d)out.push({key:'dups',tone:'warn',text:d+(d===1?' payment looks':' payments look')+' recorded twice.',fix:'match',count:d});
+  // 4) transfers with only one side (last 60 days): money that left one account but never arrived in another
+  const since=new Date(Date.parse(today+'T12:00:00Z')-60*dayMs).toISOString().slice(0,10);
+  const lonely=oneSided(txns,acct.id,o.pairedIds).filter(t=>t.date>=since).length;
+  if(lonely)out.push({key:'lonely',tone:'warn',text:lonely+(lonely===1?' transfer has':' transfers have')+' no matching side in your other accounts.',fix:'match',count:lonely});
+  // 5) records that cannot be right
+  const broken=(txns||[]).filter(t=>live(t)&&t.acct===acct.id&&(!validISO(t.date)||!Number.isFinite(+t.amount)||String(t.amount).trim()==='')).length;
+  if(broken)out.push({key:'broken',tone:'bad',text:broken+(broken===1?' record has':' records have')+' an unreadable date or amount.',fix:'match',count:broken});
+  // 6) the independent check: a bank statement's closing balance
+  const s=(o.statements||{})[acct.id];
+  if(!s)out.push({key:'statement',tone:'note',text:'Not checked against a bank statement yet.',fix:'statement'});
+  else if(!s.ok)out.push({key:'statement',tone:'bad',text:'Your '+s.date+' statement says '+money(s.closing)+'; the app said '+money(s.app)+' for that day.',fix:'statement'});
+  else{const age=ageDays(s.date,today);out.push({key:'statement',tone:age>45?'note':'good',text:(age>45?'Last matched a statement ':'Matched your statement ')+'of '+s.date+(age>45?'. Worth checking this month\'s.':'.'),fix:age>45?'statement':null});}
+  const tone=out.reduce((w,c)=>WORST[c.tone]>WORST[w]?c.tone:w,'good');
+  return{id:acct.id,name:acct.name||acct.id,tone,checks:out};
+ }
+ /* o: {today, accounts, txns, pairedIds, unchecked, misc, conflicts, lastSync (ISO time or null), statements {acctId: statementCheck result}} */
+ function trustReport(o){
+  // every visible account; a loan only once the bank feed reports its balance (most loans are tracked by hand)
+  const today=o.today,accounts=(o.accounts||[]).filter(a=>a&&!a.hidden&&(a.type!=='loan'||a.sourceBalance));
+  const rows=accounts.map(a=>accountChecks(a,o.txns||[],o));
+  const all=[];
+  const n=+o.unchecked||0,m=+o.misc||0,k=+o.conflicts||0;
+  all.push(n===0?{key:'unchecked',tone:'good',text:'Every payment the app sorted for you has been checked.'}:{key:'unchecked',tone:n>=20?'bad':'warn',text:n+(n===1?' payment was':' payments were')+' sorted by the app and not checked by you yet. Spending totals may be in the wrong place.',fix:'sortcheck',count:n});
+  all.push(m===0?{key:'misc',tone:'good',text:'Nothing is sitting in Miscellaneous.'}:{key:'misc',tone:m>=10?'bad':'warn',text:m+(m===1?' payment is':' payments are')+' in Miscellaneous, so budgets and leaks cannot see them.',fix:'misc',count:m});
+  all.push(k===0?{key:'conflicts',tone:'good',text:'No records were changed on two devices at once.'}:{key:'conflicts',tone:'warn',text:k+(k===1?' record was':' records were')+' changed on two devices. Both versions are kept until you choose.',fix:'conflicts',count:k});
+  // lastSync undefined = the bank feed is not set up on this device: per-account bank-balance ages cover freshness instead
+  if(o.lastSync===undefined){}
+  else if(!o.lastSync)all.push({key:'feed',tone:'warn',text:'The bank feed has not synced on this device yet.',fix:'sync'});
+  else{const h=Math.round((Date.now()-Date.parse(o.lastSync))/36e5);all.push(h<=24?{key:'feed',tone:'good',text:'Bank feed synced '+(h<1?'within the hour':h+' hours ago')+'.'}:h<=72?{key:'feed',tone:'warn',text:'Bank feed last synced '+Math.round(h/24)+' days ago.',fix:'sync'}:{key:'feed',tone:'bad',text:'Bank feed last synced '+Math.round(h/24)+' days ago. Recent spending is missing.',fix:'sync'});}
+  const items=all.concat(rows.flatMap(r=>r.checks.map(c=>({...c,acct:r.id,acctName:r.name}))));
+  const bad=items.filter(c=>c.tone==='bad').length,warn=items.filter(c=>c.tone==='warn').length;
+  const tone=bad?'bad':warn?'warn':'good';
+  const headline=tone==='good'?'You can trust these numbers':tone==='warn'?'Mostly right: '+warn+(warn===1?' thing':' things')+' worth a look':'Not reliable yet: '+bad+(bad===1?' thing needs':' things need')+' fixing';
+  const plain=tone==='good'?'Every account matches the bank, nothing is unsorted and nothing is recorded twice.':tone==='warn'?'Balances are right. A few details could put spending in the wrong place.':'Some balances or totals on screen are wrong until these are fixed. Start at the top.';
+  return{tone,headline,plain,bad,warn,all,accounts:rows,matched:rows.filter(r=>r.checks.some(c=>c.key==='match'&&c.tone==='good')).length,accountCount:rows.length};
+ }
  function gapWords(g){
   if(!g)return 'No bank balance yet. Tap 🏦 Bank feed to bring one in.';
   if(Math.abs(cents(g.difference))<1)return 'Matches the bank.';
   return g.difference>0?'The app is '+money(g.difference)+' lower than the bank. It is missing money coming in, or has spending counted twice.':'The app is '+money(-g.difference)+' higher than the bank. It is missing some spending, or has money in counted twice.';
  }
- return {shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money};
+ return {shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money,balanceOn,statementCheck,trustReport};
 });
 
 /* ---------- Screens (Jaimi's Finance page only) ---------- */
@@ -113,13 +180,81 @@ function fixHome(){
 }
 window.fixHome=fixHome;
 
+/* ---------- Can I trust my numbers? (top of Fix my numbers, and the Home line) ---------- */
+var K_STATEMENTS='fin_statement_checks_v1';
+function trustStatements(){const s=typeof load==='function'?load(K_STATEMENTS,{latest:{},history:[]}):{latest:{}};return (s&&s.latest)||{};}
+function trustData(){
+ const moves=typeof FinMoves!=='undefined'?FinMoves.detectMoves(TXNS,ACCTS):[],h=fixHome()||{misc:0,off:0,check:0};
+ let token=false,last=null;try{token=!!localStorage.getItem('finance_pocketsmith_app_token');last=localStorage.getItem('finance_pocketsmith_last_sync');}catch(e){}
+ return FinFix.trustReport({today:todayISO(),accounts:ACCTS,txns:TXNS,pairedIds:moves.flatMap(m=>[m.outId,m.inId]),unchecked:h.check,misc:h.misc,
+  conflicts:(typeof load==='function'?load('lifehub_finance_sync_conflicts',[]):[]).length,lastSync:token?(last||null):undefined,statements:trustStatements()});
+}
+window.trustData=trustData;
+/* The one line Home shows: green when everything passed, otherwise how many things to look at. */
+function trustHome(){try{const r=trustData();return{tone:r.tone,headline:r.headline,matched:r.matched,accounts:r.accountCount};}catch(e){return null;}}
+window.trustHome=trustHome;
+const TRUST_ICON={good:'✅',warn:'⚠️',bad:'❌',note:'ℹ️'};
+const TRUST_FIX={sync:'Sync now',feed:'Bank feed settings',match:'Open',sortcheck:'Check them',misc:'Sort them',conflicts:'Review',statement:'Check a statement'};
+function trustFix(kind,acct){
+ if(kind==='sync'){closeSheet();if(typeof finSyncNow==='function')finSyncNow().then(()=>{try{render();}catch(e){}});return;}
+ if(kind==='feed'){try{(window.top||window).location.assign(new URL('app.html#bankfeed',location.href).href);}catch(e){location.assign('app.html#bankfeed');}return;}
+ if(kind==='match'){if(acct)fixAcctOpen(acct);else fixMatchOpen();return;}
+ if(kind==='sortcheck'){if(typeof sortCheckOpen==='function')sortCheckOpen();return;}
+ if(kind==='misc'){fixMiscOpen();return;}
+ if(kind==='conflicts'){if(typeof openDataReview==='function')openDataReview();return;}
+ if(kind==='statement'){trustStatementOpen(acct);return;}
+}
+function trustRow(c){
+ return '<div class="tr-row tr-'+esc(c.tone)+'"><span class="tr-i" aria-hidden="true">'+TRUST_ICON[c.tone]+'</span><span class="tr-t">'+(c.acctName?'<b>'+esc(c.acctName)+'</b> ':'')+esc(c.text)+'</span>'
+  +(c.fix?'<button class="tr-b" onclick="trustFix(\''+esc(c.fix)+'\',\''+esc(c.acct||'')+'\')">'+esc(TRUST_FIX[c.fix]||'Open')+'</button>':'')+'</div>';
+}
+function trustBlock(){
+ let r;try{r=trustData();}catch(e){return '';}
+ const order={bad:0,warn:1},items=r.all.concat(r.accounts.flatMap(a=>a.checks.map(c=>({...c,acct:a.id,acctName:a.name})))),todo=items.filter(c=>c.tone in order).sort((a,b)=>order[a.tone]-order[b.tone]);
+ const next=todo[0];
+ return '<div class="tr-card tr-'+esc(r.tone)+'" role="status"><div class="tr-h">'+TRUST_ICON[r.tone]+' '+esc(r.headline)+'</div><p>'+esc(r.plain)+'</p>'
+  +'<p class="fx-small">'+r.matched+' of '+r.accountCount+' accounts match the bank today.</p>'
+  +(next?'<div class="tr-next"><div class="fh-mean-h">Fix this first</div>'+trustRow(next)+'</div>':'')+'</div>'
+  +'<details class="ck-ev tr-all"><summary>See every check ('+items.length+')</summary>'
+  +'<div class="fh-mean-h" style="margin-top:8px">Across the app</div>'+r.all.map(trustRow).join('')
+  +r.accounts.map(a=>'<div class="fh-mean-h" style="margin-top:10px">'+TRUST_ICON[a.tone]+' '+esc(a.name)+'</div>'+a.checks.map(c=>trustRow({...c,acct:a.id})).join('')).join('')
+  +'</details>'
+  +'<details class="ck-ev"><summary>How these checks work</summary><p class="fx-small">Each account\'s balance in the app is worked out from every payment recorded in it. It is compared with the balance your bank reports through the bank feed. If the two are the same, every payment is there exactly once. A bank statement is the strongest check because it comes straight from the bank, not through the feed: once a month, type in the closing balance and the app compares it with its own figure for that day. Nothing here changes your records.</p></details>';
+}
+/* Statement check: type the closing balance from a bank statement; the app compares its own balance for that day. */
+function trustStatementOpen(acct){
+ const accts=ACCTS.filter(a=>!a.hidden),pick=acct||(accts[0]&&accts[0].id),last=trustStatements(),eom=(()=>{const d=new Date();d.setDate(0);return d.toISOString().slice(0,10);})();
+ $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fh-link" onclick="fixOpen()">‹ Fix my numbers</button><h2>🧾 Check against a statement</h2>'
+  +'<p>Open your bank statement (in the bank app or the PDF). Find the <b>closing balance</b> and the date it is for. Type them here. The app works out its own balance for that same day and tells you if they match.</p>'
+  +'<label class="ck-row"><span>Account</span><select id="ts_acct">'+accts.map(a=>'<option value="'+esc(a.id)+'"'+(a.id===pick?' selected':'')+'>'+esc(a.name)+'</option>').join('')+'</select></label>'
+  +'<label class="ck-row"><span>Statement date</span><input type="date" id="ts_date" value="'+eom+'"></label>'
+  +'<label class="ck-row"><span>Closing balance</span><input id="ts_amt" inputmode="decimal" placeholder="e.g. 1,234.56 or -45.00"></label>'
+  +'<button class="btn dark" style="margin-top:10px" onclick="trustStatementSave()">Compare</button><div id="ts_out" aria-live="polite"></div>'
+  +(Object.keys(last).length?'<details class="ck-ev"><summary>Last checks</summary>'+Object.values(last).map(s=>'<p class="fx-small">'+(s.ok?'✅ ':'❌ ')+esc((acctById(s.acct)||{}).name||s.acct)+' · '+esc(s.date)+' · statement '+FinFix.money(s.closing)+(s.ok?'':' · app '+FinFix.money(s.app))+'</p>').join('')+'</details>':'');
+ openSheet();
+}
+async function trustStatementSave(){
+ const a=acctById($('ts_acct').value);let r;
+ try{r=FinFix.statementCheck(a,TXNS,$('ts_date').value,$('ts_amt').value,new Date().toISOString());}catch(e){$('ts_out').innerHTML='<p class="fx-small" style="color:var(--bad)">'+esc(e.message)+'</p>';return;}
+ const s=load(K_STATEMENTS,{latest:{},history:[]})||{latest:{},history:[]};s.latest=s.latest||{};s.history=(s.history||[]);
+ s.latest[a.id]=r;s.history.unshift(r);s.history=s.history.slice(0,60);
+ try{await saveAtomic({[K_STATEMENTS]:s});}catch(e){$('ts_out').innerHTML='<p class="fx-small">Worked out, but could not be saved: '+esc(e.message||'')+'</p>';}
+ $('ts_out').innerHTML=r.ok
+  ?'<div class="tr-card tr-good"><div class="tr-h">✅ Matches your statement</div><p>'+esc(a.name)+' was '+FinFix.money(r.closing)+' on '+esc(r.date)+' in both the bank and the app. Every payment up to that day is right.</p></div>'
+  :'<div class="tr-card tr-bad"><div class="tr-h">❌ '+FinFix.money(Math.abs(r.difference))+' different</div><p>The statement says '+FinFix.money(r.closing)+'; the app says '+FinFix.money(r.app)+' for '+esc(r.date)+'. '+(r.difference>0?'The app is missing money coming in, or has a payment counted twice.':'The app is missing some spending, or has money coming in counted twice.')+'</p><button class="btn ghost" onclick="fixAcctOpen(\''+esc(a.id)+'\')">Look at '+esc(a.name)+'</button></div>';
+ try{render();}catch(e){}
+}
+
 /* Screen 1: the starting point. */
 function fixOpen(){
+ /* Nothing here can be saved while another tab holds the lock, so say so before any sorting is done, not after. */
+ try{const l=typeof finStorageLock==='function'?finStorageLock():null;if(l){toastMsg(l.title+'. Close the other tab and reload before sorting.');try{render();}catch(e){}return;}}catch(e){}
  const h=fixHome()||{misc:0,miscTotal:0,off:0,check:0};
- $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🧰 Fix my numbers</h2><p>Two jobs make every other number in the app right. Do them in order.</p>'
+ $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🧰 Fix my numbers</h2>'+trustBlock()+'<div class="fh-mean-h" style="margin-top:14px">The jobs</div><p>These make every other number in the app right. Do them in order.</p>'
   +(h.check?'<button class="fx-job" onclick="sortCheckOpen()"><b>✨ Check what I sorted</b><span>'+h.check+(h.check===1?' payment I was not sure about':' payments I was not sure about')+'</span></button>':'')
   +'<button class="fx-job" onclick="fixMiscOpen()"><b>1. Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
   +'<button class="fx-job" onclick="fixMatchOpen()"><b>2. Match to my bank</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
+  +'<button class="fx-job" onclick="trustStatementOpen()"><b>3. Check against a statement (once a month)</b><span>The strongest check: type a statement\'s closing balance and see if the app agrees</span></button>'
   +'<p class="fx-small">Nothing moves money. Every change can be undone.</p>';
  openSheet();
 }

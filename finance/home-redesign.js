@@ -96,6 +96,16 @@ function shopCard(e){
   const body=e.locked?'<p class="fh-note">🔒 Unlock with your passcode.</p>':e.connected?'<p class="fh-note">This month: '+aud(e.month.in)+' in · '+aud(e.month.out)+' out</p>':'<p class="fh-note">Not started yet. It shows up here once your shop is added.</p>';
   return card('shop',e.name||'Your shop',body+'<button type="button" class="fh-btn" onclick="FinHome.act(\'shop\')">Open shop</button>','fh-shop');
  }
+function winsHtml(w){
+  if(!w||!w.parts||!w.parts.length)return '';
+  const icon={good:'🌟',watch:'🙂',act:'🌱',note:'🙂'}[w.tone]||'🙂';
+  return '<section class="fh-wins fh-wins-'+esc(w.tone||'note')+'" aria-label="This week\'s wins"><span class="fh-wins-i" aria-hidden="true">'+icon+'</span><div><div class="fh-wins-h">This week so far</div><div class="fh-wins-t">'+esc(w.text)+'</div></div></section>';
+ }
+function lockHtml(l){
+  if(!l)return '';
+  return '<section class="fh-feed fh-feed-err fh-lock" aria-label="Saving is paused" role="alert"><div class="fh-feed-t"><span class="fh-feed-i" aria-hidden="true">🔒</span><div><div class="fh-feed-h">'+esc(l.title)+'</div><div class="fh-feed-s">'+esc(l.sub)+'</div></div></div>'
+   +'<div class="fh-feed-lock"><button type="button" class="fh-btn fh-feed-b" onclick="if(typeof exportFinanceRecovery===\'function\')exportFinanceRecovery()">Download recovery</button><button type="button" class="fh-btn fh-feed-b" onclick="location.reload()">Reload</button></div></section>';
+ }
 function feedHtml(f){
   if(!f)return '';
   const icon={ok:'✅',old:'⚠️',off:'🔌',err:'⚠️',busy:'⏳'}[f.state]||'⚠️';
@@ -115,13 +125,16 @@ function feedHtml(f){
   return '<section class="fh-plan fh-acts" aria-label="Your actions"><div class="fh-pl-top"><div class="fh-coach-h">✅ Your actions</div><span class="fh-pl-n">'+a.count+' open</span></div>'
    +a.items.map(x=>'<div class="fh-act"><div class="fh-act-t">'+esc(x.text)+'<small>'+(x.since?'Since '+esc(x.since):'')+(x.seen>1?' · came up '+x.seen+' times':'')+(x.verdict==='kept'?' · ✅ on track':x.verdict==='missed'?' · ⚠️ not yet':'')+'</small>'
      +(x.review?'<button type="button" class="fh-link" onclick="coachReviewView(\''+esc(x.review)+'\')">Why? See the review ›</button>':'')+'</div>'
-     +'<div class="fh-act-b"><button type="button" class="fh-act-done" onclick="coachActionDone(\''+esc(x.id)+'\',\'home\')">✓ Done</button><button type="button" class="fh-act-drop" onclick="coachActionDropOpen(\''+esc(x.id)+'\',\'home\')">Drop</button></div></div>').join('')
+     +'<div class="fh-act-b"><button type="button" class="fh-act-done" onclick="coachActionDone(\''+esc(x.id)+'\',\'home\')">✓ Done</button><button type="button" class="fh-act-drop" onclick="coachActionDropOpen(\''+esc(x.id)+'\',\'home\')">Drop</button></div>'+(typeof coachReviewBlock==='function'&&x.rv?coachReviewBlock(x.id,'home',x.rv):'')+'</div>').join('')
    +'<button type="button" class="fh-link" onclick="FinHome.act(\'actions\')">'+(a.count>a.items.length?'See all '+a.count+' actions ›':'Past reviews and finished actions ›')+'</button></section>';
  }
- function fixCard(f){
-  if(!f)return '';
-  const bits=[];if(f.misc)bits.push(f.misc+' payments in Miscellaneous');if(f.off)bits.push(f.off+(f.off===1?' account does':' accounts do')+' not match the bank');if(f.check)bits.push(f.check+' sorted for you to check');
-  return '<section class="fh-coach fh-fix" aria-label="Fix my numbers"><div><div class="fh-coach-h">🧰 Fix my numbers</div><div class="fh-coach-s">'+esc(bits.join(' · '))+'. Sorting these makes every other number right.</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'fixnumbers\')">Fix</button></section>';
+ function fixCard(f,t){
+  // all checks passed: a quiet green line, so you can see the numbers have been checked
+  if(t&&t.tone==='good')return '<section class="fh-trust" aria-label="Can I trust my numbers"><div><b>✅ You can trust these numbers</b><small>'+t.matched+' of '+t.accounts+' accounts match the bank. Nothing unsorted, nothing counted twice.</small></div><button type="button" class="fh-link" onclick="FinHome.act(\'fixnumbers\')">See the checks ›</button></section>';
+  if(!f&&!t)return '';
+  const bits=[];if(f&&f.misc)bits.push(f.misc+' payments in Miscellaneous');if(f&&f.off)bits.push(f.off+(f.off===1?' account does':' accounts do')+' not match the bank');if(f&&f.check)bits.push(f.check+' sorted for you to check');
+  const head=t?(t.tone==='bad'?'❌ ':'⚠️ ')+t.headline:'🧰 Fix my numbers';
+  return '<section class="fh-coach fh-fix" aria-label="Fix my numbers"><div><div class="fh-coach-h">'+esc(head)+'</div><div class="fh-coach-s">'+(bits.length?esc(bits.join(' · '))+'. ':'')+(t?t.matched+' of '+t.accounts+' accounts match the bank. ':'')+'Sorting these makes every other number right.</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'fixnumbers\')">Fix</button></section>';
  }
  function coachCard(c){
   if(!c)return '';
@@ -140,7 +153,7 @@ function feedHtml(f){
   const fw=d.files&&d.files.waiting>0,files=fw?card('files','Receipts and bills','<p class="fh-note">📥 '+d.files.waiting+(d.files.waiting===1?' file is':' files are')+' waiting for you.</p><button type="button" class="fh-btn" onclick="FinHome.act(\'files\')">Open</button>','fh-files'):'';
   const saving=card('saving','Saving for',(((d.goals||[]).length||(d.funds||[]).length)?'<p class="fh-note">Each bar shows how much you have saved toward its target.</p>':'')+bars(d.goals||[],'No goals yet.','FinHome.tab(\'goals\')','Goals')+(typeof goalPinsHint==='function'?goalPinsHint():'')+((d.funds||[]).length?'<div class="fh-sub">Sinking funds (set aside for bills)</div>'+bars(d.funds||[],'','FinHome.tab(\'funds\')','Funds'):''));
   return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div>'+(d.feed?'':'<div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div>')+(d.game?'<button type="button" class="fh-lv" onclick="FinHome.act(\'quests\')" aria-label="Level '+d.game.level+', '+d.game.streak+' day streak. Open daily wins"><b>Lv '+d.game.level+'</b><span class="fh-lvbar"><i style="width:'+d.game.pct+'%"></i></span><span>🔥 '+d.game.streak+'</span></button>':'')+'</div>'
-   +feedHtml(d.feed)+fixCard(d.fix)+planCard(d.plan)+actionsCard(d.actions)+coachCard(d.coach)+hero+al+(typeof goalPinsHomeHtml==='function'?goalPinsHomeHtml():'')
+   +lockHtml(d.lock)+winsHtml(d.wins)+feedHtml(d.feed)+fixCard(d.fix,d.trust)+planCard(d.plan)+actionsCard(d.actions)+coachCard(d.coach)+hero+al+(typeof goalPinsHomeHtml==='function'?goalPinsHomeHtml():'')
    +card('accounts','Accounts',jars(d.jars||[])+'<p class="fh-note">Each jar shows how full the account is compared with its monthly budget.</p>')
    +saving+files+shopCard(d.shop)+'</div>';
  }

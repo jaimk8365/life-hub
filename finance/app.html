@@ -29,7 +29,7 @@
 </style>
 </head>
 <body>
-<header><b>💰 My Finance</b><a href="../" target="_blank" rel="noopener" aria-label="Open Life Hub separately">Life Hub ↗</a><button id="bank-feed-status" onclick="FinanceStandalone.toggleBankFeed()" aria-controls="bank-feed-panel" aria-expanded="false">Bank feed</button><button id="finance-sync-status" onclick="FinanceStandalone.toggleSync()" aria-controls="finance-sync-panel" aria-expanded="false">Sync</button></header>
+<header><b>💰 My Finance</b><a href="../?tab=finance" aria-label="Back to Finance in Life Hub">‹ Life Hub</a><button id="bank-feed-status" onclick="FinanceStandalone.toggleBankFeed()" aria-controls="bank-feed-panel" aria-expanded="false">Bank feed</button><button id="finance-sync-status" onclick="FinanceStandalone.toggleSync()" aria-controls="finance-sync-panel" aria-expanded="false">Sync</button></header>
 <p id="finance-loading" role="status">Checking your existing encrypted sync…</p><section id="bali-sweep-card" hidden aria-live="polite"><b>🌴 Available for Bali</b><div id="bali-sweep-amount">$0</div><p id="bali-sweep-detail"></p><p id="bali-sweep-note"></p></section>
 <iframe id="f-finance" title="My Finance — encrypted personal accounts" hidden></iframe>
 <section id="bank-feed-panel" hidden aria-labelledby="bank-feed-heading"><button class="close" onclick="FinanceStandalone.toggleBankFeed()" aria-label="Close bank feed settings">✕</button><h2 id="bank-feed-heading">PocketSmith bank feed</h2><div id="bank-feed-content"></div><p id="bank-feed-message" role="status"></p></section>

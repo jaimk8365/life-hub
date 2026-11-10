@@ -27,8 +27,25 @@
   html,body{height:100%;overflow:hidden}
   body{font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
 
+  /* ---- where am I + back (one slim bar above every section) ---- */
+  :root{--crumb-h:42px}
+  .crumb{position:fixed;z-index:15;top:0;left:0;right:0;height:calc(var(--crumb-h) + var(--sat));padding:var(--sat) 10px 0;display:flex;align-items:center;gap:8px;background:var(--paper);border-bottom:1px solid var(--line)}
+  .crumb-back{display:inline-flex;align-items:center;gap:4px;max-width:55%;height:32px;padding:0 12px 0 8px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:700 13px 'Hanken Grotesk',system-ui,sans-serif;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .crumb-back[hidden]{display:none}
+  .crumb-back b{font-size:17px;line-height:1;margin-right:2px}
+  .crumb-here{flex:1;min-width:0;font:600 15px 'Fraunces',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .crumb-back:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
+  .crumb-back,.crumb-life{min-height:32px!important;max-height:32px;margin:0;box-shadow:none;line-height:1}
+  .crumb-life{display:none;align-items:center;gap:4px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:700 13px 'Hanken Grotesk',system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+  /* Finance has its own tab bar at the bottom; on a phone, two bars would stack, so Life Hub's steps aside
+     there and the top bar carries the way out (‹ Back, and 🏡 Life for every other section). */
+  @media (max-width:759px){
+    body.in-finance .mobile-bar{display:none!important}
+    body.in-finance .stage{bottom:0}
+    body.in-finance .crumb-life{display:inline-flex}
+  }
   /* ---- frames ---- */
-  .stage{position:fixed;top:0;right:0;bottom:calc(var(--tabbar-h) + var(--sab));left:0;background:var(--paper)}
+  .stage{position:fixed;top:calc(var(--crumb-h) + var(--sat));right:0;bottom:calc(var(--tabbar-h) + var(--sab));left:0;background:var(--paper)}
   .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--paper)}
   .stage iframe.active{display:block}
   .stage iframe#f-quest{background:#0b0716}
@@ -70,7 +87,8 @@
   .park-card .park-choices button{background:#fff;border:1px solid #E8DFF0}
   .park-card .park-choices button.selected{background:#30263D;color:#fff}
   @media (min-width:760px){
-    .stage{top:0;bottom:0;left:var(--rail-w)}
+    .stage{top:calc(var(--crumb-h) + var(--sat));bottom:0;left:var(--rail-w)}
+    .crumb{left:var(--rail-w)}
     nav{
       top:0;bottom:0;left:0;right:auto;width:var(--rail-w);height:auto;
       flex-direction:column;justify-content:flex-start;gap:6px;
@@ -147,8 +165,14 @@
 <link rel="stylesheet" href="./theme-jaimi.css" />
 </head>
 <body>
+  <div class="crumb" id="crumb" role="navigation" aria-label="Where you are">
+    <button id="crumbBack" class="crumb-back" type="button" onclick="navBack()" hidden><b aria-hidden="true">‹</b><span id="crumbBackLabel">Back</span></button>
+    <span id="crumbHere" class="crumb-here" aria-live="polite"></span>
+    <button id="crumbLife" class="crumb-life" type="button" onclick="toggleMore()" aria-label="All Life Hub sections"><span aria-hidden="true">🏡</span>Life</button>
+  </div>
   <div class="stage">
     <iframe id="f-copilot" title="Co-Pilot"></iframe>
+    <iframe id="f-finance" title="My Finance"></iframe>
     <iframe id="f-hub" title="Life Hub"></iframe>
     <iframe id="f-quest" title="Night Court Questkeeper"></iframe>
     <iframe id="f-course" title="Brain — mental health"></iframe>
@@ -183,7 +207,7 @@
     <button id="b-kids" class="sec" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
     <button id="b-family" class="sec" onclick="show('family')"><span class="ico">👨‍👩‍👧‍👦</span><span>Family</span></button>
     <a id="b-board" class="finance-link" href="./board/" onclick="markOpened('board')"><span class="ico" aria-hidden="true">🖥️</span><span>Family board</span></a>
-    <a id="b-finance" class="finance-link" href="./finance/app.html" onclick="markOpened('finance')"><span class="ico" aria-hidden="true">💰</span><span>Open Finance</span></a>
+    <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Finance</span></button>
     <span class="nav-label">Just for me</span>
     <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
     <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
@@ -226,7 +250,7 @@
       <button class="tile" data-k="admin" data-home="lifeHome" onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
       <button class="tile" data-k="kids" data-home="lifeHome" onclick="showFromMore('kids')"><span class="ico">🧒</span>Kids</button>
       <button class="tile" data-k="family" data-home="lifeHome" onclick="showFromMore('family')"><span class="ico">👨‍👩‍👧‍👦</span>Family</button>
-      <button class="tile" data-keep="1" onclick="markOpened('finance');location.assign('./finance/app.html')"><span class="ico">💰</span>Finance</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('finance')"><span class="ico">💰</span>Finance</button>
     </div>
     <h2>Just for me</h2>
     <div class="tiles" id="lifeMe">
@@ -258,9 +282,65 @@
   </div>
 
 <script>
-  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html' };
+  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html' };
   const BUTTONS = { copilot:'b-copilot' };
-  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family']);
+  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance']);
+
+  /* ---- Where am I, and Back ----
+     Every section change is one step in the browser's history, so the phone's back gesture, the browser's back
+     button and the ‹ Back button at the top all go to the place you were before, and say its name. */
+  const PLACE_NAMES = {
+    'cp:today':'☀️ Today','cp:now':'🎯 Now','cp:inbox':'📥 Inbox','cp:guides':'🧭 Plan guides','cp:shutdown':'🌙 Shutdown',
+    'cp:ideas':'💡 Idea Vault','cp:etsy':'🛍️ Etsy Studio','cp:notes':'🗒️ Notes','cp:settings':'⚙️ Settings',
+    hub:'🏡 Life Hub',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Home',admin:'📋 Life Admin',
+    kids:'🧒 Kids',family:'👨‍👩‍👧‍👦 Family',course:'🧠 Brain',quest:'🌙 Quests',reading:'📚 Books',beauty:'💄 Beauty',wardrobe:'👗 Wardrobe',finance:'💰 Finance'
+  };
+  let navCurrent = null, navSilent = false;
+  const placeKey = p => p ? (p.cp ? 'cp:'+p.cp : p.sec) : '';
+  const placeName = p => PLACE_NAMES[placeKey(p)] || (p && p.cp ? '🎯 Co-Pilot' : '🏡 Life Hub');
+  function navPaint(back){
+    if (back === undefined){ try { back = window.history && window.history.state ? window.history.state.back : null; } catch(e){ back = null; } }
+    const here = document.getElementById('crumbHere'), b = document.getElementById('crumbBack'), label = document.getElementById('crumbBackLabel');
+    if (here) here.textContent = navCurrent ? placeName(navCurrent) : '';
+    if (b){
+      b.hidden = !back;
+      if (label) label.textContent = back ? placeName(back) : 'Back';
+      if (b.setAttribute) b.setAttribute('aria-label', back ? 'Back to ' + placeName(back).replace(/^\S+\s/, '') : 'Back');
+    }
+  }
+  function navRecord(p){
+    if (navSilent) return;
+    const h = window.history;
+    if (!navCurrent){ navCurrent = p; try { h && h.replaceState({ lh:p, back:null }, ''); } catch(e){} navPaint(null); return; }
+    if (placeKey(p) === placeKey(navCurrent)){ navPaint(); return; }
+    const back = navCurrent; navCurrent = p;
+    try { h && h.pushState({ lh:p, back }, ''); } catch(e){}
+    navPaint(back);
+  }
+  function navGo(p){
+    navSilent = true;
+    try { if (p.cp) showCopilot(p.cp); else show(p.sec); } finally { navSilent = false; }
+    navCurrent = p; navPaint();
+  }
+  function navBack(){
+    try { if (window.history.state && window.history.state.back) { window.history.back(); return; } } catch(e){}
+  }
+  window.addEventListener('popstate', e => { const s = e.state; if (s && s.lh) navGo(s.lh); });
+
+  /* ---- Finance inside Life Hub ----
+     Finance shares this page's one encrypted store and sync (bulk-storage.js and sync.js below), so there is only
+     ever one copy of your money data running. The bank feed scripts load the first time Finance is opened. */
+  let financeFeedLoaded = false;
+  function loadFinanceFeed(){
+    if (financeFeedLoaded) return; financeFeedLoaded = true;
+    try {
+      const add = src => new Promise(done => { try { const s = document.createElement('script'); s.src = src; s.onload = done; s.onerror = done; document.body.appendChild(s); } catch(e){ done(); } });
+      add('./finance/pocketsmith-import.js?v=20261028-unmatched').then(() => add('./finance/pocketsmith-client.js?v=20261009-mapping')).then(() => {
+        // the importer waits for the Finance screen to be ready before it changes anything
+        try { if (window.PocketSmithFinance && window.PocketSmithFinance.state().connected) window.PocketSmithFinance.syncNow(true).catch(() => {}); } catch(e){}
+      });
+    } catch(e){}
+  }
   let parkFocus = null;
   let parkSelection = 'later';
   let inboxTimer = 0;
@@ -285,19 +365,22 @@
   function showCopilot(route='now'){
     copilotRoute=route; markOpened('cp:'+route);
     const f=document.getElementById('f-copilot');
-    if(!f.src||!f.src.includes('/copilot/index.html')){
-      f.src=SRC.copilot+'#'+encodeURIComponent(route);
+    const silent=navSilent; navSilent=true;
+    try{
+      if(!f.src||!f.src.includes('/copilot/index.html')){
+        f.src=SRC.copilot+'#'+encodeURIComponent(route);
+        show('copilot');
+        return;
+      }
       show('copilot');
-      return;
-    }
-    show('copilot');
+    }finally{ navSilent=silent; navRecord({cp:route}); }
     try{f.contentWindow.location.hash=route;}catch(e){}
     try{f.contentWindow.postMessage({type:'copilot-route',route},location.origin);}catch(e){f.contentWindow.location.hash=route;}
   }
   function show(which){
-    // Keep old user-click navigation calls working without embedding Finance again.
-    if (which === 'finance'){ window.location.assign('./finance/app.html'); return; }
     if (!Object.prototype.hasOwnProperty.call(SRC, which)) which = 'hub';
+    if (which === 'finance') loadFinanceFeed();
+    if (which !== 'copilot') navRecord({ sec:which }); else if (!navSilent) navRecord({ cp:copilotRoute });
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById(BUTTONS[k]||'b-'+k);
       const on = k === which;
@@ -306,6 +389,7 @@
       if(b)b.classList.toggle('active', on);
     }
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
+    try { document.body.classList.toggle('in-finance', which === 'finance'); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
     // on phone, highlight "More" when a tucked-away section is showing
     const inMore = MOBILE_SECTIONS.has(which);
@@ -328,7 +412,7 @@
   document.addEventListener('click', (e)=>{
     const p = document.getElementById('morePanel');
     if (!p || p.hidden) return;
-    if (!p.contains(e.target) && !e.target.closest('#b-more')) p.hidden = true;
+    if (!p.contains(e.target) && !e.target.closest('#b-more,#b-mobile-more,#crumbLife')) p.hidden = true;
   });
   // wait for the sync engine's first pull (or its ready signal) so sections open on fresh data
   let booted = false;
@@ -337,11 +421,12 @@
     booted = true;
     let saved = null;
     try { saved = localStorage.getItem('lifehub_tab'); } catch(e){}
-    // A previously saved Money tab must not launch a popup during startup.
+    // Finance is a section like any other: a saved Finance tab, or ?tab=finance, opens it here, never in a new tab.
     const query=new URLSearchParams(location.search);
     const requested=query.get('tab')==='copilot'?location.hash.slice(1)||'now':null;
     if(requested){showCopilot(requested);return;}
-    if(saved){show(saved==='finance'?'hub':saved);return;}
+    if(query.get('tab')==='finance'){show('finance');return;}
+    if(saved){show(saved);return;}
     showCopilot('today');
   };
   window.addEventListener('lifehub-sync-ready', boot, { once: true });

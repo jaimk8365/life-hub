@@ -69,8 +69,10 @@
 
  function disconnectBankFeed(){window.PocketSmithFinance.disconnect();refreshBankStatus();renderBankFeed();}
  function boot(){if(booted)return;booted=true;const frame=el('f-finance');frame.src='./index.html';frame.hidden=false;frame.classList.add('active');el('finance-loading').hidden=true;refreshStatus();refreshBankStatus();frame.addEventListener('load',()=>{renderBali();if(window.PocketSmithFinance&&window.PocketSmithFinance.state().connected)window.PocketSmithFinance.syncNow(true).catch(()=>{});setInterval(renderBali,5000)},{once:true});}
- window.addEventListener('lifehub-sync-ready',boot,{once:true});
- setTimeout(boot,7000);
+ // Finance now lives inside Life Hub; this page stays for bank feed setup, which Life Hub opens with #bankfeed.
+ function bootAndOpen(){boot();try{if(typeof location!=='undefined'&&location.hash==='#bankfeed'){const p=el('bank-feed-panel');if(p&&p.hidden)toggleBankFeed();}}catch(e){}}
+ window.addEventListener('lifehub-sync-ready',bootAndOpen,{once:true});
+ setTimeout(bootAndOpen,7000);
  document.addEventListener('lifehub-sync-state',refreshStatus);
  document.addEventListener('pocketsmith-finance-state',()=>{refreshBankStatus();if(el('bank-feed-panel')&&!el('bank-feed-panel').hidden)renderBankFeed();});
  document.addEventListener('pocketsmith:snapshot',renderBali);

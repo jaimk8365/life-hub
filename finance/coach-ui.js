@@ -10,7 +10,8 @@ var _coachSt=null;
 function coachState(){if(!_coachSt){_coachSt=Object.assign(FinCoach.emptyState(),load(K_COACH,{}));try{if(FinCoach.tidyActions(_coachSt,todayISO()))coachSave(_coachSt);}catch(e){}}return _coachSt;}
 /* Actions made during a review remember which review they came from, so Past reviews and Home can link back to it. */
 function coachAdd(st,o){const s=st.session;return FinCoach.addAction(st,Object.assign({},o,s?{reviewId:s.id}:{}),todayISO());}
-function coachSave(st){_coachSt=st;try{const r=save(K_COACH,JSON.parse(JSON.stringify(st)));if(r&&r.catch)r.catch(()=>toastMsg('Could not save your check-in progress.'));}catch(e){toastMsg('Could not save your check-in progress.');}}
+function coachSaveFailMsg(){try{const e=window.FinanceStore&&window.FinanceStore.state&&window.FinanceStore.state().error;if(/another tab|older Finance tab/i.test(String(e||'')))return 'Not saved: Finance is open in another tab. Close it, download recovery, then reload.';}catch(x){}return 'Could not save your check-in progress.';}
+function coachSave(st){_coachSt=st;try{const r=save(K_COACH,JSON.parse(JSON.stringify(st)));if(r&&r.catch)r.catch(()=>toastMsg(coachSaveFailMsg()));}catch(e){toastMsg(coachSaveFailMsg());}}
 /* The month-end review is only offered once the bank data reaches the last day of that month. */
 function coachLastDataDate(){let m='';for(const t of TXNS)if(!t.deleted&&t.date>m&&t.date<=todayISO())m=t.date;return m||null;}
 function coachDue(st){return FinCoach.reviewsDue({today:todayISO(),state:st,lastDataDate:coachLastDataDate()});}
@@ -32,6 +33,8 @@ function coachPosition(){
   return FinCoach.position({cash:balance('everyday'),safe,trusted,allowanceLeft:every.length?left:NaN,billsBeforePayday:bills,
     categories:rows.map(r=>({name:(catOf(r.category)||{}).n||r.name,spent:+r.spent||0,budget:+r.budget||0}))});
 }
+/* How trustworthy the categories are right now, from the same counts Fix my numbers shows on Home. */
+function coachDataQuality(){try{const h=typeof fixHome==='function'?fixHome():null;return h?{unchecked:h.check||0,unmatched:h.off||0,miscCount:h.misc||0}:null;}catch(e){return null;}}
 function coachLeakList(st){
   const today=todayISO(),since=FinDates.shift(today,-49),cats={};
   CATS.concat(CUSTOM_CATS||[]).forEach(c=>{const m=+CAT_BUDGET[c.id]||0;if(m>0)cats[c.id]={name:c.n,weekly:Math.round(m*12/52*100)/100};});
@@ -39,7 +42,7 @@ function coachLeakList(st){
   let pulls=[];try{pulls=FinMoves.detectMoves(TXNS.filter(t=>t.date>=since),accts).filter(m=>byId[m.from]&&byId[m.from].type==='save'&&byId[m.to]&&byId[m.to].type==='spend').map(m=>({id:m.id,date:m.date,amount:m.amount}));}catch(e){}
   let moves=[];try{const cs=load(K_CYCLE_MOVES,null);if(cs&&cs.cycle===FinDates.budgetWeek(today).start)moves=cs.moves||[];}catch(e){}
   let subs=[];try{subs=recurringScan().filter(r=>!r.bnpl&&r.perMo>0).map(r=>({label:r.label,perMo:r.perMo}));}catch(e){}
-  return FinCoach.leaks({today,txns:TXNS.filter(t=>t.date>=since),cats,marks:st.marks,savingsWithdrawals:pulls,borrowsThisWeek:moves.length,borrowedTotal:moves.reduce((s,m)=>s+(+m.amount||0),0),subscriptions:subs});
+  return FinCoach.leaks({today,quality:coachDataQuality(),txns:TXNS.filter(t=>t.date>=since),cats,marks:st.marks,savingsWithdrawals:pulls,borrowsThisWeek:moves.length,borrowedTotal:moves.reduce((s,m)=>s+(+m.amount||0),0),subscriptions:subs});
 }
 function coachWeeklyFor(f){
   if(f.weekly)return f.weekly.slice(0,-1);   // finished weeks only
@@ -98,7 +101,7 @@ function coachMonth(st){
   const into=moves.filter(m=>by[m.to]&&by[m.to].type==='save'&&by[m.from]&&by[m.from].type==='spend'),outOf=moves.filter(m=>by[m.from]&&by[m.from].type==='save'&&by[m.to]&&by[m.to].type==='spend');
   let subs=[];try{subs=recurringScan().filter(r=>!r.bnpl&&r.perMo>0).map(r=>({label:r.label,perMo:r.perMo}));}catch(e){}
   const goals=[];try{(SHARED_GOALS||[]).forEach(g=>{const p=FinGoals.goalProgress(g);if(p.target>0)goals.push({name:g.name,saved:p.saved,target:p.target});});}catch(e){}
-  const r=FinCoach.monthReview({month:ym,txns,cats:Object.fromEntries(Object.entries(coachCatsWeekly()).map(([k,c])=>[k,{name:c.name,monthly:c.monthly}])),marks:st.marks,
+  const r=FinCoach.monthReview({month:ym,quality:coachDataQuality(),txns,cats:Object.fromEntries(Object.entries(coachCatsWeekly()).map(([k,c])=>[k,{name:c.name,monthly:c.monthly}])),marks:st.marks,
     income:coachMonthIncome(txns,ym),
     expectedIncome:(INCOME||[]).filter(i=>i.type==='base').reduce((s,i)=>s+(+i.mo||0),0),
     loanIds:loans.map(a=>a.id),loans:loans.map(a=>({id:a.id,name:a.name,balance:balance(a.id),verified:!!(a.sourceBalance&&a.sourceBalance.date>=end)})),
@@ -205,11 +208,11 @@ function coachRender(){
     if(!f)body='<div class="fh-meaning fh-t-good"><p class="fh-mean-main">✅ No money leaks stand out right now.</p></div>';
     else{
       s.leak=f;coachSaveSession(st);
-      body='<div class="fh-meaning fh-t-act"><div class="fh-mean-h">'+coachTag('fact')+' '+esc(f.name)+'</div><p class="fh-mean-main">'+esc(FinCoach.message(f).happened)+'</p></div>'+coachEvidenceBox(f,'The payments behind this')+coachNoteBox({key:'leak:'+FinDates.budgetWeek(todayISO()).start+':'+f.key,cat:f.cat||f.key,name:f.name,period:'Week of '+FinDates.short(FinDates.budgetWeek(todayISO()).start),ids:(f.evidence||[]).filter(id=>String(id).indexOf('>')<0)});
+      body='<div class="fh-meaning fh-t-act"><div class="fh-mean-h">'+coachTag('fact')+' '+esc(f.name)+'</div><p class="fh-mean-main">'+esc(FinCoach.message(f,null,{calm:FinCoach.isCalm(st)}).happened)+'</p></div>'+coachEvidenceBox(f,'The payments behind this')+coachNoteBox({key:'leak:'+FinDates.budgetWeek(todayISO()).start+':'+f.key,cat:f.cat||f.key,name:f.name,period:'Week of '+FinDates.short(FinDates.budgetWeek(todayISO()).start),ids:(f.evidence||[]).filter(id=>String(id).indexOf('>')<0)});
     }
   }else if(step==='coach'){
     let f=s.leak||null;if(!f&&s.kinds.includes('month')){const r=coachMonth(st);f=r&&r.leaks[0]||null;if(f){s.leak=f;coachSaveSession(st);}}
-    const rc=f?FinCoach.realityCheck({weekly:coachWeeklyFor(f)}):null,m=FinCoach.message(f,rc);
+    const rc=f?FinCoach.realityCheck({weekly:coachWeeklyFor(f)}):null,m=FinCoach.message(f,rc,{calm:FinCoach.isCalm(st)});
     body='<div class="ck-coach"><p><b>What happened.</b> '+esc(m.happened)+'</p><p><b>Why it matters.</b> '+esc(m.matters)+'</p><p><b>What to do now.</b> '+esc(m.todo)+'</p></div>'+coachEvidenceBox(f);
     if(rc&&rc.weekly>0)body+='<details class="ck-ev"><summary>'+(rc.proven?coachTag('fact'):coachTag('estimate'))+' If this carries on</summary><div class="ck-rows"><div class="ck-row"><span>A month</span><b>'+FinCoach.aud(rc.monthly)+'</b></div><div class="ck-row"><span>Six months</span><b>'+FinCoach.aud(rc.sixMonths)+'</b></div><div class="ck-row"><span>A year</span><b>'+FinCoach.aud(rc.annual)+'</b></div></div><p class="tiny">'+esc(rc.label)+'. '+esc(rc.basis)+' '+esc(rc.saving.text)+'</p></details>';
     if(f&&m.options.length){
@@ -321,7 +324,7 @@ function coachSummaryData(st,s){
   return{lines,warn,acts,others:open.filter(a=>acts.indexOf(a)<0)};
 }
 function coachSaveAction(i){const st=coachState(),s=st.session,g=s&&s.sug&&s.sug[i];if(!g)return;coachAdd(st,{text:'Move '+FinCoach.aud(g.amount)+' to '+g.name});coachSave(st);toastMsg('Added to your actions. Move it in your bank app.');coachRender();}
-function coachMonthAction(i){const st=coachState(),r=coachMonth(st),x=r&&r.next[i];if(!x)return;coachAdd(st,{text:x.text});coachSave(st);toastMsg('Added to your actions.');}
+function coachMonthAction(i){const st=coachState(),r=coachMonth(st),x=r&&r.next[i];if(!x)return;coachAdd(st,{text:x.text,findingKey:x.key||null});coachSave(st);toastMsg('Added to your actions.');}
 function coachActionDrop(id){coachActionDropOpen(id,'session');}
 
 /* ---------- actions ---------- */
@@ -343,6 +346,7 @@ function coachMark(id,kind){const st=coachState();FinCoach.mark(st,id,kind);coac
 function coachChoose(i){
   const st=coachState(),s=st.session,f=s&&s.leak;if(!f)return;
   const m=FinCoach.message(f),text=i<0?m.todo:m.options[i];
+  if(f.kind==='data'&&i===0){FinCoach.markRaised(st,f,todayISO());s.chosen=text;FinCoach.confirm(st);coachSave(st);closeSheet();try{if(typeof fixOpen==='function')fixOpen();}catch(e){}return;}
   const a=coachAdd(st,{text,findingKey:f.key,check:i===0&&f.kind==='over'?{type:'category-limit',cat:f.cat,limit:f.limit}:null});
   if(i<0)FinCoach.setStatus(st,a.id,'later','',todayISO());
   FinCoach.markRaised(st,f,todayISO());s.chosen=text;FinCoach.confirm(st);coachSave(st);coachRender();
@@ -385,13 +389,14 @@ function coachPrefsOpen(){
   $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔔 Money reminders</h2><p class="f">A gentle reminder when you open the app, at most once a day. Missed reviews wait on Home. They do not pile up.</p>'
    +['daily','payday','month'].map(k=>'<label class="ck-row" style="cursor:pointer"><span>'+{daily:'Daily money check-in',payday:'Wednesday Payday Reset',month:'Month-End Review'}[k]+'</span><input type="checkbox" id="ckp-'+k+'"'+(pr[k]?' checked':'')+' style="width:22px;height:22px"></label>').join('')
    +'<label class="ck-row"><span>Not before</span><select id="ckp-hour">'+hrs.map(h=>'<option value="'+h+'"'+(h===pr.fromHour?' selected':'')+'>'+fmt(h)+'</option>').join('')+'</select></label>'
+   +'<div class="fh-mean-h" style="margin-top:14px">Calm mode</div><label class="ck-row" style="cursor:pointer"><span>Say less, less often<small style="display:block;color:var(--ink-soft);font-weight:600">One action on Home, no "weeks in a row", and the same leak waits 4 weeks before it is raised again. Nothing is hidden from the lists.</small></span><input type="checkbox" id="ckp-calm"'+(pr.calm?' checked':'')+' style="width:22px;height:22px"></label>'
    +'<button class="btn dark" style="margin-top:12px" onclick="coachPrefsSave()">Save</button>';
   openSheet();
 }
 function coachPrefsSave(){
   const st=coachState();
-  try{FinCoach.setPrefs(st,{daily:$('ckp-daily').checked,payday:$('ckp-payday').checked,month:$('ckp-month').checked,fromHour:+$('ckp-hour').value});}catch(e){toastMsg(e.message);return;}
-  coachSave(st);coachPublish();closeSheet();toastMsg('Reminder settings saved.');
+  try{FinCoach.setPrefs(st,{daily:$('ckp-daily').checked,payday:$('ckp-payday').checked,month:$('ckp-month').checked,fromHour:+$('ckp-hour').value,calm:!!($('ckp-calm')&&$('ckp-calm').checked)});}catch(e){toastMsg(e.message);return;}
+  coachSave(st);coachPublish();closeSheet();toastMsg('Reminder settings saved.');try{render();}catch(e){}
 }
 /* Co-Pilot (the daily front door) reads this one small note: what is due, nothing else. No amounts or names. */
 var K_COPILOT_MONEY='cp_money_v1';
@@ -530,11 +535,35 @@ function coachActionRow(a,where){
   const r=a.reviewId?FinCoach.reviewOf(coachState(),a.reviewId):null;
   return '<div class="ck-act"><div class="ck-act-t">'+esc(a.text)+'<small>'+(a.created?'Since '+esc(FinDates.short(a.created)):'')+(a.seen>1?' · came up '+a.seen+' times':'')+(a.verdict==='kept'?' · ✅ on track':a.verdict==='missed'?' · ⚠️ not yet':'')+'</small>'
    +(r?'<button class="fh-link" onclick="coachReviewView(\''+esc(r.id)+'\')">From your '+esc(r.title)+' on '+esc(FinDates.short(r.on))+' ›</button>':'')+'</div>'
-   +'<div class="ck-act-b"><button class="ck-done" onclick="coachActionDone(\''+esc(a.id)+'\',\''+where+'\')">✓ Done</button><button class="ck-drop" onclick="coachActionDropOpen(\''+esc(a.id)+'\',\''+where+'\')">Drop</button></div></div>';
+   +'<div class="ck-act-b"><button class="ck-done" onclick="coachActionDone(\''+esc(a.id)+'\',\''+where+'\')">✓ Done</button><button class="ck-drop" onclick="coachActionDropOpen(\''+esc(a.id)+'\',\''+where+'\')">Drop</button></div>'
+   +coachReviewBlock(a.id,where,coachActionReviewFor(a,coachState()))+'</div>';
+}
+/* A small "How is it going?" check under each action: the facts we have, plus one tap for how it feels. */
+function coachReviewBlock(id,where,r){
+  if(!r)return '';
+  const w=esc(where||''),facts=[r.age,r.line,r.seen>1?'Came up '+r.seen+' times':''].filter(Boolean);
+  return '<div class="ck-rv ck-rv-'+esc(r.tone||'note')+'"><div class="ck-rv-h">How is it going?</div>'
+   +(facts.length?'<div class="ck-rv-f">'+facts.map(esc).join(' · ')+'</div>':'')
+   +'<div class="ck-rv-b">'+[['good','😀'],['part','😐'],['no','😟']].map(x=>'<button type="button" class="ck-rv-btn'+(r.rating&&r.rating.v===x[0]?' on':'')+'" aria-pressed="'+(r.rating&&r.rating.v===x[0]?'true':'false')+'" onclick="coachActionRate(\''+esc(r.id||id)+'\',\''+x[0]+'\',\''+w+'\')">'+x[1]+' '+esc(FinCoach.RATINGS[x[0]])+'</button>').join('')+'</div>'
+   +(r.rating&&r.rating.on?'<div class="ck-rv-s">You said "'+esc(r.rating.label)+'" on '+esc(FinDates.short(r.rating.on))+'</div>':'')+'</div>';
+}
+function coachActionReviewFor(a,st,ev){try{const r=FinCoach.actionReview(a,ev||coachEvidence(),todayISO());r.id=a.id;return r;}catch(e){return null;}}
+function coachActionRate(id,v,where){
+  const st=coachState();try{FinCoach.rateAction(st,id,v,todayISO());}catch(e){toastMsg(e.message);return;}
+  coachSave(st);toastMsg('Noted ✓');
+  try{render();}catch(e){}
+  if(where==='list')coachActionsOpen();
+}
+/* One line of wins for the top of Home: things done this week, never things owed. */
+function coachWinsHome(){
+  try{if(!coachOn())return null;const st=coachState();
+    const plan=FinCoach.planOf(st,coachPlanWeek());
+    const w=FinCoach.weeklyWins({today:todayISO(),actions:st.actions.filter(a=>a.rating),plan:plan?FinCoach.planProgress(plan):null,weekSpend:coachEvidence().weekSpend,cats:coachCatsWeekly()});
+    return w.parts.length?w:null;}catch(e){return null;}
 }
 function coachActionsHome(){
-  try{if(!coachOn())return null;const st=coachState(),open=FinCoach.followUps(st,coachEvidence());if(!open.length)return null;
-    return{count:open.length,items:open.slice(0,5).map(a=>({id:a.id,text:a.text,since:a.created?FinDates.short(a.created):'',seen:a.seen||1,verdict:a.verdict||null,review:a.reviewId&&FinCoach.reviewOf(st,a.reviewId)?a.reviewId:null}))};}catch(e){return null;}
+  try{if(!coachOn())return null;const st=coachState(),ev=coachEvidence(),open=FinCoach.followUps(st,ev);if(!open.length)return null;
+    return{count:open.length,items:open.slice(0,FinCoach.isCalm(st)?FinCoach.CALM.homeActions:3).map(a=>({id:a.id,text:a.text,since:a.created?FinDates.short(a.created):'',seen:a.seen||1,verdict:a.verdict||null,rv:coachActionReviewFor(a,st,ev),review:a.reviewId&&FinCoach.reviewOf(st,a.reviewId)?a.reviewId:null}))};}catch(e){return null;}
 }
 function coachActionsOpen(){
   const st=coachState(),open=FinCoach.followUps(st,coachEvidence()),done=st.actions.filter(a=>a.status==='completed'||a.status==='dismissed').slice(0,8);

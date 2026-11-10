@@ -29,11 +29,15 @@ function finProfileData(d){
     out.files=null;out.game=null;
   }else{
     out.files={waiting:finFilesWaiting()};
-    out.feed=finFeedData();
+    out.feed=finFeedData();out.lock=finStorageLock();
     out.coach=typeof coachHome==='function'?coachHome():null;
     out.fix=typeof fixHome==='function'?fixHome():null;
+    out.trust=typeof trustHome==='function'?trustHome():null;
     out.plan=typeof coachPlanHome==='function'?coachPlanHome():null;
     out.actions=typeof coachActionsHome==='function'?coachActionsHome():null;
+    out.wins=typeof coachWinsHome==='function'?coachWinsHome():null;
+    // calm mode: the bank-feed nudge only when the feed is really stale (over a day), never for "synced 7 hours ago"
+    try{if(out.feed&&out.feed.state==='old'&&typeof coachState==='function'&&FinCoach.isCalm(coachState())&&!/while ago/.test(out.feed.sub||''))out.feed=null;}catch(e){}
     out.game=finGameHome();out.shop=finShopSummary();
     const ma=finMoveAlert();
     if(ma)out.alert={count:(d.alert.count||0)+1,text:ma.text};
@@ -657,11 +661,19 @@ function finSwapUndo(){
 
 /* ================= Bank feed status, Sync now and automatic re-sync ================= */
 var _feedBusy=false,_feedTimer=null;
+/* Saving is locked when another Finance tab saved first, or an interrupted save needs recovery. Its own banner,
+   separate from the bank feed, so a storage problem is never read as a bank problem. */
+function finStorageLock(){
+  try{const fs=window.FinanceStore&&window.FinanceStore.state&&window.FinanceStore.state(),msg=String((fs&&fs.error)||'');
+   if(!msg)return null;
+   const tab=/another tab|older Finance tab/i.test(msg);
+   return{title:tab?'Finance is open in another tab':'A save needs recovery',sub:tab?'Saving is paused so nothing gets overwritten. Close the other Finance tab, tap Download recovery, then Reload. Changes made here since then are not saved yet.':msg};}catch(e){return null;}
+}
 function finFeedData(){
   let token=false,last=null;
   try{token=!!localStorage.getItem('finance_pocketsmith_app_token');last=localStorage.getItem('finance_pocketsmith_last_sync');}catch(e){}
   const ps=finPocketSmith(),st=ps&&ps.state?ps.state():null;
-  if(!token)return{state:'off',title:'Bank feed is not connected on this device',sub:'Tap the 🏦 Bank feed button at the top of My Finance to connect it. Each device needs its own connection.',canSync:false};
+  if(!token)return{state:'off',title:'Bank feed is not connected on this device',sub:'Open Fix my numbers and tap Bank feed settings to connect it. Each device needs its own connection.',canSync:false};
   if(_feedBusy||(st&&st.status==='busy'))return{state:'busy',title:'Syncing your bank feed…',sub:'',canSync:true,busy:true};
   if(st&&st.status==='err')return{state:'err',title:'The bank feed needs attention',sub:st.detail||'Tap Sync now to try again.',canSync:true};
   if(!last)return{state:'old',title:'Not synced yet on this device',sub:'Tap Sync now.',canSync:true};

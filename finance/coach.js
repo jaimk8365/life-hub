@@ -16,7 +16,11 @@
  function storeKey(profile){if(!available(profile))throw Error('The money coach is only for the owner profile.');return 'fin_coach_v1';}
  function emptyState(){return{done:{daily:{},payday:{},month:{}},session:null,actions:[],marks:{},raised:{},reminded:null,prefs:defaultPrefs(),notes:{},plans:{},history:[]};}
  /* Reminder settings: which reviews to invite you to, and not before what hour (Brisbane time). */
- function defaultPrefs(){return{daily:true,payday:true,month:true,fromHour:7};}
+ function defaultPrefs(){return{daily:true,payday:true,month:true,fromHour:7,calm:false};}
+ /* Calm mode: the same facts, said once and more quietly. One action on Home, no "Nth week in a row", a longer quiet
+    period before the same leak is raised again, and the bank-feed nudge only when the feed is really stale. */
+ const isCalm=st=>!!(st&&st.prefs&&st.prefs.calm);
+ const CALM={homeActions:1,quietDays:28};
 
  /* ---------- which review is due ---------- */
  /* daily: once a day. payday: the Wednesday budget week, until done (no pile-up of missed weeks).
@@ -229,7 +233,21 @@
   return out;   // oldest first, this week last
  }
  const merchant=n=>String(n||'').toLowerCase().replace(/[^a-z ]+/g,' ').replace(/\s+/g,' ').trim().split(' ').slice(0,2).join(' ');
+ /* Data first. While many payments are unsorted or an account does not match the bank, every leak number is a guess,
+    so the only finding raised is "sort your payments". quality: {unchecked, unmatched, miscCount}. */
+ const DATA_GATE={unchecked:20,misc:10};
+ function dataGate(q){
+  if(!q)return null;
+  const unchecked=+q.unchecked||0,unmatched=+q.unmatched||0,misc=+q.miscCount||0;
+  const why=[];
+  if(unchecked>=DATA_GATE.unchecked)why.push(unchecked+' payments sorted for you are still unchecked');
+  if(unmatched>0)why.push(unmatched+(unmatched===1?' account does':' accounts do')+' not match the bank');
+  if(misc>=DATA_GATE.misc)why.push(misc+' payments are sitting in Miscellaneous');
+  if(!why.length)return null;
+  return{key:'data',kind:'data',name:'Sort your payments first',count:unchecked+misc,amount:0,evidence:[],score:1000,why};
+ }
  function leaks(o){
+  const gate=dataGate(o.quality);if(gate)return[gate];
   const today=o.today,marks=o.marks||{},cats=o.cats||{};
   const spend=(o.txns||[]).filter(t=>!t.deleted&&t.amount<0&&t.cat!=='transfer'&&!marks[t.id]&&!isEssential(t.cat));
   const found=[];
@@ -265,9 +283,10 @@
  /* Only raise an issue again if it carries on getting worse, or if there is an action to follow up. 14-day quiet period. */
  function pickLeak(list,st,today){
   for(const f of list){
-   const prev=st.raised[f.key];
+   if(f.kind==='data')return f;   // unsorted data is raised every time until it is sorted
+   const prev=st.raised[f.key],quiet=isCalm(st)?CALM.quietDays:14;
    const follow=st.actions.some(a=>a.findingKey===f.key&&(a.status==='accepted'||a.status==='changed'));
-   if(!prev||follow||D.diffDays(prev.on,today)>=14||f.amount>=prev.amount*1.1)return f;
+   if(!prev||follow||D.diffDays(prev.on,today)>=quiet||(!isCalm(st)&&f.amount>=prev.amount*1.1))return f;
   }
   return null;
  }
@@ -368,10 +387,12 @@
 
  /* ---------- the coach's words: what happened, why it matters, what to do now ---------- */
  const ORD=['','first','second','third','fourth','fifth','sixth'];
- function message(f,rc){
+ function message(f,rc,opts){
   if(!f)return{happened:'Nothing stands out this time.',matters:'Your spending is within what you planned.',todo:'Keep going. No change needed.',options:[]};
-  const yr=rc&&rc.proven?' At this rate that is about '+aud(rc.annual)+' a year.':'';
+  const calm=!!(opts&&opts.calm),yr=rc&&rc.proven&&!calm?' At this rate that is about '+aud(rc.annual)+' a year.':'';
+  if(calm&&f.kind==='over')f=Object.assign({},f,{streak:1});   // calm mode: this week only, never "sixth week in a row"
   switch(f.kind){
+   case 'data':return{happened:'The numbers are not reliable yet: '+(f.why||[]).join(', ')+'.',matters:'Every limit, leak and streak below is worked out from those payments. Sorting them first makes the rest true.',todo:'Open Fix my numbers and sort what is waiting. The coach will hold its advice until then.',options:['Sort them now in Fix my numbers','Remind me next check-in']};
    case 'over':return{happened:(f.streak>=2?'This is the '+(ORD[f.streak]||f.streak+'th')+' week in a row':'This week')+' '+f.name+' is over its '+aud(f.limit)+' limit, by '+aud(f.amount)+'.',
      matters:(f.streak>=2?'That is a pattern, not a one-off.':'One week over is not a habit yet.')+yr,
      todo:'Choose what you are changing this week.',options:['Spend less on '+f.name.toLowerCase(),'Raise the limit (it is not realistic)','Knowingly take it from another goal']};
@@ -391,7 +412,10 @@
  const OPEN=a=>a.status==='accepted'||a.status==='changed'||a.status==='later';
  /* Two actions are the same when they come from the same finding, or say the same thing (ignoring case and punctuation). */
  const actionWords=t=>String(t||'').toLowerCase().replace(/\.(?!\d)/g,' ').replace(/[^a-z0-9$.]+/g,' ').trim();
- const sameAction=(a,b)=>(a.findingKey&&a.findingKey===b.findingKey)||actionWords(a.text)===actionWords(b.text);
+ /* The topic of an action: the category it is about (from its check or its finding key), so three wordings of the
+    same Misc problem from three different reviews count as one. */
+ const actionTopic=a=>{if(a.check&&a.check.cat)return 'cat:'+a.check.cat;const m=/^(?:over|rising|prio):([^:]+)/.exec(a.findingKey||'');return m?'cat:'+m[1]:null;};
+ const sameAction=(a,b)=>(a.findingKey&&a.findingKey===b.findingKey)||(actionTopic(a)&&actionTopic(a)===actionTopic(b))||actionWords(a.text)===actionWords(b.text);
  /* Adding an action you already have keeps one: the newest wording, a count of how often it came up, and its old id. */
  function addAction(st,o,today){
   const text=String(o&&o.text||'').trim();if(!text)throw Error('An action needs some words.');
@@ -424,6 +448,42 @@
   });
  }
 
+ /* The week's wins, for one line on Home. Facts only, every one of them something Jaimi did.
+    o: {today, actions (followUps output), plan (planProgress output or null), weekSpend {cat:spent}, cats {id:{name,weekly}}} */
+ function weeklyWins(o){
+  const wk=D.budgetWeek(o.today),parts=[];
+  const rated=(o.actions||[]).filter(a=>a.rating&&a.rating.on>=wk.start&&a.rating.on<=wk.end),good=rated.filter(a=>a.rating.v==='good').length;
+  if(rated.length)parts.push({kind:'actions',n:good,of:rated.length,text:good+' of '+rated.length+(rated.length===1?' action':' actions')+' going well'});
+  if(o.plan&&o.plan.total)parts.push({kind:'plan',n:o.plan.done,of:o.plan.total,text:o.plan.done+' of '+o.plan.total+' plan steps done'});
+  const cats=Object.entries(o.cats||{}).filter(([id,c])=>c.weekly>0&&!isEssential(id)),spend=o.weekSpend||{};
+  if(cats.length){const under=cats.filter(([id,c])=>(spend[id]||0)<=c.weekly).length;parts.push({kind:'budget',n:under,of:cats.length,text:under+' of '+cats.length+(cats.length===1?' budget':' budgets')+' under this week'});}
+  const score=parts.reduce((s,p)=>s+(p.of?p.n/p.of:0),0)/(parts.length||1);
+  return{parts,text:parts.map(p=>p.text).join(' · '),tone:!parts.length?'note':score>=0.7?'good':score>=0.4?'watch':'act',dayNum:wk.dayNum};
+ }
+ /* A quick check on one open action: how long it has been open, the number now when the evidence has one,
+    and Jaimi's own tap on how it is going. Facts only: nothing here changes a budget or moves money. */
+ const RATINGS={good:'Going well',part:'Partly',no:'Not yet'};
+ function actionReview(a,evidence,today){
+  const days=a.created&&today?Math.max(0,Math.round((Date.parse(today)-Date.parse(a.created))/864e5)):null;
+  const age=days==null?'':days===0?'Added today':days===1?'Open 1 day':'Open '+days+' days';
+  const spend=(evidence&&evidence.weekSpend)||{};
+  let line='',tone='note';
+  if(a.check&&a.check.type==='category-limit'){
+   const s=spend[a.check.cat],limit=+a.check.limit||0;
+   if(Number.isFinite(s)){tone=s<=limit?'good':'watch';line='This week so far: '+aud(s)+' of your '+aud(limit)+' limit ('+(s<=limit?aud(limit-s)+' left':aud(s-limit)+' over')+')';}
+  }else{
+   const m=/^(?:over|rising):(.+)$/.exec(a.findingKey||'');
+   if(m&&Number.isFinite(spend[m[1]]))line='This week so far: '+aud(spend[m[1]])+' spent here';
+  }
+  const r=a.rating&&RATINGS[a.rating.v]?{v:a.rating.v,label:RATINGS[a.rating.v],on:a.rating.on||null}:null;
+  return{line,tone,age,seen:a.seen||1,rating:r};
+ }
+ function rateAction(st,id,value,today){
+  if(!RATINGS[value])throw Error('Unknown rating.');
+  const a=st.actions.find(x=>x.id===id);if(!a)throw Error('Action not found.');
+  a.rating={v:value,on:today};a.updated=today;return a;
+ }
+
  /* ---------- Month-End Review ---------- */
  /* o: {month:'YYYY-MM', txns (this month and the month before), cats {id:{name,monthly}}, marks, income [{amount,person}],
     expectedIncome (monthly), loans [{id,name,balance,verified}], savings {in,out,pulls}, goals [{name,saved,target}], state}
@@ -451,7 +511,7 @@
   const variance=Object.entries(cats).filter(([,c])=>c.monthly>0).map(([id,c])=>{const s=byCat[id]||0;return{cat:id,name:c.name,budget:round(c.monthly),spent:s,diff:round(c.monthly-s),pct:Math.round(s/c.monthly*100)};}).sort((a,b)=>a.diff-b.diff);
   const overCats=variance.filter(v=>v.diff<0);
   // 4) top three leaks, seen from the last day of the month
-  const lk=leaks({today:end,txns:(o.txns||[]).filter(t=>t.date<=end),cats:Object.fromEntries(Object.entries(cats).map(([k,c])=>[k,{name:c.name,weekly:round((c.monthly||0)*12/52)}])),marks,savingsWithdrawals:(o.savings&&o.savings.pulls)||[],subscriptions:o.subscriptions||[]});
+  const lk=leaks({today:end,quality:o.quality,txns:(o.txns||[]).filter(t=>t.date<=end),cats:Object.fromEntries(Object.entries(cats).map(([k,c])=>[k,{name:c.name,weekly:round((c.monthly||0)*12/52)}])),marks,savingsWithdrawals:(o.savings&&o.savings.pulls)||[],subscriptions:o.subscriptions||[]});
   const top=[],keys=new Set();for(const f of lk){const g=f.kind+':'+(f.cat||f.name);if(keys.has(g))continue;keys.add(g);top.push(f);if(top.length===3)break;}
   // 5) habits: better or worse than last month (at least 15% and $30 either way)
   const habits={better:[],worse:[]};
@@ -468,9 +528,11 @@
    return{name:l.name,balance:round(Math.abs(l.balance||0)),verified:!!l.verified,paid,interest,principal:round(paid-interest)};});
   // 8) realistic changes for next month (at most three, each labelled)
   const next=[];
-  const repeatOver=overCats.filter(v=>(priorCat[v.cat]||0)>v.budget);
-  repeatOver.slice(0,1).forEach(v=>next.push(limitAdvice(v,priorCat[v.cat]||0)));
-  if(top[0])next.push({kind:'avoidable',text:'Biggest leak: '+message(top[0]).happened+' Pick one change for next month, for example a weekly limit.'});
+  // With unsorted data, a "realistic limit" is just the unsorted total divided by months: hold that advice back.
+  const gated=top[0]&&top[0].kind==='data';
+  const repeatOver=gated?[]:overCats.filter(v=>(priorCat[v.cat]||0)>v.budget);
+  repeatOver.slice(0,1).forEach(v=>next.push(Object.assign(limitAdvice(v,priorCat[v.cat]||0),{key:'over:'+v.cat})));
+  if(top[0])next.push({kind:'avoidable',key:top[0].key,text:'Biggest leak: '+message(top[0]).happened+' Pick one change for next month, for example a weekly limit.'});
   if(savings.pulls)next.push({kind:'necessary',text:'Savings were used to cover everyday spending '+savings.pulls+' time'+(savings.pulls===1?'':'s')+'. Plan for what ran short on Wednesday instead.'});
   if(split.oneoff>0&&next.length<3)next.push({kind:'oneoff',text:aud(split.oneoff)+' was one-off spending. It is not counted as a habit, so no change is needed for it.'});
   if(!next.length)next.push({kind:'necessary',text:'No changes needed. Keep the same plan for next month.'});
@@ -527,7 +589,7 @@
   return{kind:first.kind,text};
  }
  function reminded(st,today){st.reminded=today;}
- function setPrefs(st,p){const cur=Object.assign(defaultPrefs(),st.prefs||{});for(const k of ['daily','payday','month'])if(k in p)cur[k]=!!p[k];
+ function setPrefs(st,p){const cur=Object.assign(defaultPrefs(),st.prefs||{});for(const k of ['daily','payday','month','calm'])if(k in p)cur[k]=!!p[k];
   if('fromHour' in p){const h=Math.round(+p.fromHour);if(!(h>=0&&h<=22))throw Error('Choose an hour between 0 and 22.');cur.fromHour=h;}st.prefs=cur;return cur;}
  /* A short note for Co-Pilot: what is due and nothing else. No amounts, names or balances leave the Finance page. */
  function copilotNote(due,st,today){
@@ -540,6 +602,6 @@
  }
 
  return{limitAdvice,archiveReview,reviewOf,anytimeDue,tidyActions,openActions,buildWeekPlan,planOf,savePlan,tickPlanItem,updatePlanItem,addPlanItem,removePlanItem,planProgress,planImpact,overDetail,NOTE_TAGS,addNote,notesFor,noteMark,available,storeKey,emptyState,reviewsDue,planSession,STEPS,start,confirm,skip,back,pause,finish,findDuplicates,dataCheck,position,incomeCheck,protect,allocate,savingsSuggestions,
-  ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,reminder,reminded,aud,
+  ESSENTIAL,MARKS,leaks,pickLeak,markRaised,mark,weeklyTotals,realityCheck,goalImpact,message,addAction,setStatus,followUps,actionReview,rateAction,RATINGS,dataGate,DATA_GATE,actionTopic,weeklyWins,isCalm,CALM,reminder,reminded,aud,
   defaultPrefs,setPrefs,copilotNote,payWindow,expectedPays,receivedPays,protectPlan,weekReview,monthReview,lastDayOfMonth,prevMonth};
 });
