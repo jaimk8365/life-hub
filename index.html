@@ -44,6 +44,15 @@
     body.in-finance .stage{bottom:0}
     body.in-finance .crumb-life{display:inline-flex}
   }
+  .crumb-find{display:inline-flex;align-items:center;justify-content:center;width:36px;height:32px;min-height:32px!important;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:15px;cursor:pointer;margin:0;padding:0}
+  .findpanel{position:fixed;z-index:31;top:calc(var(--crumb-h) + var(--sat) + 6px);left:10px;right:10px;max-width:520px;margin-left:auto;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 40px rgba(43,39,34,.18);padding:12px;max-height:70vh;overflow:auto}
+  .findpanel input{width:100%;height:48px;border:2px solid var(--line);border-radius:14px;padding:0 14px;font:600 16px inherit;font-family:inherit;background:var(--paper);color:var(--ink);outline:none}
+  .findpanel input:focus{border-color:var(--coral)}
+  .findres{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;width:100%;border:0;background:transparent;text-align:left;padding:10px 6px;border-top:1px solid var(--line-soft,#EEE9DF);font-family:inherit;color:var(--ink);cursor:pointer;border-radius:10px}
+  .findres:first-of-type{border-top:0;margin-top:8px}.findres b{font-size:15px;overflow-wrap:anywhere;display:block}.findres small{color:var(--ink-faint);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .findres i{font-style:normal;font-size:20px;text-align:center}.findres em{font:800 10.5px system-ui,sans-serif;font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
+  .findnone{padding:14px 6px 4px;color:var(--ink-faint);font-weight:700;font-size:14px;text-align:center}
+  @media (min-width:760px){ .findpanel{left:calc(var(--rail-w) + 14px);right:14px;margin-left:0} }
   /* ---- frames ---- */
   .stage{position:fixed;top:calc(var(--crumb-h) + var(--sat));right:0;bottom:calc(var(--tabbar-h) + var(--sab));left:0;background:var(--paper)}
   .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--paper)}
@@ -168,8 +177,10 @@
   <div class="crumb" id="crumb" role="navigation" aria-label="Where you are">
     <button id="crumbBack" class="crumb-back" type="button" onclick="navBack()" hidden><b aria-hidden="true">‹</b><span id="crumbBackLabel">Back</span></button>
     <span id="crumbHere" class="crumb-here" aria-live="polite"></span>
+    <button id="crumbFind" class="crumb-find" type="button" onclick="toggleFind()" aria-label="Search everything" aria-expanded="false">🔍</button>
     <button id="crumbLife" class="crumb-life" type="button" onclick="toggleMore()" aria-label="All Life Hub sections"><span aria-hidden="true">🏡</span>Life</button>
   </div>
+  <div class="findpanel" id="findPanel" hidden role="search"><input id="findInput" type="search" placeholder="🔍 Search everything" aria-label="Search tasks, planner, notes, admin and inbox" oninput="runFind()" autocomplete="off"><div id="findOut"></div></div>
   <div class="stage">
     <iframe id="f-copilot" title="Co-Pilot"></iframe>
     <iframe id="f-finance" title="My Finance"></iframe>
@@ -327,6 +338,32 @@
   }
   window.addEventListener('popstate', e => { const s = e.state; if (s && s.lh) navGo(s.lh); });
 
+  /* ---- Search everything: planner blocks, tasks, notes, Life Admin and the Inbox, straight from this device ---- */
+  let findCore = null, findHits = [];
+  const findRead = (key, pick) => { try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return pick(v) || []; } catch(e){ return []; } };
+  function toggleFind(){
+    const p = document.getElementById('findPanel'), b = document.getElementById('crumbFind'); p.hidden = !p.hidden;
+    if (b && b.setAttribute) b.setAttribute('aria-expanded', String(!p.hidden));
+    if (!p.hidden){ const i = document.getElementById('findInput'); i.value = ''; document.getElementById('findOut').innerHTML = ''; setTimeout(() => i.focus(), 30);
+      if (!findCore) import('./plan/core.mjs').then(m => { findCore = m; runFind(); }).catch(() => {}); }
+  }
+  function runFind(){
+    const q = document.getElementById('findInput').value, out = document.getElementById('findOut'); if (!findCore || !out) return;
+    const asList = v => Array.isArray(v) ? v : null;
+    findHits = findCore.search(q, {
+      blocks: findRead('plan_blocks', asList), tasks: findRead('hq_task_engine_v1', v => v && asList(v.tasks)), notes: findRead('cp_notes_v1', v => v && asList(v.notes)),
+      admin: findRead('la_items', v => asList(v) || (v && asList(v.items))), inbox: findRead('cp_inbox_v1', asList) });
+    const safe = t => String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    out.innerHTML = findHits.map((r, i) => '<button type="button" class="findres" onclick="openFind(' + i + ')"><i aria-hidden="true">' + safe(r.icon) + '</i><span><b>' + safe(r.title) + '</b><small>' + safe(r.sub) + '</small></span><em>' + safe(r.kind) + '</em></button>').join('')
+      || (q.trim() ? '<div class="findnone">Nothing found</div>' : '');
+  }
+  function openFind(i){
+    const r = findHits[i]; if (!r) return; document.getElementById('findPanel').hidden = true;
+    if (r.go.cp) return showCopilot(r.go.cp);
+    show(r.go.sec);
+    // a dated planner block opens on its day (when the Planner is already loaded)
+    if (r.go.sec === 'plan' && /^\d{4}-\d{2}-\d{2}$/.test(r.go.date || '')) setTimeout(() => { try { document.getElementById('f-plan').contentWindow.eval("viewDate='" + r.go.date + "';setMode('day')"); } catch(e){} }, 400);
+  }
   /* ---- Finance inside Life Hub ----
      Finance shares this page's one encrypted store and sync (bulk-storage.js and sync.js below), so there is only
      ever one copy of your money data running. The bank feed scripts load the first time Finance is opened. */
@@ -414,6 +451,7 @@
     if (!p || p.hidden) return;
     if (!p.contains(e.target) && !e.target.closest('#b-more,#b-mobile-more,#crumbLife')) p.hidden = true;
   });
+  document.addEventListener('click', (e)=>{ const p = document.getElementById('findPanel'); if (p && !p.hidden && !p.contains(e.target) && !e.target.closest('#crumbFind')) p.hidden = true; });
   // wait for the sync engine's first pull (or its ready signal) so sections open on fresh data
   let booted = false;
   const boot = () => {
@@ -426,6 +464,11 @@
     const requested=query.get('tab')==='copilot'?location.hash.slice(1)||'now':null;
     if(requested){showCopilot(requested);return;}
     if(query.get('tab')==='finance'){show('finance');return;}
+    // Coming back after a break (3 hours or more): land on your day, not wherever you were. Mornings open Today, later opens Now.
+    try {
+      const seen = JSON.parse(localStorage.getItem(K_LAST_OPENED) || '{}'), last = Math.max(0, ...Object.values(seen).map(Number).filter(Number.isFinite));
+      if (last && Date.now() - last > 3 * 3600000) { showCopilot(new Date().getHours() < 9 ? 'today' : 'now'); return; }
+    } catch(e){}
     if(saved){show(saved);return;}
     showCopilot('today');
   };

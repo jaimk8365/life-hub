@@ -98,3 +98,42 @@ test('one set of priority words, and pictures escape what they show', () => {
   const html = C.timelineHtml(items, { esc, nowMin: 9 * 60 + 5, tickable: true }) + C.nowNextHtml(C.nowNext(items, 9 * 60 + 5), { esc, nowMin: 9 * 60 + 5, at: 1e12, tickable: true });
   assert.ok(!html.includes('<b>hi</b>')); assert.match(html, /data-pp-tick="x"/); assert.match(html, /25 min left/);
 });
+
+test('month heat map leaves routines out and counts one-off things', () => {
+  const heat = C.monthHeat({ blocks, events, done: {}, month: '2026-11', money: [{ date: '2026-11-13', title: 'Rates' }] });
+  assert.equal(heat.length, 30); const d12 = heat[11];
+  assert.equal(d12.iso, today); assert.deepEqual(d12.extras.map(x => x.cat), ['other', 'event']); assert.equal(d12.extras[0].must, true); assert.equal(d12.allday, 1);
+  assert.equal(heat[12].money, 1); assert.equal(heat[13].extras.length, 0);
+  assert.deepEqual([...C.routineTitles(blocks)], ['Wake up', 'Focus block']);
+});
+
+test('habits: five at most, one tap, and "of the last 7" instead of a streak that resets', () => {
+  let st = C.habitAdd(null, '💊 Meds', 'h1'); st = C.habitAdd(st, 'walk the dog', 'h2');
+  assert.deepEqual(st.habits, [{ id: 'h1', name: 'Meds', icon: '💊' }, { id: 'h2', name: 'walk the dog', icon: '🧘' }]);
+  for (const d of ['2026-11-12', '2026-11-11', '2026-11-09', '2026-11-06', '2026-11-01']) st = C.habitToggle(st, 'h1', d);
+  const [meds] = C.habitWeek(st, today);
+  assert.equal(meds.last7, 4, 'a missed day does not zero anything'); assert.equal(meds.doneToday, true);
+  assert.deepEqual(meds.days.map(d => d.done), [true, false, true, true, false, false, false]); assert.equal(meds.days[4].future, true);
+  st = C.habitToggle(st, 'h1', today); assert.equal(C.habitWeek(st, today)[0].doneToday, false);
+  for (let i = 3; i <= 5; i++) st = C.habitAdd(st, 'habit ' + i, 'h' + i);
+  assert.throws(() => C.habitAdd(st, 'six', 'h6'), /Five is the limit/); assert.throws(() => C.habitAdd(null, '  ', 'x'), /name/);
+  st = C.habitRemove(st, 'h1'); assert.equal(st.habits.length, 4); assert.equal(st.log.h1, undefined);
+});
+
+test('goals and projects: three at a time, progress from steps, only the next step shows', () => {
+  let g = C.goalAdd([], '🏕️ Camp', 'g1'); g = C.goalStepAdd(g, 'g1', 'Pay deposit', 's1'); g = C.goalStepAdd(g, 'g1', 'Pack bag', 's2');
+  assert.deepEqual(C.goalView(g)[0], { id: 'g1', name: 'Camp', icon: '🏕️', done: 0, total: 2, pct: 0, next: { id: 's1', text: 'Pay deposit', done: false }, finished: false });
+  g = C.goalStepToggle(g, 'g1', 's1'); assert.equal(C.goalView(g)[0].pct, 50); assert.equal(C.goalView(g)[0].next.text, 'Pack bag');
+  g = C.goalStepToggle(g, 'g1', 's2'); assert.equal(C.goalView(g)[0].finished, true);
+  g = C.goalAdd(C.goalAdd(g, 'Two', 'g2'), 'Three', 'g3'); assert.throws(() => C.goalAdd(g, 'Four', 'g4'), /Three at a time/);
+  g = C.goalArchive(g, 'g1'); assert.equal(C.goalView(g).length, 2); assert.equal(g.length, 3, 'parked, not deleted');
+  assert.equal(C.goalAdd(g, 'Four', 'g4').length, 4);
+});
+
+test('search finds things across the hub and says where to open them', () => {
+  const sources = { blocks, tasks: [{ title: 'Book dentist for kids', status: 'today' }, { title: 'Dentist old', status: 'binned' }], notes: [{ title: 'Passwords hint', body: 'dentist portal login is the email' }, { title: 'Gone', body: 'dentist', deletedAt: 'x' }], admin: [{ name: 'Family dental check-up', nextDue: '2026-11-01' }], inbox: [{ text: 'ask dentist about braces' }] };
+  const hits = C.search('dentist', sources);
+  assert.deepEqual(hits.map(h => h.kind), ['Planner', 'Task', 'Note', 'Inbox']); assert.deepEqual(hits[0].go, { sec: 'plan', date: today });
+  assert.equal(C.search('dent kids', sources)[0].title, 'Book dentist for kids', 'every word must match');
+  assert.equal(C.search('dental', sources)[0].go.sec, 'admin'); assert.deepEqual(C.search('   ', sources), []);
+});

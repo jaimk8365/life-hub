@@ -54,3 +54,9 @@ test('Co-Pilot places (Today, Inbox) are steps too, and going back does not add 
  assert.equal(p.history.index,1,'back moved along the history instead of pushing a new entry');
  p.run("showCopilot('inbox')");assert.equal(p.history.index,1,'the same place twice is one step');
 });
+
+test('search lives in the top bar and coming back after a break lands on your day', () => {
+  assert.match(source, /id="crumbFind"[^>]*onclick="toggleFind\(\)"/); assert.match(source, /id="findPanel" hidden/);
+  assert.match(source, /import\('\.\/plan\/core\.mjs'\)/); assert.ok(source.includes("last && Date.now() - last > 3 * 3600000"));
+  const p = page('kitchen'); assert.equal(p.active(), 'f-kitchen', 'no record of a break: carry on where you were');
+});

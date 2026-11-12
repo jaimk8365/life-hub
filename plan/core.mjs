@@ -226,3 +226,78 @@ export function timelineHtml(items, { esc, nowMin, tickable = false, from = 420,
     .concat(free.map(g => ({ t: g.start + 0.5, html: `<div class="pp-free-row">🌿 ${esc(durWords(g.mins))} free</div>` })));
   return '<div class="pp-line">' + rows.sort((a, b) => a.t - b.t).map(r => r.html).join('') + '</div>';
 }
+
+/* ---------- month as a heat map ---------- */
+/** Each day of a month: how full it is and its one-off things (routines left out, they are the same every day). */
+export function monthHeat({ blocks, events, done, month, money }) {
+  const [y, m] = month.split('-').map(Number), days = new Date(Date.UTC(y, m, 0)).getUTCDate(), out = [];
+  for (let d = 1; d <= days; d++) {
+    const iso = month + '-' + String(d).padStart(2, '0'), items = dayItems({ blocks, events, done, iso });
+    out.push({ iso, d, load: dayLoad(items), extras: items.filter(i => !i.repeat).map(i => ({ cat: i.cat, must: i.pri === 'high' && i.kind === 'block', done: i.done })), money: (money || []).filter(x => x && x.date === iso).length, allday: (events || []).filter(e => e && e.date === iso && !e.start).length });
+  }
+  return out;
+}
+/** Titles of repeating blocks, so a month cell can leave them out. */
+export const routineTitles = blocks => new Set((blocks || []).filter(b => b && b.repeat && b.repeat.type && b.repeat.type !== 'once').map(b => b.title));
+
+/* ---------- habits: a few, one tap, no streak that resets to zero ---------- */
+export const HABIT_MAX = 5;
+export function habitWeek(state, today) {
+  const start = mondayOf(today), log = (state && state.log) || {};
+  return ((state && state.habits) || []).slice(0, HABIT_MAX).map(h => {
+    const mine = log[h.id] || {};
+    const days = Array.from({ length: 7 }, (_, i) => { const iso = addDays(start, i); return { iso, done: !!mine[iso], today: iso === today, future: iso > today }; });
+    let last7 = 0; for (let i = 0; i < 7; i++) if (mine[addDays(today, -i)]) last7++;
+    return { id: h.id, name: h.name, icon: h.icon || '🌱', days, last7, doneToday: !!mine[today] };
+  });
+}
+export function habitAdd(state, name, id) {
+  const s = { habits: [...((state && state.habits) || [])], log: { ...((state && state.log) || {}) } }, text = String(name || '').trim().slice(0, 40);
+  if (!text) throw new Error('Give the habit a name.');
+  if (s.habits.length >= HABIT_MAX) throw new Error('Five is the limit. Remove one first.');
+  const m = text.match(/^(\p{Extended_Pictographic}️?)\s*(.+)$/u);
+  s.habits.push({ id, name: m ? m[2] : text, icon: m ? m[1] : guess(text).icon === '✅' ? '🌱' : guess(text).icon });
+  return s;
+}
+export function habitToggle(state, id, iso) {
+  const s = { habits: [...((state && state.habits) || [])], log: { ...((state && state.log) || {}) } }, mine = { ...(s.log[id] || {}) };
+  if (mine[iso]) delete mine[iso]; else mine[iso] = true;
+  s.log[id] = mine; return s;
+}
+export function habitRemove(state, id) { const s = { habits: ((state && state.habits) || []).filter(h => h.id !== id), log: { ...((state && state.log) || {}) } }; delete s.log[id]; return s; }
+
+/* ---------- goals and projects: a name, small steps, and only the next step asks for attention ---------- */
+export const GOAL_MAX = 3;
+export function goalView(goals) {
+  return (goals || []).filter(g => g && !g.archived).map(g => {
+    const steps = g.steps || [], done = steps.filter(s => s.done).length, next = steps.find(s => !s.done) || null;
+    return { id: g.id, name: g.name, icon: g.icon || '🎯', done, total: steps.length, pct: steps.length ? Math.round(done / steps.length * 100) : 0, next, finished: steps.length > 0 && done === steps.length };
+  });
+}
+export function goalAdd(goals, name, id) {
+  const text = String(name || '').trim().slice(0, 60); if (!text) throw new Error('Give it a name.');
+  if ((goals || []).filter(g => !g.archived).length >= GOAL_MAX) throw new Error('Three at a time. Finish or park one first.');
+  const m = text.match(/^(\p{Extended_Pictographic}️?)\s*(.+)$/u);
+  return [...(goals || []), { id, name: m ? m[2] : text, icon: m ? m[1] : '🎯', steps: [] }];
+}
+export function goalStepAdd(goals, goalId, text, id) {
+  const t = String(text || '').trim().slice(0, 80); if (!t) throw new Error('Type the step.');
+  return (goals || []).map(g => g.id === goalId ? { ...g, steps: [...(g.steps || []), { id, text: t, done: false }] } : g);
+}
+export function goalStepToggle(goals, goalId, stepId) { return (goals || []).map(g => g.id === goalId ? { ...g, steps: (g.steps || []).map(s => s.id === stepId ? { ...s, done: !s.done } : s) } : g); }
+export function goalArchive(goals, goalId) { return (goals || []).map(g => g.id === goalId ? { ...g, archived: true } : g); }
+
+/* ---------- search across the whole hub ---------- */
+/** sources: {blocks, tasks, notes, admin, inbox}. Returns the best 20 matches with where to open them. */
+export function search(query, sources) {
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean); if (!words.length) return [];
+  const hit = text => { const t = String(text || '').toLowerCase(); return words.every(w => t.includes(w)); };
+  const out = [], s = sources || {};
+  for (const b of s.blocks || []) if (b && hit(b.title + ' ' + (b.note || ''))) out.push({ kind: 'Planner', icon: b.icon || '🗓️', title: b.title, sub: (b.repeat && b.repeat.type === 'once' ? b.repeat.date : 'repeats') + ' · ' + to12(b.start || '09:00'), go: { sec: 'plan', date: b.repeat && b.repeat.type === 'once' ? b.repeat.date : null } });
+  for (const t of s.tasks || []) if (t && t.status !== 'binned' && hit(t.title)) out.push({ kind: 'Task', icon: t.status === 'done' || t.completed ? '✅' : '☑️', title: t.title, sub: t.status === 'done' || t.completed ? 'done' : (t.dueDate || t.area || ''), go: { sec: 'tasks' } });
+  for (const n of s.notes || []) if (n && !n.deletedAt && hit((n.title || '') + ' ' + (n.body || ''))) out.push({ kind: 'Note', icon: '🗒️', title: n.title || String(n.body || '').slice(0, 40), sub: String(n.body || '').replace(/\s+/g, ' ').slice(0, 60), go: { cp: 'notes' } });
+  for (const a of s.admin || []) if (a && hit(a.name || a.title)) out.push({ kind: 'Life Admin', icon: '📋', title: a.name || a.title, sub: a.nextDue ? 'due ' + a.nextDue : '', go: { sec: 'admin' } });
+  for (const i of s.inbox || []) if (i && hit(i.text)) out.push({ kind: 'Inbox', icon: '📥', title: i.text, sub: '', go: { cp: 'inbox' } });
+  const rank = r => (String(r.title || '').toLowerCase().startsWith(words[0]) ? 0 : 1);
+  return out.sort((a, b) => rank(a) - rank(b)).slice(0, 20);
+}

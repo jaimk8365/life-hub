@@ -4,10 +4,11 @@
 // the full add sheet, drag to reorder, energy sort, nudges, pattern suggestions, the tray, Month and Year.
 // Reads the page's own globals (BLOCKS, DONE, viewDate, render…). No personal data lives in this file.
 /* global BLOCKS, DONE, ENERGY, PLAN_FEED, PRI, K_BLOCKS, K_DONE, K_ENERGY, K_MONEY_DATES, viewDate:writable, mode, sortMode, weekCursor,
-   todayISO, save, load, esc, uid, toast, render, setMode, setEnergy, clearEnergy, setSort, openBlock, catC, isDone, niceDate, dkey */
+   todayISO, monthCursor, save, load, esc, uid, toast, render, setMode, setEnergy, clearEnergy, setSort, openBlock, catC, isDone, niceDate, dkey */
 import * as C from './core.mjs';
 
 const K_CARRY = 'plan_carry_v1', K_HINT = 'plan_plus_hint_v1';
+const K_ROUT = 'plan_plus_routines_v1', K_GOALS = 'plan_goals_v1';
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const say = msg => { try { toast(msg); } catch { /* no toast on this page */ } };
@@ -67,6 +68,23 @@ html,body{overflow-x:hidden;max-width:100%}
 .pp-mu time{font:800 12px system-ui,sans-serif;color:var(--ink-soft,#6B655C)}.pp-mu.done{opacity:.45;text-decoration:line-through}.pp-mu.late time{color:#C75B45}
 .pp-read{margin:0 0 12px}.pp-read>summary{cursor:pointer;font-weight:800;padding:12px 14px;border:1px solid var(--line,#E7E0D4);border-radius:14px;background:var(--card,#fff);list-style:none}
 .pp-read[open]>summary{margin-bottom:12px}
+#sched .block.pp-rt{min-height:0!important;padding-top:6px;padding-bottom:6px;opacity:.82}
+#sched .block.pp-rt .sub,#sched .block.pp-rt .t2{display:none}
+#sched .block.pp-rt .em{transform:scale(.8)}
+#sched .block.pp-rt .nm{font-size:14px;font-weight:600}
+.pp-rtchip{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;margin:0 0 10px;border:1px dashed var(--line,#E7E0D4);border-radius:14px;background:transparent;font:800 13.5px inherit;font-family:inherit;color:var(--ink-soft,#6B655C);cursor:pointer}
+.monthday{position:relative}.monthday.pp-l-warn{background:#FCF4DC!important}.monthday.pp-l-bad{background:#F8E1DB!important}
+.pp-md{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}.pp-md u{width:9px;height:9px;border-radius:50%;background:var(--pc,#A39C90);display:block}.pp-md u.m{box-shadow:0 0 0 2px #2B2722 inset}.pp-md u.d{opacity:.3}
+.pp-mkey{display:flex;gap:10px;flex-wrap:wrap;font:700 11.5px system-ui,sans-serif;color:var(--ink-soft,#6B655C);margin:0 0 10px}.pp-mkey span{display:inline-flex;gap:4px;align-items:center}.pp-mkey i{width:14px;height:10px;border-radius:3px;display:inline-block;border:1px solid var(--line,#E7E0D4)}
+.pp-goals{border-radius:16px;border:1px solid var(--line,#E7E0D4);background:var(--card,#fff);padding:12px 14px;margin:0 0 12px}
+.pp-goals h3{font:800 11px system-ui,sans-serif;letter-spacing:.1em;color:var(--ink-soft,#6B655C);margin:0 0 8px}
+.pp-goal{padding:10px 0;border-top:1px solid var(--line,#E7E0D4)}.pp-goal:first-of-type{border-top:0}
+.pp-goal-h{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px}.pp-goal-h span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}.pp-goal-h small{font:800 12px system-ui,sans-serif;color:var(--ink-soft,#6B655C)}
+.pp-gbar{height:10px;border-radius:999px;background:#EEE9DF;overflow:hidden;margin:6px 0}.pp-gbar u{display:block;height:100%;border-radius:999px;background:var(--mint,#7FB79B)}
+.pp-gnext{display:flex;align-items:center;gap:6px}.pp-gnext b{flex:1;min-width:0;font-size:14.5px;font-weight:600;overflow-wrap:anywhere}
+.pp-gnext button,.pp-gform button,.pp-goal-x{flex:none;min-width:44px;height:44px;border-radius:12px;border:1px solid var(--line,#E7E0D4);background:var(--card,#fff);font-size:16px;cursor:pointer}
+.pp-gform{display:flex;gap:6px;margin-top:8px}.pp-gform input{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line,#E7E0D4);padding:0 12px;font:600 15px inherit;font-family:inherit;background:var(--card,#fff);color:var(--ink,#2B2722)}
+.pp-goal-x{border:0;background:transparent;color:var(--ink-faint,#A39C90);height:32px;min-width:32px}
 @media(max-width:560px){.wrap{padding-left:12px;padding-right:12px}}
 `;
 
@@ -122,6 +140,15 @@ function enhanceDay() {
     // a star means a real must-do, not a routine that happens anyway
     const sub = el.querySelector('.sub'); if (sub && b.repeat && b.repeat.type !== 'once') sub.textContent = sub.textContent.replace(/^\s*★\s*/, '').replace(/\s*· repeats\s*$/, ' 🔁');
   }
+  // routines: slim rows that do not shout, or tucked away entirely with one tap
+  const routs = els.filter(x => x.b.repeat && x.b.repeat.type !== 'once'), hideR = load(K_ROUT, 'show') === 'hide';
+  routs.forEach(x => { x.el.classList.add('pp-rt'); if (hideR) x.el.classList.add('pp-hide'); });
+  if (routs.length) {
+    const doneR = routs.filter(x => isDone(viewDate, x.b.id)).length, chip = document.createElement('button');
+    chip.type = 'button'; chip.className = 'pp-rtchip'; chip.dataset.ppRoutines = '1'; chip.setAttribute('aria-pressed', String(hideR));
+    chip.textContent = hideR ? `🔁 ${routs.length} routines · ${doneR} done · show` : `🔁 hide ${routs.length} routines`;
+    top.appendChild(chip);
+  }
   $$('div', sched).filter(el => el.children.length === 0 && / priority$/.test(el.textContent)).forEach(el => { el.textContent = el.textContent.replace(/ priority$/, ''); });
   // free time you can see (time order only, so drag to reorder is untouched)
   if (sortMode === 'time') {
@@ -153,6 +180,7 @@ function enhanceWeek() {
   const start = weekCursor || C.mondayOf(todayISO()), old = root.querySelector('.wkgrid'); if (!old || root.querySelector('.pp-wk')) return;
   old.classList.add('pp-hide');
   old.insertAdjacentHTML('afterend', weekHtml(start));
+  (root.querySelector('.pp-musts') || root.querySelector('.pp-key')).insertAdjacentHTML('afterend', goalsHtml());
   // the written plan stays, one tap away
   const rest = [...root.children].filter(el => !el.classList.contains('daynav') && !el.classList.contains('todaybtn') && !el.classList.contains('wkgrid') && !/^pp-/.test(el.className));
   if (rest.length) {
@@ -160,6 +188,46 @@ function enhanceWeek() {
     d.addEventListener('toggle', () => { readOpen = d.open; });
     rest.forEach(el => d.appendChild(el)); root.appendChild(d);
   }
+}
+
+/* ---------- month: a heat map (how full each day is), one-off things as dots, routines left out ---------- */
+function enhanceMonth() {
+  const root = document.getElementById('root'); if (!root || root.querySelector('.pp-mkey')) return;
+  const cells = $$('.monthday:not(.out)', root); if (!cells.length) return;
+  const heat = C.monthHeat({ blocks: BLOCKS, events: feedEvents(), done: DONE, month: monthCursor, money: load(K_MONEY_DATES, []) }), rt = C.routineTitles(BLOCKS);
+  cells.forEach((cell, i) => {
+    const h = heat[i]; if (!h) return;
+    $$('.monthitem.tasks', cell).forEach(el => { if (rt.has(el.textContent)) el.classList.add('pp-hide'); });
+    if (h.load.tone !== 'good') cell.classList.add('pp-l-' + h.load.tone);
+    const dots = h.extras.filter(x => x.cat !== 'event');
+    if (dots.length) cell.insertAdjacentHTML('beforeend', '<div class="pp-md" aria-hidden="true">' + dots.slice(0, 6).map(x => `<u class="${x.must ? 'm' : ''}${x.done ? ' d' : ''}" style="--pc:${C.CAT_COLOURS[x.cat] || C.CAT_COLOURS.other}"></u>`).join('') + '</div>');
+    cell.setAttribute('aria-label', `${h.d}: ${h.load.pct}% full`);
+  });
+  const grid = root.querySelector('.monthgrid');
+  if (grid) grid.insertAdjacentHTML('beforebegin', '<div class="pp-mkey" aria-hidden="true"><span><i style="background:var(--card,#fff)"></i>open</span><span><i style="background:#FCF4DC"></i>busy</span><span><i style="background:#F8E1DB"></i>full</span><span>● one-off</span></div>');
+}
+
+/* ---------- goals and projects (week view): a name, small steps, only the next step shows ---------- */
+function goalsHtml() {
+  const view = C.goalView(load(K_GOALS, []));
+  return `<section class="pp-goals" aria-label="Goals and projects"><h3>🎯 GOALS & PROJECTS · ${view.length}/${C.GOAL_MAX}</h3>`
+    + view.map(g => `<div class="pp-goal"><div class="pp-goal-h"><span aria-hidden="true">${esc(g.icon)}</span><span>${esc(g.name)}</span><small>${g.done}/${g.total}</small><button type="button" class="pp-goal-x" data-pp-goal="park" data-id="${esc(g.id)}" aria-label="Park ${esc(g.name)}" title="Park it">✕</button></div>
+      <div class="pp-gbar"><u style="width:${g.pct}%"></u></div>
+      ${g.finished ? '<div class="pp-free-row">🎉 done</div>' : g.next ? `<div class="pp-gnext"><b>➜ ${esc(g.next.text)}</b><button type="button" data-pp-goal="today" data-id="${esc(g.id)}" data-step="${esc(g.next.id)}" aria-label="Do it today" title="Do it today">☀️</button><button type="button" data-pp-goal="tick" data-id="${esc(g.id)}" data-step="${esc(g.next.id)}" aria-label="Step done" title="Done">✓</button></div>` : ''}
+      <form class="pp-gform" data-pp-step="${esc(g.id)}" autocomplete="off"><input placeholder="＋ next small step" aria-label="Add a step to ${esc(g.name)}"><button type="submit" aria-label="Add step">＋</button></form></div>`).join('')
+    + (view.length < C.GOAL_MAX ? `<form class="pp-gform" data-pp-newgoal autocomplete="off"><input placeholder="＋ goal or project" aria-label="Add a goal or project"><button type="submit" aria-label="Add">＋</button></form>` : '') + '</section>';
+}
+function goalAct(kind, id, step) {
+  let goals = load(K_GOALS, []);
+  if (kind === 'tick') goals = C.goalStepToggle(goals, id, step);
+  else if (kind === 'park') { if (!confirm('Park this one? Its steps are kept.')) return; goals = C.goalArchive(goals, id); }
+  else if (kind === 'today') {
+    const g = goals.find(x => x.id === id), st = g && (g.steps || []).find(x => x.id === step); if (!st) return;
+    const today = todayISO(), b = C.quickBlock(st.text, { today, nowMin: nowMin(), items: itemsFor(today), id: uid() });
+    if (b) { b.icon = g.icon || b.icon; b.pri = 'high'; b.note = g.name; BLOCKS.push(b); save(K_BLOCKS, BLOCKS); say(`${b.icon} ${C.to12(b.start)} today`); }
+    return render();
+  }
+  save(K_GOALS, goals); render();
 }
 
 /* ---------- the add sheet: title first, the rest behind "More options"; reminders on existing blocks ---------- */
@@ -209,10 +277,17 @@ function carry(id, what, day) {
   b.repeat = { type: 'once', date }; save(K_BLOCKS, BLOCKS); say(date === today ? 'Moved to today ☀️' : 'Moved to ' + niceDate(date)); render();
 }
 document.addEventListener('submit', e => { const f = e.target.closest?.('[data-pp-add]'); if (!f) return; e.preventDefault(); const i = f.querySelector('input'); if (addQuick(i.value)) { const n = document.getElementById('pp-add-in'); if (n) n.value = ''; } });
+document.addEventListener('submit', e => {
+  const f = e.target.closest?.('[data-pp-newgoal],[data-pp-step]'); if (!f) return; e.preventDefault();
+  const v = f.querySelector('input').value;
+  try { save(K_GOALS, 'ppNewgoal' in f.dataset ? C.goalAdd(load(K_GOALS, []), v, uid()) : C.goalStepAdd(load(K_GOALS, []), f.dataset.ppStep, v, uid())); render(); } catch (err) { say(err.message); }
+});
 document.addEventListener('input', e => { if (e.target.id === 'pp-add-in') draft = e.target.value; });
 document.addEventListener('change', e => { const id = e.target.dataset?.ppCarryday; if (id) carry(id, 'day', e.target.value); });
 document.addEventListener('click', e => {
-  const t = e.target.closest?.('[data-pp-carry],[data-pp-energy],[data-pp-more],[data-pp-day]'); if (!t) return;
+  const t = e.target.closest?.('[data-pp-carry],[data-pp-energy],[data-pp-more],[data-pp-day],[data-pp-routines],[data-pp-goal]'); if (!t) return;
+  if (t.dataset.ppRoutines) { save(K_ROUT, load(K_ROUT, 'show') === 'hide' ? 'show' : 'hide'); return render(); }
+  if (t.dataset.ppGoal) return goalAct(t.dataset.ppGoal, t.dataset.id, t.dataset.step);
   if (t.dataset.ppCarry) return carry(t.dataset.id, t.dataset.ppCarry);
   if (t.dataset.ppEnergy) { if (ENERGY[viewDate] === t.dataset.ppEnergy) clearEnergy(); else setEnergy(t.dataset.ppEnergy); return; }
   if ('ppMore' in t.dataset) { moreOpen = !moreOpen; document.getElementById('pp-more')?.classList.toggle('pp-hide', !moreOpen); t.setAttribute('aria-expanded', String(moreOpen)); return; }
@@ -232,6 +307,8 @@ window.render = function () {
   try { if (mode === 'day') enhanceDay(); else if (mode === 'week') enhanceWeek(); } catch (err) { console.warn('Planner extras skipped: ' + err.message); }
   if (typing) { const i = document.getElementById('pp-add-in'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch { /* fine */ } } }
 };
+const baseMonth = window.renderMonth;
+if (typeof baseMonth === 'function') window.renderMonth = function () { baseMonth.apply(this, arguments); try { enhanceMonth(); } catch (err) { console.warn('Month extras skipped: ' + err.message); } };
 window.openBlock = function (id) { baseOpen.apply(this, arguments); try { enhanceSheet(id); } catch (err) { console.warn('Sheet extras skipped: ' + err.message); } };
 C.startCountdowns(document, window);
 window.render();

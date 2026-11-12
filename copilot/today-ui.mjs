@@ -38,7 +38,7 @@ let foldOpen = false;
 function ensureLook() {
   const doc = globalThis.document; if (!doc || !doc.head || doc.getElementById('pp-shared-css')) return;
   const st = doc.createElement('style'); st.id = 'pp-shared-css';
-  st.textContent = Day.SHARED_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
+  st.textContent = Day.SHARED_CSS + HABIT_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
   doc.head.appendChild(st);
   doc.addEventListener('toggle', e => { if (e.target?.classList?.contains('tg-fold')) foldOpen = e.target.open; }, true);
   if (globalThis.window) Day.startCountdowns(doc, globalThis.window);
@@ -56,6 +56,17 @@ export function nowStrip(ctx) {
   return Day.nowNextHtml(Day.nowNext(items, now), { esc: ctx.esc, nowMin: now, at: ctx.at ?? Date.now(), tickable: true });
 }
 export const foldAttr = () => (foldOpen ? 'open' : '');
+
+/* ---------- habits: up to five, one tap, seven dots. No streak that resets to zero. ---------- */
+const K_HABITS = 'cp_habits_v1';
+const habitState = ctx => ctx.habits || readLS(K_HABITS, { habits: [], log: {} });
+export function habitsCard(ctx) {
+  const { esc } = ctx, rows = Day.habitWeek(habitState(ctx), ctx.today);
+  const dot = d => `<i class="${d.done ? 'on' : ''}${d.today ? ' now' : ''}${d.future ? ' fut' : ''}"></i>`;
+  return `<div class="card tg-habits"><h3>🌱 Habits</h3>${rows.map(h => `<div class="tg-habit"><button type="button" class="tg-hbtn${h.doneToday ? ' on' : ''}" data-action="habit-tick" data-id="${esc(h.id)}" aria-pressed="${h.doneToday}" aria-label="${esc(h.name)}: ${h.doneToday ? 'done today, tap to undo' : 'tap when done today'}">${h.doneToday ? '✓' : esc(h.icon)}</button><div class="tg-hmid"><b>${esc(h.name)}</b><span class="tg-dots" aria-label="${h.last7} of the last 7 days">${h.days.map(dot).join('')}<small>${h.last7}/7</small></span></div><button type="button" class="tg-hx" data-action="habit-remove" data-id="${esc(h.id)}" aria-label="Remove ${esc(h.name)}">✕</button></div>`).join('')}
+    ${rows.length < Day.HABIT_MAX ? `<div class="tg-hadd"><input id="tg-habit-new" maxlength="40" placeholder="＋ habit  e.g. 💊 Meds" aria-label="New habit"><button type="button" class="soft-button" data-action="habit-add" aria-label="Add habit">＋</button></div>` : ''}</div>`;
+}
+const HABIT_CSS = '.tg-habit{display:grid;grid-template-columns:52px 1fr 32px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.06)}.tg-habit:first-of-type{border-top:0}.tg-hbtn{width:52px;height:52px;border-radius:50%;border:2px solid #CBE3D4;background:#fff;font-size:24px;cursor:pointer;color:#2B2722}.tg-hbtn.on{background:#7FB79B;border-color:#7FB79B;color:#fff;font-weight:800}.tg-hmid{min-width:0;display:flex;flex-direction:column;gap:5px}.tg-hmid b{font-size:15.5px;overflow-wrap:anywhere}.tg-dots{display:flex;align-items:center;gap:5px}.tg-dots i{width:14px;height:14px;border-radius:50%;background:#EEE9DF;display:block}.tg-dots i.on{background:#7FB79B}.tg-dots i.now{box-shadow:0 0 0 2px #2B2722}.tg-dots i.fut{opacity:.4}.tg-dots small{margin-left:4px;font-weight:800;color:#6B655C}.tg-hx{border:0;background:transparent;color:#A39C90;font-size:14px;height:32px;cursor:pointer}.tg-hadd{display:flex;gap:8px;margin-top:10px}.tg-hadd input{flex:1;min-width:0;min-height:44px;border:1px solid #D9C9FA;border-radius:12px;padding:0 12px;font:inherit}';
 /** Everything after the marker (the older, longer plan) goes behind one tap. */
 export function fold(html) {
   const mark = '<!--tg-fold-->', at = String(html).indexOf(mark); if (at < 0) return html;
@@ -76,6 +87,7 @@ export function glance(ctx) {
     ${ctx.nowTask ? `<div class="card tg-now"><p class="eyebrow">YOUR TASK</p><h2>${esc(ctx.nowTask.title)}</h2><button class="soft-button" data-route="now">Open it ›</button></div>` : (strip ? '' : '<div class="card tg-now"><p class="eyebrow">DO THIS NOW</p><p>Nothing urgent. Pick one thing below, or rest.</p></div>')}
     ${todo.length ? `<div class="card"><h3>📌 Sent to today</h3>${todo.map(t => `<div class="tg-row"><span>${esc(t.title)}</span></div>`).join('')}</div>` : ''}
     <div class="card tg-myday"><div class="icon-row"><h3>🗓️ My day</h3><button class="soft-button" data-action="today-open" data-section="plan">Planner ›</button></div>${allDay.map(row).join('')}${items.length ? Day.timelineHtml(items, { esc, nowMin: now, tickable: true }) : (allDay.length ? '' : '<p class="hint">Nothing planned today.</p>')}</div>
+    ${habitsCard(ctx)}
     <div class="tg-grid">
       ${ctx.moneyCard || ''}
       <div class="card mini-card"><h3>🍳 Dinner tonight</h3><p>${ctx.dinner ? esc(ctx.dinner) : 'Not planned yet.'}</p><button class="soft-button" data-action="today-open" data-section="kitchen">Kitchen ›</button></div>
@@ -140,6 +152,16 @@ export function maybeRefresh(rerender, { ls = globalThis.localStorage, fetchFn =
 export function act(action, button, ctx, fx) {
   const doc = globalThis.document, ls = globalThis.localStorage;
   if (action === 'today-open') { fx.openSection(button.dataset.section); return true; }
+  if (action === 'habit-tick' || action === 'habit-remove' || action === 'habit-add') {
+    try {
+      let st = readLS(K_HABITS, { habits: [], log: {} });
+      if (action === 'habit-tick') st = Day.habitToggle(st, button.dataset.id, ctx.today);
+      else if (action === 'habit-remove') { if (!globalThis.confirm || globalThis.confirm('Remove this habit? Its dots go too.')) st = Day.habitRemove(st, button.dataset.id); }
+      else st = Day.habitAdd(st, doc.getElementById('tg-habit-new')?.value, 'h' + Date.now().toString(36));
+      ls.setItem(K_HABITS, JSON.stringify(st));
+    } catch (err) { fx.toast(err.message || 'Could not save that.'); }
+    fx.render(); return true;
+  }
   if (action === 'pp-tick') {
     // the same tick the Planner uses (plan_done), so both screens always agree
     try { const done = JSON.parse(ls.getItem('plan_done') || '{}') || {}, key = Day.doneKey(ctx.today, button.dataset.ppTick); if (done[key]) delete done[key]; else done[key] = true; ls.setItem('plan_done', JSON.stringify(done)); }
