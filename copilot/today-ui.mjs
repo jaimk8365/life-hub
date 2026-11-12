@@ -2,6 +2,7 @@
 // in the same style as guides-ui.mjs. ctx = data to show, fx = Co-Pilot functions that save things.
 // Nothing here deletes data or moves money.
 import * as QW from './questworld.mjs';
+import * as Day from '../plan/core.mjs';
 
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -30,17 +31,51 @@ export function titleFrom(text) {
   return line.length > 140 ? line.slice(0, 137) + '…' : line;
 }
 
+/* ---------- the Planner's day, shown here too: one day, one truth ---------- */
+const readLS = (key, fallback) => { try { const v = globalThis.localStorage?.getItem(key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } };
+const clockMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+let foldOpen = false;
+function ensureLook() {
+  const doc = globalThis.document; if (!doc || !doc.head || doc.getElementById('pp-shared-css')) return;
+  const st = doc.createElement('style'); st.id = 'pp-shared-css';
+  st.textContent = Day.SHARED_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
+  doc.head.appendChild(st);
+  doc.addEventListener('toggle', e => { if (e.target?.classList?.contains('tg-fold')) foldOpen = e.target.open; }, true);
+  if (globalThis.window) Day.startCountdowns(doc, globalThis.window);
+}
+/** Planner blocks plus timed calendar events for a day. ctx.planner lets tests pass data in. */
+export function dayOf(ctx) {
+  const p = ctx.planner || { blocks: readLS('plan_blocks', []), done: readLS('plan_done', {}) };
+  return Day.dayItems({ blocks: Array.isArray(p.blocks) ? p.blocks : [], events: ctx.events, done: p.done || {}, iso: ctx.today });
+}
+/** Now-and-next from the Planner, for the top of Today and of Now. Empty when the day has nothing timed. */
+export function nowStrip(ctx) {
+  ensureLook();
+  const items = dayOf(ctx); if (!items.length) return '';
+  const now = ctx.nowMin ?? clockMin();
+  return Day.nowNextHtml(Day.nowNext(items, now), { esc: ctx.esc, nowMin: now, at: ctx.at ?? Date.now(), tickable: true });
+}
+export const foldAttr = () => (foldOpen ? 'open' : '');
+/** Everything after the marker (the older, longer plan) goes behind one tap. */
+export function fold(html) {
+  const mark = '<!--tg-fold-->', at = String(html).indexOf(mark); if (at < 0) return html;
+  return html.slice(0, at) + `<details class="tg-fold" ${foldAttr()}><summary>📋 Full plan and all tasks</summary>` + html.slice(at + mark.length) + '</details>';
+}
+export const tierWord = tier => Day.TIER_WORDS[tier] || 'Should';
+
 export function glance(ctx) {
   const { esc } = ctx, tomorrow = addDays(ctx.today, 1);
   const ev = eventsOn(ctx.events, ctx.today), next = eventsOn(ctx.events, tomorrow), todo = dueToday(ctx.tasks, ctx.today);
   const nice = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Brisbane', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(ctx.today + 'T12:00:00+10:00'));
   const row = e => `<div class="tg-row"><b>${esc(e.start ? to12(e.start) : 'All day')}</b><span>${esc(e.title)}</span></div>`;
+  const items = dayOf(ctx), now = ctx.nowMin ?? clockMin(), strip = nowStrip(ctx), allDay = ev.filter(e => !e.start);
   return `<section class="tg" aria-label="Today at a glance">
     <div class="header"><div><p class="eyebrow">TODAY</p><h1>${esc(nice)}</h1></div><button class="soft-button" data-route="rescue">Rescue my day</button></div>
     <button class="primary tg-start" data-route="morning">☀️ Start my day <small>· about 2 min</small></button>
-    <div class="card tg-now"><p class="eyebrow">DO THIS NOW</p>${ctx.nowTask ? `<h2>${esc(ctx.nowTask.title)}</h2><button class="soft-button" data-route="now">Open it ›</button>` : '<p>Nothing urgent. Pick one thing below, or rest.</p>'}</div>
+    ${strip}
+    ${ctx.nowTask ? `<div class="card tg-now"><p class="eyebrow">YOUR TASK</p><h2>${esc(ctx.nowTask.title)}</h2><button class="soft-button" data-route="now">Open it ›</button></div>` : (strip ? '' : '<div class="card tg-now"><p class="eyebrow">DO THIS NOW</p><p>Nothing urgent. Pick one thing below, or rest.</p></div>')}
     ${todo.length ? `<div class="card"><h3>📌 Sent to today</h3>${todo.map(t => `<div class="tg-row"><span>${esc(t.title)}</span></div>`).join('')}</div>` : ''}
-    <div class="card"><div class="icon-row"><h3>📅 Today's calendar</h3><button class="soft-button" data-action="today-open" data-section="plan">Planner ›</button></div>${ev.map(row).join('') || '<p class="hint">Nothing on the calendar today.</p>'}</div>
+    <div class="card tg-myday"><div class="icon-row"><h3>🗓️ My day</h3><button class="soft-button" data-action="today-open" data-section="plan">Planner ›</button></div>${allDay.map(row).join('')}${items.length ? Day.timelineHtml(items, { esc, nowMin: now, tickable: true }) : (allDay.length ? '' : '<p class="hint">Nothing planned today.</p>')}</div>
     <div class="tg-grid">
       ${ctx.moneyCard || ''}
       <div class="card mini-card"><h3>🍳 Dinner tonight</h3><p>${ctx.dinner ? esc(ctx.dinner) : 'Not planned yet.'}</p><button class="soft-button" data-action="today-open" data-section="kitchen">Kitchen ›</button></div>
@@ -105,6 +140,12 @@ export function maybeRefresh(rerender, { ls = globalThis.localStorage, fetchFn =
 export function act(action, button, ctx, fx) {
   const doc = globalThis.document, ls = globalThis.localStorage;
   if (action === 'today-open') { fx.openSection(button.dataset.section); return true; }
+  if (action === 'pp-tick') {
+    // the same tick the Planner uses (plan_done), so both screens always agree
+    try { const done = JSON.parse(ls.getItem('plan_done') || '{}') || {}, key = Day.doneKey(ctx.today, button.dataset.ppTick); if (done[key]) delete done[key]; else done[key] = true; ls.setItem('plan_done', JSON.stringify(done)); }
+    catch { fx.toast('Could not save that tick.'); }
+    fx.render(); return true;
+  }
   if (action === 'today-board') { fx.openBoard(); return true; }
   if (action === 'tg-paste-clip') {
     const box = doc.getElementById('tg-paste');

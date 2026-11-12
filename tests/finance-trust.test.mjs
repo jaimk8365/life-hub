@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const F=createRequire(import.meta.url)('../finance/fix-numbers.js');
 let n=0;const tx=(acct,date,amount,o={})=>({id:'t'+(++n),acct,date,amount,cat:'groceries',note:'shop',...o});
-const today='2026-11-10',now=new Date('2026-11-10T09:00:00+10:00').toISOString();
+const today='2026-11-10',now=new Date().toISOString();
 
 const clean=()=>{
  const accounts=[
