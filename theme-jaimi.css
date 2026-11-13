@@ -1,51 +1,54 @@
-/* Jaimi's shared visual theme: Soft Ocean. Calm, gentle on the eyes and easy to scan. */
+/* Jaimi's shared visual theme: Sunny Beach. Bright beach colours, still easy to read. */
 :root{
-  --joy-yellow:#E8C26B;
-  --joy-yellow-soft:#FBF3DC;
-  --joy-lilac:#9AA9D3;
-  --joy-lilac-soft:#E8EEF5;
-  --joy-turquoise:#5FA394;
-  --joy-turquoise-soft:#E3F2EE;
-  --joy-pink:#5F8BAA;
-  --joy-pink-soft:#E6EEF4;
-  --joy-cream:#F1F5F8;
-  --joy-ink:#34404A;
+  --joy-yellow:#FFC93C;
+  --joy-yellow-soft:#FFF3C4;
+  --joy-lilac:#4FB3E8;
+  --joy-lilac-soft:#E2F3FC;
+  --joy-turquoise:#14B8A6;
+  --joy-turquoise-soft:#D9F7F1;
+  --joy-pink:#1A7FBD;
+  --joy-pink-soft:#DFF0FA;
+  --joy-orange:#FF7A45;
+  --joy-orange-soft:#FFE8DC;
+  --joy-green:#35B36B;
+  --joy-cream:#FFF8E8;
+  --joy-ink:#15384D;
   --paper:var(--joy-cream)!important;
-  --paper-2:#F7FAFC!important;
-  --card:#FBFCFD!important;
+  --paper-2:#FFFCF3!important;
+  --card:#FFFFFF!important;
   --ink:var(--joy-ink)!important;
-  --ink-soft:#5B6B78!important;
-  --ink-faint:#6B7A87!important;
-  --line:#D6E0E8!important;
-  --line-soft:#E4EBF1!important;
-  --coral:#D98C80!important;
+  --ink-soft:#3F5C6B!important;
+  --ink-faint:#5F7A88!important;
+  --line:#F1E1BD!important;
+  --line-soft:#F8EFD9!important;
+  --coral:var(--joy-orange)!important;
   --mint:var(--joy-turquoise)!important;
   --sunshine:var(--joy-yellow)!important;
-  --sky:var(--joy-turquoise)!important;
+  --sky:#1A7FBD!important;
   --plum:var(--joy-lilac)!important;
-  --good:#3F8F7F;
-  --warn:#B87425;
-  --bad:#BF5E55;
+  --good:#1F9A62;
+  --warn:#B86A00;
+  --bad:#D2452F;
 }
 
 body{
   background:
-    radial-gradient(circle at 8% 3%,rgba(232,194,107,.10),transparent 24rem),
-    radial-gradient(circle at 96% 12%,rgba(95,139,170,.10),transparent 27rem),
-    radial-gradient(circle at 55% 100%,rgba(95,163,148,.08),transparent 32rem),
+    radial-gradient(circle at 6% 0%,rgba(255,201,60,.22),transparent 26rem),
+    radial-gradient(circle at 100% 8%,rgba(79,179,232,.20),transparent 28rem),
+    radial-gradient(circle at 50% 100%,rgba(20,184,166,.14),transparent 34rem),
     var(--paper);
 }
 
 .card,.scard,.item,.acct,.bsec,.stat,.sheet{
   border-color:var(--line)!important;
-  box-shadow:0 7px 22px rgba(52,64,74,.06)!important;
+  box-shadow:0 7px 22px rgba(21,56,77,.08)!important;
 }
 .card h2,.card-title,h1{color:var(--joy-ink)}
 .pills,.tabs{background:var(--joy-lilac-soft)!important}
 .pills button.on,.tab.active{background:var(--joy-ink)!important;color:#fff!important}
-.btn.dark,.btn-primary,.primary{background:linear-gradient(135deg,var(--joy-pink),#4F7896)!important;color:#fff!important}
-.btn.soft,.btn-soft,.ghost{background:var(--joy-lilac-soft);border-color:#CCDAE6!important}
-.bar>i,.progress>i{background:linear-gradient(90deg,var(--joy-turquoise),var(--joy-lilac),var(--joy-pink))!important}
+.btn.dark,.btn-primary,.primary{background:linear-gradient(135deg,#1A7FBD,#0E639A)!important;color:#fff!important}
+.btn.soft,.btn-soft,.ghost{background:var(--joy-lilac-soft);border-color:#F1E1BD!important}
+.bar>i,.progress>i{background:linear-gradient(90deg,var(--joy-turquoise),var(--joy-yellow),var(--joy-orange))!important}
 .chip,.tagchip{border-radius:999px!important}
 .flag{border-left:5px solid var(--joy-yellow)!important}
 .em,.ico{filter:none}
@@ -54,14 +57,14 @@ button:not(.close):not(.check):not(.chk):not(.rbox),
 .btn,.acct,.tab{min-height:44px}
 button:active,.btn:active,.acct:active{transform:scale(.97)}
 button:focus-visible,.btn:focus-visible,.acct:focus-visible{
-  outline:3px solid rgba(95,139,170,.45)!important;
+  outline:3px solid rgba(26,127,189,.5)!important;
   outline-offset:2px;
 }
 input[type="checkbox"]:checked{accent-color:var(--joy-turquoise)}
 
 @media (prefers-reduced-motion:no-preference){
   .card,.item,.acct,.btn,button{transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
-  .card:hover{box-shadow:0 10px 28px rgba(52,64,74,.09)!important}
+  .card:hover{box-shadow:0 10px 28px rgba(21,56,77,.13)!important}
   input[type="checkbox"]:checked{animation:joy-pop .28s ease-out}
   @keyframes joy-pop{50%{transform:scale(1.28)}}
 }
@@ -71,3 +74,17 @@ input[type="checkbox"]:checked{accent-color:var(--joy-turquoise)}
   .tiny{font-size:12px!important;letter-spacing:.035em!important}
   .card{padding:16px!important}
 }
+
+/* ---- beach brights: a colour stripe on cards, sunny highlights, and the Life Hub menu and strip in the same colours ---- */
+.card,.scard,.ov{border-top:4px solid var(--joy-turquoise)!important}
+.card:nth-of-type(4n+2),.scard:nth-of-type(4n+2),.ov:nth-of-type(4n+2){border-top-color:var(--joy-yellow)!important}
+.card:nth-of-type(4n+3),.scard:nth-of-type(4n+3),.ov:nth-of-type(4n+3){border-top-color:var(--joy-orange)!important}
+.card:nth-of-type(4n),.scard:nth-of-type(4n),.ov:nth-of-type(4n){border-top-color:var(--joy-lilac)!important}
+nav button.active,nav a.active{background:var(--joy-yellow-soft)!important;box-shadow:inset 5px 0 0 var(--joy-orange)!important;color:var(--joy-ink)!important}
+nav .nav-label,nav button.nav-fold{color:#0E639A!important}
+.crumb{background:linear-gradient(90deg,var(--joy-turquoise-soft),var(--joy-yellow-soft))!important}
+.crumb-quick button.on{background:var(--joy-yellow)!important;border-color:var(--joy-orange)!important}
+.crumb-sub button.on{background:#0E639A!important;border-color:#0E639A!important}
+.mobile-bar button.active{background:var(--joy-yellow-soft)!important;color:var(--joy-ink)!important}
+.mobile-bar .park-fab,.fab{background:linear-gradient(135deg,var(--joy-orange),#F25C2A)!important;box-shadow:0 8px 22px rgba(255,122,69,.45)!important;color:#fff!important}
+.count-badge{background:var(--joy-orange)!important;color:#fff!important}

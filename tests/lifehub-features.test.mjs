@@ -603,7 +603,7 @@ test('encrypted device sync includes full Quest progress and the one-tap inbox',
 
 test('Life Hub uses a soft shared Jaimi theme and a distinct Matthew theme', async () => {
   const jaimi=await text('theme-jaimi.css'), matthew=await text('theme-matthew.css');
-  for(const colour of ['#F1F5F8','#34404A','#5F8BAA','#5FA394']) assert.match(jaimi,new RegExp(colour));
+  for(const colour of ['#FFF8E8','#15384D','#1A7FBD','#14B8A6','#FFC93C','#FF7A45']) assert.match(jaimi,new RegExp(colour)); // Sunny Beach, chosen by Jaimi 13/11/2026
   for(const colour of ['#19324D','#E07A3F','#2F6B4F']) assert.match(matthew,new RegExp(colour));
   assert.match(jaimi,/prefers-reduced-motion/);
   assert.match(jaimi,/min-height:\s*44px/);

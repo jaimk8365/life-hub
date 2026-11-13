@@ -97,7 +97,7 @@
   }
   nav button .ico, nav .finance-link .ico{font-size:21px;line-height:1;filter:grayscale(.85);opacity:.75;transition:all .15s}
   nav button:focus-visible, nav .finance-link:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
-  nav button.active{color:var(--ink);background:rgba(232,146,124,.13)}
+  nav button.active,nav a.active{color:var(--ink);background:rgba(232,146,124,.24);box-shadow:inset 4px 0 0 var(--coral);font-weight:800}
   nav button.active .ico{filter:none;opacity:1;transform:scale(1.08)}
 
   /* ---- iPad / Mac: left rail ---- */
@@ -263,8 +263,8 @@
       <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📚</span><span>Books</span></button>
       <button id="b-beauty" class="sec" onclick="show('beauty')"><span class="ico">💄</span><span>Beauty</span></button>
       <button id="b-wardrobe" class="sec" onclick="show('wardrobe')"><span class="ico">👗</span><span>Wardrobe</span></button>
+      <button id="b-hub" onclick="show('hub')"><span class="ico">🎛️</span><span>Old Command Centre</span></button>
     </div>
-    <button id="b-hub" onclick="show('hub')"><span class="ico">🎛️</span><span>Command Centre</span></button>
     <button id="b-more" class="morebtn" onclick="toggleMore()"><span class="ico">🏡</span><span>Life</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
@@ -316,7 +316,7 @@
       <button class="tile" data-k="reading" data-home="lifeMe" onclick="showFromMore('reading')"><span class="ico">📚</span>Books</button>
       <button class="tile" data-k="beauty" data-home="lifeMe" onclick="showFromMore('beauty')"><span class="ico">💄</span>Beauty</button>
       <button class="tile" data-k="wardrobe" data-home="lifeMe" onclick="showFromMore('wardrobe')"><span class="ico">👗</span>Wardrobe</button>
-      <button class="tile" data-k="hub" data-home="lifeMe" onclick="showFromMore('hub')"><span class="ico">🎛️</span>Command Centre</button>
+      <button class="tile" data-k="hub" data-home="lifeMe" onclick="showFromMore('hub')"><span class="ico">🎛️</span>Old Command Centre</button>
     </div>
     <div id="lifeOld" hidden>
       <button class="oldbtn" onclick="const t=document.getElementById('lifeOldTiles');t.hidden=!t.hidden">⋯ Not used lately (<span id="lifeOldCount">0</span>)</button>
@@ -352,7 +352,15 @@
   };
   /* Pages that belong together: the menu shows one door, and the strip shows the pages inside it. */
   const NAV_GROUPS = [['plan','cp:guides'], ['family','kids','board'], ['kitchen','recipes']];
-  const NAV_ME = new Set(['course','quest','reading','beauty','wardrobe','cp:ideas','cp:etsy','cp:notes']);
+  const NAV_ME = new Set(['hub','course','quest','reading','beauty','wardrobe','cp:ideas','cp:etsy','cp:notes']);
+  /* Light up the menu button for the page you are on. Today, Inbox and the other Co-Pilot pages each get their own light, not all "Now". */
+  function navLight(key){
+    try {
+      document.querySelectorAll('nav .routebtn').forEach(b => { const m = (b.getAttribute('onclick') || '').match(/showCopilot\('([^']+)'\)/); if (m) b.classList.toggle('active', key === 'cp:' + m[1]); });
+      NAV_GROUPS.forEach(g => { const door = document.getElementById('b-' + g[0]); if (door) door.classList.toggle('active', g.includes(key)); });
+      if (NAV_ME.has(key)) navMeSet(true);
+    } catch(e){}
+  }
   function navOpen(k){ if (String(k).startsWith('cp:')) showCopilot(k.slice(3)); else show(k); }
   function navMeSet(open){ try { const box = document.getElementById('navMe'), b = document.getElementById('navMeBtn'); box.hidden = !open; b.setAttribute('aria-expanded', String(!!open)); } catch(e){} }
   function navMeToggle(){ const open = document.getElementById('navMe').hidden; navMeSet(open); try { localStorage.setItem('lifehub_nav_me', open ? '1' : ''); } catch(e){} }
@@ -385,8 +393,7 @@
       document.querySelectorAll('#crumbQuick [data-q]').forEach(q => q.classList.toggle('on', q.dataset.q === key));
       sub.innerHTML = group ? group.map(k => '<button type="button" class="' + (k === key ? 'on' : '') + '" aria-current="' + (k === key ? 'page' : 'false') + '" onclick="navOpen(\'' + k + '\')">' + PLACE_NAMES[k] + '</button>').join('') : '';
       document.body.classList.toggle('has-sub', !!group);
-      NAV_GROUPS.forEach(g => { const door = document.getElementById('b-' + g[0]); if (door) door.classList.toggle('active', g.includes(key)); });
-      if (NAV_ME.has(key)) navMeSet(true);
+      navLight(key);
     } catch(e){}
   }
   function navRecord(p){
@@ -495,7 +502,7 @@
       f.classList.toggle('active', on);
       if(b)b.classList.toggle('active', on);
     }
-    try { const key = which === 'copilot' ? 'cp:' + copilotRoute : which; NAV_GROUPS.forEach(g => { const door = document.getElementById('b-' + g[0]); if (door) door.classList.toggle('active', g.includes(key)); }); } catch(e){}
+    navLight(which === 'copilot' ? 'cp:' + copilotRoute : which);
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     try { document.body.classList.toggle('in-finance', which === 'finance'); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';

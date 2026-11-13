@@ -136,3 +136,44 @@ test('Inbox → Life Admin, search inside items, and the calendar on the Overvie
   assert.deepEqual(snapshot({ calendar: cached, today, nowMin: 0 }).coming.map(e => [e.title, e.today]), [['Pupil free day', true], ['Swim carnival', false]]);
   assert.ok(!/^\s*\{ prefix: 'lhcache_/m.test(read('sync.js')), 'the calendar cache stays on this device');
 });
+
+test('the menu lights the page you are on: each Co-Pilot page has its own light', () => {
+  const html = read('index.html');
+  assert.match(html, /function navLight\(key\)/); assert.match(html, /navLight\(which === 'copilot' \? 'cp:' \+ copilotRoute : which\)/);
+  assert.match(html, /b\.classList\.toggle\('active', key === 'cp:' \+ m\[1\]\)/); assert.match(html, /nav button\.active,nav a\.active\{[^}]*box-shadow:inset 4px 0 0 var\(--coral\)/);
+});
+
+test('Inbox sorts itself: where things go, the list of what was sorted, and no doubles', async () => {
+  const T = await import('../copilot/today-ui.mjs'), { patchCopilotAutoSort } = await import('../tools/copilot-autosort-patches.mjs');
+  assert.deepEqual([{ kind: 'idea' }, { kind: 'note' }, { kind: 'etsy', area: 'etsy' }, { kind: 'task', area: 'work' }, { kind: 'task', area: 'home' }, null].map(T.autoTarget), ['idea', 'note', 'etsy', 'work', 'home', 'home']);
+  const before = T.sortedSnapshot({ ideas: [{ id: 'i1' }], notes: { notes: [] } }, [{ id: 't1' }]);
+  assert.deepEqual(T.sortedDiff(before, T.sortedSnapshot({ ideas: [{ id: 'i1' }], notes: { notes: [] } }, [{ id: 't1' }, { id: 't2' }])), { kind: 'task', id: 't2' });
+  assert.equal(T.sortedDiff(before, before), null);
+  const mem = new Map(), ls = { getItem: k => mem.has(k) ? mem.get(k) : null, setItem: (k, v) => mem.set(k, String(v)) };
+  T.sortedAdd({ key: 'k1', text: 'Book <dentist>', target: 'home', tier: 'essential', made: { kind: 'task', id: 't2' }, parked: true, at: 'x' }, ls);
+  T.sortedAdd({ key: 'k2', text: 'From reminders', target: 'idea', made: { kind: 'idea', id: 'i2' }, parked: false, at: 'y' }, ls);
+  const html = T.sortedCard(s => String(s).replace(/</g, '&lt;'), ls);
+  assert.match(html, /Sorted for you/); assert.match(html, /Book &lt;dentist>/); assert.match(html, /🏠 Home task · Must/); assert.equal((html.match(/data-action="unsort"/g) || []).length, 1, 'only parked thoughts can be put back');
+  assert.equal(T.sortedTake('k1', ls).text, 'Book <dentist>'); assert.deepEqual(T.sortedRead(ls).map(e => e.key), ['k2']); assert.equal(T.sortedCard(String, { getItem: () => null }), '');
+  const tasks = [{ title: 'Pay rego', status: 'inbox' }, { title: 'Old one', status: 'done' }];
+  assert.equal(T.alreadyFiled(' pay REGO ', 'home', {}, tasks), true); assert.equal(T.alreadyFiled('Old one', 'home', {}, tasks), false, 'a finished task does not block a new one');
+  assert.equal(T.alreadyFiled('Robot vac', 'idea', { ideas: [{ text: 'robot vac', status: 'cooling' }] }, []), true);
+  const src = read('src/copilot.html');
+  assert.equal(patchCopilotAutoSort(src), src, 'the source page already has the hooks');
+  for (const bit of ['function autoSortInbox()', 'function unsortInbox(key)', 'setTimeout(autoSortInbox, 300);', "else if (action === 'unsort') unsortInbox(button.dataset.key);", '${TodayUI.pasteBox()}${TodayUI.sortedCard(esc)}', "persist('rewards', rewardsBefore)"]) assert.ok(src.includes(bit), bit);
+  assert.equal(patchCopilotAutoSort('<p>other</p>'), '<p>other</p>');
+});
+
+test('Family hides the duplicate "What\'s due" card; Overview takes over weather, top 3 and brain dump', async () => {
+  const { patchFamily } = await import('../tools/family-patches.mjs'), O = await import('../overview/core.mjs');
+  const page = `<div class="card">\n    <h2>📋 What's due</h2><div id="dueList"></div></div><div class="card"><h2>🛒 Shopping list</h2></div>`, once = patchFamily(page);
+  assert.match(once, /<div class="card" hidden>\s*<h2>📋 What's due/); assert.match(once, /<div class="card"><h2>🛒 Shopping list/); assert.equal(patchFamily(once), once); assert.match(once, /id="dueList"/);
+  assert.deepEqual(O.weatherView({ current: { temperature_2m: 27.4, weather_code: 61 }, daily: { temperature_2m_max: [31.2], temperature_2m_min: [18.6], precipitation_probability_max: [70] } }), { icon: '🌧️', words: 'Rain', now: 27, max: 31, min: 19, rain: 70 });
+  assert.equal(O.weatherView({}), null); assert.ok(O.WEATHER_URL.startsWith('https://api.open-meteo.com/'));
+  const out = O.dumpToInbox('- call school\n\n• order uniforms\n', [{ id: 'a', text: 'old' }], { at: 't', id: n => 'n' + n });
+  assert.equal(out.added, 2); assert.deepEqual(out.inbox.slice(1), [{ id: 'n0', text: 'call school', at: 't', source: 'park' }, { id: 'n1', text: 'order uniforms', at: 't', source: 'park' }]);
+  const blocks = [{ id: 'm', title: 'Dentist', icon: '🦷', start: '15:00', mins: 30, cat: 'admin', pri: 'high', repeat: { type: 'once', date: today } }];
+  const s = O.snapshot({ blocks, tasks: { tasks: [{ title: 'Excursion form', status: 'today', tier: 'essential' }, { title: 'Nice to do', status: 'today', tier: 'interesting' }] }, admin: items, today, nowMin: 0 });
+  assert.deepEqual(s.top3.map(t => t.title), ['Dentist', 'Excursion form', 'Telstra']); assert.equal(s.top3From, 'today');
+  const html = read('index.html'); assert.match(html, /Old Command Centre/); assert.match(html, /const NAV_ME = new Set\(\['hub',/);
+});

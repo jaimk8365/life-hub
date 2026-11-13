@@ -12,7 +12,15 @@
   *{box-sizing:border-box}
   body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(30px + env(safe-area-inset-bottom,0px))}
   .wrap{max-width:900px;margin:0 auto}
-  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:2px 2px 12px}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:0}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 2px 12px;flex-wrap:wrap}
+  .wx{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:800;font-size:14px}
+  .wx i{font-style:normal;font-size:20px}.wx small{font-weight:700;color:var(--ink-soft);font-size:12.5px}
+  .top{display:grid;gap:8px}.top div{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-weight:700;font-size:15px;overflow-wrap:anywhere}
+  .top div b{font-family:'Fraunces',serif;font-size:20px;text-align:center;color:var(--coral)}.top div.done{opacity:.55;text-decoration:line-through}
+  .dump{display:flex;gap:8px}.dump textarea{flex:1;min-width:0;min-height:48px;height:48px;border:1.5px solid var(--line);border-radius:14px;padding:12px;font:500 15px/1.4 inherit;font-family:inherit;background:var(--paper);color:var(--ink);resize:vertical;outline:none}
+  .dump textarea:focus{border-color:var(--coral)}.dump button{border:0;border-radius:14px;min-width:52px;background:var(--ink);color:#fff;font:800 20px inherit;cursor:pointer}
+  .said{font-weight:800;color:var(--good);font-size:13px;margin-top:8px;min-height:18px}
   .grid{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
   @media(min-width:700px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide{grid-column:1/-1}}
   .ov{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;min-width:0}
@@ -31,27 +39,32 @@
   .chip.on{background:#EAF3EE;border-color:#BFDCCB;color:var(--good)}.chip strong{font-family:'Fraunces',serif;font-size:19px}
   a.row{text-decoration:none}
 </style>
+<link rel="stylesheet" href="../theme-jaimi.css" />
 </head>
 <body>
 <div class="wrap">
-  <h1>📊 Overview</h1>
+  <div class="head"><h1>📊 Overview</h1><div class="wx" id="wx" hidden></div></div>
   <div class="grid" id="root" aria-live="polite"></div>
 </div>
 <script type="module">
 import * as Day from '../plan/core.mjs';
-import { snapshot } from './core.mjs';
+import { snapshot, weatherView, dumpToInbox, WEATHER_URL } from './core.mjs';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch { return d; } };
 const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const dayWord = (iso, today) => iso === today ? 'Today' : iso === Day.addDays(today, 1) ? 'Tomorrow' : new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' });
 const st = document.createElement('style'); st.textContent = Day.SHARED_CSS; document.head.appendChild(st);
 
+let draft = '', said = '';
 function draw() {
+  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('#dump textarea'); if (typing) return; // never redraw under your typing
   const today = todayISO(), now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
-  const s = snapshot({ blocks: read('plan_blocks', []), done: read('plan_done', {}), money: read('plan_money_dates', []), admin: read('la_items', []), goals: read('plan_goals_v1', []), habits: read('cp_habits_v1', null), tasks: read('hq_task_engine_v1', null), inbox: read('cp_inbox_v1', []), calendar: read('lhcache_cal_v1', []), today, nowMin });
+  const s = snapshot({ blocks: read('plan_blocks', []), done: read('plan_done', {}), money: read('plan_money_dates', []), admin: read('la_items', []), goals: read('plan_goals_v1', []), habits: read('cp_habits_v1', null), tasks: read('hq_task_engine_v1', null), inbox: read('cp_inbox_v1', []), calendar: read('lhcache_cal_v1', []), guides: read('cp_guides_v1', null), today, nowMin });
   const card = (title, go, body, cls = '') => `<section class="ov ${cls}"><h2>${title}${go ? `<button type="button" data-go="${go}">Open ›</button>` : ''}</h2>${body}</section>`;
   document.getElementById('root').innerHTML =
     card('🎯 Right now', 'cp:now', Day.nowNextHtml(s.nowNext, { esc, nowMin, at: Date.now() }) + `<div class="chips" style="margin-top:10px"><button type="button" class="chip" data-go="plan"><strong>${s.day.done}/${s.day.total}</strong> today</button><button type="button" class="chip" data-go="cp:inbox">📥 <strong>${s.counts.inbox}</strong> inbox</button><button type="button" class="chip" data-go="tasks">✅ <strong>${s.counts.tasks}</strong> tasks</button><button type="button" class="chip" data-go="finance">💰 Money</button></div>`, 'wide')
+    + card(s.top3From === 'week' ? '⭐ Top 3 this week' : '⭐ Top 3 today', 'cp:now', s.top3.length ? `<div class="top">${s.top3.map((t, n) => `<div class="${t.done ? 'done' : ''}"><b>${n + 1}</b><span>${esc(t.title)}</span></div>`).join('')}</div>` : '<div class="none">Nothing urgent. Pick your three on Now.</div>')
+    + card('🧠 Brain dump', 'cp:inbox', `<form class="dump" id="dump"><textarea name="text" placeholder="Get it out of your head. One thought per line." aria-label="Brain dump">${esc(draft)}</textarea><button type="submit" aria-label="Park these thoughts">＋</button></form><div class="said" id="said" role="status">${esc(said)}</div>`)
     + card('📅 Coming up', 'plan', s.coming.length ? s.coming.map(e => `<button type="button" class="row" data-go="plan" data-date="${esc(e.date)}"><i aria-hidden="true">📅</i><span><b>${esc(e.title)}</b><small>${e.start ? esc(Day.to12(e.start)) : 'All day'}</small></span><em class="${e.today ? 'hot' : ''}">${esc(dayWord(e.date, today))}</em></button>`).join('') : '<div class="none">Nothing on the calendar this week</div>')
     + card('⭐ Musts this week', 'plan', s.musts.length ? s.musts.map(m => `<button type="button" class="row" data-go="plan" data-date="${esc(m.date)}"><i aria-hidden="true">${esc(m.icon)}</i><b>${esc(m.title)}</b><em class="${m.today ? 'hot' : ''}">${esc(dayWord(m.date, today))}</em></button>`).join('') + (s.mustsMore ? `<div class="none">＋ ${s.mustsMore} more</div>` : '') : '<div class="none">✨ No musts left this week</div>')
     + card('📋 Due soon', 'admin', s.due.length ? s.due.map(d => `<button type="button" class="row" data-item="${esc(d.id)}"><i aria-hidden="true">📋</i><b>${esc(d.name)}</b><em class="${d.tone}">${esc(d.words)}</em></button>`).join('') + (s.dueMore ? `<div class="none">＋ ${s.dueMore} more</div>` : '') : '<div class="none">✨ Nothing due for 2 weeks</div>')
@@ -69,11 +82,32 @@ document.addEventListener('click', e => {
     if (go.startsWith('cp:')) parent.showCopilot(go.slice(3)); else parent.show(go);
   } catch { /* opened on its own, outside Life Hub: nothing to jump to */ }
 });
+document.addEventListener('input', e => { if (e.target.matches('#dump textarea')) { draft = e.target.value; said = ''; } });
+document.addEventListener('submit', e => {
+  if (!e.target.matches('#dump')) return; e.preventDefault();
+  try {
+    const raw = localStorage.getItem('cp_inbox_v1'), now = JSON.parse(raw === null ? '[]' : raw); if (!Array.isArray(now)) throw new Error('Inbox could not be read.');
+    const out = dumpToInbox(e.target.text.value, now, { at: new Date().toISOString(), id: n => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + n) });
+    if (!out.added) return;
+    localStorage.setItem('cp_inbox_v1', JSON.stringify(out.inbox)); draft = ''; said = '✓ ' + out.added + ' parked. They sort themselves.';
+  } catch (err) { said = err.message || 'That could not be saved.'; }
+  document.activeElement && document.activeElement.blur(); draw();
+});
+async function weather() {
+  try {
+    let json = null; const cached = JSON.parse(sessionStorage.getItem('ov_wx') || 'null');
+    if (cached && Date.now() - cached.at < 30 * 60000) json = cached.json;
+    else { const res = await fetch(WEATHER_URL); if (!res.ok) return; json = await res.json(); sessionStorage.setItem('ov_wx', JSON.stringify({ at: Date.now(), json })); }
+    const w = weatherView(json), box = document.getElementById('wx'); if (!w || !box) return;
+    box.innerHTML = `<i aria-hidden="true">${w.icon}</i><span>${w.now}°</span><small>↑${w.max}° ↓${w.min}° · ☔ ${w.rain}%</small>`; box.setAttribute('aria-label', `Gympie weather: ${w.words}, ${w.now} degrees, top ${w.max}, rain chance ${w.rain} percent`); box.hidden = false;
+  } catch { /* no weather: the pill just stays hidden */ }
+}
+weather();
 window.addEventListener('storage', draw);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) draw(); });
 window.addEventListener('focus', draw);
 setInterval(draw, 60000);
-window.ovDraw = draw;
+window.ovDraw = () => { draw(); const box = document.getElementById('wx'); if (box && box.hidden) weather(); };
 draw();
 </script>
 </body>

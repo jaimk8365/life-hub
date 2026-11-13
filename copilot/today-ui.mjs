@@ -38,7 +38,7 @@ let foldOpen = false;
 function ensureLook() {
   const doc = globalThis.document; if (!doc || !doc.head || doc.getElementById('pp-shared-css')) return;
   const st = doc.createElement('style'); st.id = 'pp-shared-css';
-  st.textContent = Day.SHARED_CSS + HABIT_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
+  st.textContent = Day.SHARED_CSS + HABIT_CSS + SORTED_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
   doc.head.appendChild(st);
   doc.addEventListener('toggle', e => { if (e.target?.classList?.contains('tg-fold')) foldOpen = e.target.open; }, true);
   if (globalThis.window) Day.startCountdowns(doc, globalThis.window);
@@ -210,3 +210,39 @@ export function publishAhead(events, today, ls = globalThis.localStorage) {
     ls.setItem('lhcache_cal_v1', next); return true;
   } catch { return false; }
 }
+
+/* ---------- Inbox sorts itself: each parked thought is filed where it belongs, and a short list shows where it went ---------- */
+export const K_SORTED = 'cp_autosort_v1';
+export const SORT_NAMES = { home: '🏠 Home task', work: '💼 Work task', idea: '💡 Idea', etsy: '🛍️ Etsy', note: '🗒️ Note', admin: '📋 Life Admin' };
+/** Where a thought goes, from the choice made when parking or from its words. */
+export function autoTarget(suggested) { const s = suggested || {}; return s.kind === 'idea' ? 'idea' : s.kind === 'note' ? 'note' : s.kind === 'etsy' ? 'etsy' : s.area === 'work' ? 'work' : 'home'; }
+/** True when the same words are already waiting in the place this thought would go (so two devices never file it twice). */
+export function alreadyFiled(text, target, store, tasks) {
+  const t = String(text || '').trim().toLowerCase(); if (!t) return false;
+  const same = v => String(v || '').trim().toLowerCase() === t;
+  if (target === 'idea') return ((store && store.ideas) || []).some(i => i && same(i.text) && !['released', 'kept', 'project'].includes(i.status));
+  if (target === 'note') return ((store && store.notes && store.notes.notes) || []).some(n => n && !n.deletedAt && same(n.body));
+  return (tasks || []).some(k => k && same(k.title) && !k.completed && !['done', 'binned'].includes(k.status));
+}
+const idsOf = list => (Array.isArray(list) ? list : []).map(x => x && x.id).filter(Boolean);
+export function sortedSnapshot(store, tasks) { return { task: idsOf(tasks), idea: idsOf(store && store.ideas), note: idsOf(store && store.notes && store.notes.notes) }; }
+/** The one thing that was made by a sort: compare before and after. */
+export function sortedDiff(before, after) { for (const kind of ['task', 'idea', 'note']) { const id = after[kind].find(x => !before[kind].includes(x)); if (id) return { kind, id }; } return null; }
+export function sortedRead(ls = globalThis.localStorage) { try { const v = JSON.parse(ls.getItem(K_SORTED) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+export function sortedAdd(entry, ls = globalThis.localStorage) {
+  const list = [{ key: entry.key, text: String(entry.text || '').slice(0, 200), target: entry.target, tier: entry.tier || '', made: entry.made || null, parked: !!entry.parked, at: entry.at }, ...sortedRead(ls)].slice(0, 30);
+  try { ls.setItem(K_SORTED, JSON.stringify(list)); } catch { /* the sort itself still happened */ }
+  return list;
+}
+/** Take one entry out of the list (when it is put back in the Inbox to sort by hand). */
+export function sortedTake(key, ls = globalThis.localStorage) {
+  const list = sortedRead(ls), hit = list.find(e => e.key === key) || null;
+  if (hit) { try { ls.setItem(K_SORTED, JSON.stringify(list.filter(e => e.key !== key))); } catch { return null; } }
+  return hit;
+}
+export function sortedCard(esc, ls = globalThis.localStorage) {
+  const list = sortedRead(ls); if (!list.length) return '';
+  const row = e => `<div class="tg-sorted-row"><span>${esc(e.text)}</span><b>${esc(SORT_NAMES[e.target] || e.target)}${e.tier ? ' · ' + esc(tierWord(e.tier)) : ''}</b>${e.parked && e.made ? `<button type="button" class="soft-button" data-action="unsort" data-key="${esc(e.key)}" aria-label="Not right: sort ${esc(e.text)} myself">↩︎</button>` : '<i></i>'}</div>`;
+  return `<section class="card tg-sorted"><h3>✅ Sorted for you</h3>${list.slice(0, 5).map(row).join('')}${list.length > 5 ? `<details><summary>All ${list.length}</summary>${list.slice(5).map(row).join('')}</details>` : ''}<p class="hint">Wrong place? Tap ↩︎ and choose yourself.</p></section>`;
+}
+export const SORTED_CSS = '.tg-sorted-row{display:grid;grid-template-columns:minmax(0,1fr) auto 44px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.07)}.tg-sorted-row:first-of-type{border-top:0}.tg-sorted-row span{overflow-wrap:anywhere;font-weight:600}.tg-sorted-row b{font-size:12px;white-space:nowrap;background:rgba(0,0,0,.06);border-radius:999px;padding:4px 9px}.tg-sorted-row button{min-width:44px;min-height:40px;padding:0}.tg-sorted details summary{cursor:pointer;font-weight:800;padding:8px 0}';
