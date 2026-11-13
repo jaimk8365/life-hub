@@ -247,6 +247,7 @@ function enhanceSheet(id) {
   } else {
     actions.before(icon);
     const b = BLOCKS.find(x => x.id === id);
+    if (b && b.adminRef) { const link = document.createElement('button'); link.type = 'button'; link.className = 'btn ghost pp-admin'; link.textContent = '📋 Open in Life Admin'; link.addEventListener('click', () => { try { parent.goAdminItem(b.adminRef); } catch { /* opened outside Life Hub */ } try { closeSheet(); } catch { /* leave it open */ } }); sheet.appendChild(link); }
     if (b) { const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn ghost pp-remind'; btn.textContent = '🔔 Remind me (adds to Calendar)'; btn.addEventListener('click', () => remind(b)); sheet.appendChild(btn); }
   }
 }
@@ -298,6 +299,8 @@ document.addEventListener('click', e => {
 try { const w = document.getElementById('mt-week'); if (w) w.textContent = 'Week'; const d = document.getElementById('mt-day'); if (d) d.textContent = 'Day'; } catch { /* labels stay */ }
 try { Object.assign(PRI.high, { n: C.WORDS.high, e: '★' }); Object.assign(PRI.med, { n: C.WORDS.med, e: '·' }); Object.assign(PRI.low, { n: C.WORDS.low, e: '○' }); } catch { /* labels stay as they were */ }
 const style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
+/* Life Hub can ask for a day (from Search, the Overview or a Life Admin link). */
+window.ppGoto = iso => { try { sessionStorage.setItem('plan_goto', ''); } catch { /* fine */ } if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) { viewDate = iso; setMode('day'); } };
 const baseRender = window.render, baseOpen = window.openBlock;
 window.render = function () {
   const typing = document.activeElement?.id === 'pp-add-in', pos = typing ? document.activeElement.selectionStart : 0;
@@ -312,3 +315,4 @@ if (typeof baseMonth === 'function') window.renderMonth = function () { baseMont
 window.openBlock = function (id) { baseOpen.apply(this, arguments); try { enhanceSheet(id); } catch (err) { console.warn('Sheet extras skipped: ' + err.message); } };
 C.startCountdowns(document, window);
 window.render();
+try { const want = sessionStorage.getItem('plan_goto'); if (want) window.ppGoto(want); } catch { /* fine */ }

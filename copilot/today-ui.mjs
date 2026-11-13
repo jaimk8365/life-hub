@@ -50,6 +50,7 @@ export function dayOf(ctx) {
 }
 /** Now-and-next from the Planner, for the top of Today and of Now. Empty when the day has nothing timed. */
 export function nowStrip(ctx) {
+  publishAhead(ctx.events, ctx.today);
   ensureLook();
   const items = dayOf(ctx); if (!items.length) return '';
   const now = ctx.nowMin ?? clockMin();
@@ -75,6 +76,7 @@ export function fold(html) {
 export const tierWord = tier => Day.TIER_WORDS[tier] || 'Should';
 
 export function glance(ctx) {
+  publishAhead(ctx.events, ctx.today);
   const { esc } = ctx, tomorrow = addDays(ctx.today, 1);
   const ev = eventsOn(ctx.events, ctx.today), next = eventsOn(ctx.events, tomorrow), todo = dueToday(ctx.tasks, ctx.today);
   const nice = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Brisbane', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(ctx.today + 'T12:00:00+10:00'));
@@ -191,4 +193,20 @@ export function act(action, button, ctx, fx) {
   }
   if (action === 'qw-forget') { QW.forget(ls); fx.render(); return true; }
   return false;
+}
+
+/** Inbox → Life Admin: a parked thought becomes something you keep, with no date. It waits under "To sort" there. */
+export function adminFromInbox(text, id, at) {
+  const t = String(text || '').trim();
+  return { id, name: t.slice(0, 80) || 'From Inbox', cat: 'other', freq: 'none', nextDue: null, lastDone: null, amount: null, note: '', body: t.length > 80 ? t : '', added: at, done: false, check: false, from: 'inbox' };
+}
+/** Keep the next two weeks of calendar events on this device, so the Overview can show what is coming up. Not synced. */
+export function publishAhead(events, today, ls = globalThis.localStorage) {
+  try {
+    if (!ls || !/^\d{4}-\d{2}-\d{2}$/.test(String(today))) return false;
+    const end = new Date(Date.parse(today + 'T12:00:00Z') + 14 * 864e5).toISOString().slice(0, 10);
+    const list = (events || []).filter(e => e && e.date >= today && e.date <= end).map(e => ({ date: e.date, start: e.start || null, title: String(e.title || '').slice(0, 80) })).sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || ''))).slice(0, 60);
+    const next = JSON.stringify(list); if (ls.getItem('lhcache_cal_v1') === next) return false;
+    ls.setItem('lhcache_cal_v1', next); return true;
+  } catch { return false; }
 }

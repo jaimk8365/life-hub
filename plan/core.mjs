@@ -296,7 +296,15 @@ export function search(query, sources) {
   for (const b of s.blocks || []) if (b && hit(b.title + ' ' + (b.note || ''))) out.push({ kind: 'Planner', icon: b.icon || '🗓️', title: b.title, sub: (b.repeat && b.repeat.type === 'once' ? b.repeat.date : 'repeats') + ' · ' + to12(b.start || '09:00'), go: { sec: 'plan', date: b.repeat && b.repeat.type === 'once' ? b.repeat.date : null } });
   for (const t of s.tasks || []) if (t && t.status !== 'binned' && hit(t.title)) out.push({ kind: 'Task', icon: t.status === 'done' || t.completed ? '✅' : '☑️', title: t.title, sub: t.status === 'done' || t.completed ? 'done' : (t.dueDate || t.area || ''), go: { sec: 'tasks' } });
   for (const n of s.notes || []) if (n && !n.deletedAt && hit((n.title || '') + ' ' + (n.body || ''))) out.push({ kind: 'Note', icon: '🗒️', title: n.title || String(n.body || '').slice(0, 40), sub: String(n.body || '').replace(/\s+/g, ' ').slice(0, 60), go: { cp: 'notes' } });
-  for (const a of s.admin || []) if (a && hit(a.name || a.title)) out.push({ kind: 'Life Admin', icon: '📋', title: a.name || a.title, sub: a.nextDue ? 'due ' + a.nextDue : '', go: { sec: 'admin' } });
+  for (const a of s.admin || []) {
+    if (!a) continue;
+    const fields = Object.entries(a.fields || {}), links = a.links || [], inside = [a.note, a.body, ...fields.map(([k, v]) => k + ' ' + v), ...links.map(l => l.title + ' ' + l.url), ...(a.files || []).map(f => f.name)].join(' ');
+    if (!hit((a.name || a.title) + ' ' + inside)) continue;
+    // say where the match is when it is not in the name: the detail, the link or the note
+    const f = fields.find(([k, v]) => words.some(w => (k + ' ' + v).toLowerCase().includes(w))), l = links.find(x => words.some(w => (x.title + ' ' + x.url).toLowerCase().includes(w)));
+    const where = hit(a.name || a.title) ? (a.nextDue ? 'due ' + a.nextDue : '') : f ? f[0] + ': ' + f[1] : l ? '🔗 ' + l.title : String(a.body || a.note || '').replace(/\s+/g, ' ').slice(0, 60);
+    out.push({ kind: 'Life Admin', icon: '📋', title: a.name || a.title, sub: where, go: { sec: 'admin', item: a.id || null } });
+  }
   for (const i of s.inbox || []) if (i && hit(i.text)) out.push({ kind: 'Inbox', icon: '📥', title: i.text, sub: '', go: { cp: 'inbox' } });
   const rank = r => (String(r.title || '').toLowerCase().startsWith(words[0]) ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b)).slice(0, 20);

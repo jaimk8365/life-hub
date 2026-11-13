@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
 import {patchCopilotHomeTasks} from '../tools/copilot-home-tasks-patches.mjs';
 import {patchCopilotDay} from '../tools/copilot-day-patches.mjs';
+import { patchCopilotAdmin } from '../tools/copilot-admin-patches.mjs';
 
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
@@ -31,7 +32,7 @@ test('source page and patch agree, and bin keeps the task so Admin items do not 
   assert.match(src, /saveTask\(\{ \.\.\.task, status: 'binned' \}\)/);
   const backups = await readdir(new URL('../src/backups/', import.meta.url));
   const before = backups.find(name => /^copilot-2026-11-10-0545-pre-home-tasks\.html$/.test(name));
-  if (before) assert.equal(patchCopilotDay(patchCopilotHomeTasks(await read('../src/backups/' + before))), src, 'the patches reproduce the source page');
+  if (before) assert.equal(patchCopilotAdmin(patchCopilotDay(patchCopilotHomeTasks(await read('../src/backups/' + before)))), src, 'the patches reproduce the source page');
 });
 
 test('Life Admin done logic matches Admin: monthly bill moves to the next date after today', async () => {

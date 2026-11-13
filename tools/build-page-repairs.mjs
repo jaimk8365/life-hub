@@ -9,6 +9,8 @@ import {patchDashboard,patchPlanner} from './page-safety-patches.mjs';
 import {patchCopilotDoors} from './copilot-doors-patches.mjs';
 import {patchCopilotHomeTasks} from './copilot-home-tasks-patches.mjs';
 import {patchCopilotDay} from './copilot-day-patches.mjs';
+import {patchAdminPlus} from './admin-plus-patches.mjs';
+import {patchCopilotAdmin} from './copilot-admin-patches.mjs';
 
 const repositoryRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const builder=join(repositoryRoot,'tools/build-hub.mjs');
@@ -19,7 +21,7 @@ export async function repairEncryptedPages({root=repositoryRoot,beforeBuild}={})
   if(!pass)throw new Error('The configured hub passcode is missing.');
   // Authenticate/decrypt both inputs before creating or replacing any output.
   const pages=[];
-  for(const [relative,patch,optional] of [['hub/index.html',patchDashboard],['plan/index.html',patchPlanner],['copilot/index.html',plain=>patchCopilotDay(patchCopilotHomeTasks(patchCopilotDoors(plain))),true]]){
+  for(const [relative,patch,optional] of [['hub/index.html',patchDashboard],['plan/index.html',patchPlanner],['copilot/index.html',plain=>patchCopilotAdmin(patchCopilotDay(patchCopilotHomeTasks(patchCopilotDoors(plain)))),true],['admin/index.html',patchAdminPlus,true]]){
     const target=join(root,relative);let original;
     try{original=await readFile(target,'utf8');}catch(error){if(optional&&error.code==='ENOENT')continue;throw error;}
     const plaintext=decryptPage(original,pass),repaired=patch(plaintext);

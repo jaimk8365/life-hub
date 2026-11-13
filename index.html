@@ -53,6 +53,29 @@
   .findres i{font-style:normal;font-size:20px;text-align:center}.findres em{font:800 10.5px system-ui,sans-serif;font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint)}
   .findnone{padding:14px 6px 4px;color:var(--ink-faint);font-weight:700;font-size:14px;text-align:center}
   @media (min-width:760px){ .findpanel{left:calc(var(--rail-w) + 14px);right:14px;margin-left:0} }
+  /* ---- always-on strip: shortcuts, and the pages inside a group ---- */
+  .crumb{height:calc(42px + var(--sat))}
+  .crumb-quick{display:flex;gap:4px;flex:0 0 auto}
+  .crumb-quick button{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:36px;height:32px;min-height:32px!important;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:15px;line-height:1;cursor:pointer;margin:0;padding:0;font-family:inherit;color:var(--ink)}
+  .crumb-quick button span{display:none;font:700 12.5px 'Hanken Grotesk',system-ui,sans-serif}
+  .crumb-quick button.on{background:rgba(232,146,124,.18);border-color:var(--coral)}
+  .crumb-quick button:focus-visible,.crumb-sub button:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
+  @media (min-width:1080px){ .crumb-quick button{width:auto;padding:0 11px} .crumb-quick button span{display:inline} }
+  @media (max-width:479px){ .crumb-back span{display:none} .crumb-back{padding:0 11px 0 9px} }
+  .crumb-sub{position:fixed;z-index:15;top:calc(42px + var(--sat));left:0;right:0;height:42px;display:none;align-items:center;gap:6px;padding:0 10px;background:var(--paper);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  body.has-sub{--crumb-h:84px}
+  body.has-sub .crumb-sub{display:flex}
+  .crumb-sub button{flex:0 0 auto;height:32px;min-height:32px!important;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:0 14px;font:700 13px 'Hanken Grotesk',system-ui,sans-serif;color:var(--ink-soft);cursor:pointer;margin:0;white-space:nowrap}
+  .crumb-sub button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  @media (min-width:760px){ .crumb-sub{left:var(--rail-w)} }
+  nav .navsub{display:none!important}
+  .nav-me{display:contents}
+  .nav-me[hidden]{display:none}
+  @media (min-width:760px){
+    nav button.nav-fold{padding:8px 10px 2px;margin-top:7px;color:var(--ink-faint);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;justify-content:space-between;gap:6px}
+    nav button.nav-fold b{font-size:13px;transition:transform .15s}
+    nav button.nav-fold[aria-expanded="true"] b{transform:rotate(90deg)}
+  }
   /* ---- frames ---- */
   .stage{position:fixed;top:calc(var(--crumb-h) + var(--sat));right:0;bottom:calc(var(--tabbar-h) + var(--sab));left:0;background:var(--paper)}
   .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--paper)}
@@ -177,10 +200,18 @@
   <div class="crumb" id="crumb" role="navigation" aria-label="Where you are">
     <button id="crumbBack" class="crumb-back" type="button" onclick="navBack()" hidden><b aria-hidden="true">‹</b><span id="crumbBackLabel">Back</span></button>
     <span id="crumbHere" class="crumb-here" aria-live="polite"></span>
+    <div class="crumb-quick" id="crumbQuick" aria-label="Shortcuts">
+      <button type="button" data-q="overview" onclick="show('overview')" aria-label="Overview" title="Overview">📊<span>Overview</span></button>
+      <button type="button" data-q="cp:today" onclick="showCopilot('today')" aria-label="Today" title="Today">☀️<span>Today</span></button>
+      <button type="button" data-q="plan" onclick="show('plan')" aria-label="Planner" title="Planner">🗓️<span>Planner</span></button>
+      <button type="button" data-q="tasks" onclick="show('tasks')" aria-label="Tasks" title="Tasks">✅<span>Tasks</span></button>
+      <button type="button" data-q="finance" onclick="show('finance')" aria-label="Finance" title="Finance">💰<span>Finance</span></button>
+    </div>
     <button id="crumbFind" class="crumb-find" type="button" onclick="toggleFind()" aria-label="Search everything" aria-expanded="false">🔍</button>
     <button id="crumbLife" class="crumb-life" type="button" onclick="toggleMore()" aria-label="All Life Hub sections"><span aria-hidden="true">🏡</span>Life</button>
   </div>
-  <div class="findpanel" id="findPanel" hidden role="search"><input id="findInput" type="search" placeholder="🔍 Search everything" aria-label="Search tasks, planner, notes, admin and inbox" oninput="runFind()" autocomplete="off"><div id="findOut"></div></div>
+  <div class="crumb-sub" id="crumbSub" aria-label="Pages in this group"></div>
+  <div class="findpanel" id="findPanel" hidden role="search"><input id="findInput" type="search" placeholder="🔍 Search everything" aria-label="Search tasks, planner, notes, Life Admin and inbox" oninput="runFind()" autocomplete="off"><div id="findOut"></div></div>
   <div class="stage">
     <iframe id="f-copilot" title="Co-Pilot"></iframe>
     <iframe id="f-finance" title="My Finance"></iframe>
@@ -198,36 +229,42 @@
     <iframe id="f-kids" title="Kids"></iframe>
     <iframe id="f-wardrobe" title="Wardrobe"></iframe>
     <iframe id="f-family" title="Family"></iframe>
+    <iframe id="f-overview" title="Overview"></iframe>
+    <iframe id="f-board" title="Family board"></iframe>
   </div>
 
   <nav aria-label="Life Hub sections">
-    <span class="nav-label">Today</span>
+    <button id="b-overview" onclick="show('overview')"><span class="ico">📊</span><span>Overview</span></button>
+    <span class="nav-label">My day</span>
     <button class="routebtn" onclick="showCopilot('today')"><span class="ico">☀️</span><span>Today</span></button>
     <button id="b-copilot" class="routebtn" onclick="showCopilot('now')"><span class="ico">🎯</span><span>Now</span></button>
     <button class="routebtn" onclick="showCopilot('inbox')"><span class="ico">📥</span><span>Inbox</span><span class="count-badge" data-inbox-count hidden>0</span></button>
     <span class="nav-label">Plan</span>
-    <button id="b-plan" onclick="show('plan')"><span class="ico">🗓️</span><span>My Planner</span></button>
-    <button class="routebtn" onclick="showCopilot('guides')"><span class="ico">🧭</span><span>Plan guides</span></button>
-    <span class="nav-label">Life</span>
-    <button id="b-hub" onclick="show('hub')"><span class="ico">🏡</span><span>Life Hub</span></button>
+    <button id="b-plan" onclick="show('plan')"><span class="ico">🗓️</span><span>Planner</span></button>
+    <button class="routebtn navsub" onclick="showCopilot('guides')"><span class="ico">🧭</span><span>Plan guides</span></button>
     <button id="b-tasks" onclick="show('tasks')"><span class="ico">✅</span><span>Tasks</span></button>
-    <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Kitchen</span></button>
-    <button id="b-recipes" class="sec" onclick="show('recipes')"><span class="ico">📖</span><span>Recipes</span></button>
-    <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
-    <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Admin</span></button>
-    <button id="b-kids" class="sec" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
+    <span class="nav-label">Home &amp; family</span>
     <button id="b-family" class="sec" onclick="show('family')"><span class="ico">👨‍👩‍👧‍👦</span><span>Family</span></button>
-    <a id="b-board" class="finance-link" href="./board/" onclick="markOpened('board')"><span class="ico" aria-hidden="true">🖥️</span><span>Family board</span></a>
+    <button id="b-kids" class="sec navsub" onclick="show('kids')"><span class="ico">🧒</span><span>Kids</span></button>
+    <a id="b-board" class="finance-link navsub" href="./board/" onclick="show('board');return false"><span class="ico" aria-hidden="true">🖥️</span><span>Family board</span></a>
+    <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Food</span></button>
+    <button id="b-recipes" class="sec navsub" onclick="show('recipes')"><span class="ico">📖</span><span>Recipes</span></button>
+    <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
+    <span class="nav-label">Money &amp; paperwork</span>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Finance</span></button>
-    <span class="nav-label">Just for me</span>
-    <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
-    <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
-    <button class="routebtn" onclick="showCopilot('ideas')"><span class="ico">💡</span><span>Idea Vault</span></button>
-    <button class="routebtn" onclick="showCopilot('etsy')"><span class="ico">🛍️</span><span>Etsy Studio</span></button>
-    <button class="routebtn" onclick="showCopilot('notes')"><span class="ico">🗒️</span><span>Notes</span></button>
-    <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📚</span><span>Books</span></button>
-    <button id="b-beauty" class="sec" onclick="show('beauty')"><span class="ico">💄</span><span>Beauty</span></button>
-    <button id="b-wardrobe" class="sec" onclick="show('wardrobe')"><span class="ico">👗</span><span>Wardrobe</span></button>
+    <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Life Admin</span></button>
+    <button id="navMeBtn" class="nav-fold" type="button" onclick="navMeToggle()" aria-expanded="false" aria-controls="navMe"><span>Just for me</span><b aria-hidden="true">›</b></button>
+    <div id="navMe" class="nav-me" hidden>
+      <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
+      <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
+      <button class="routebtn" onclick="showCopilot('ideas')"><span class="ico">💡</span><span>Idea Vault</span></button>
+      <button class="routebtn" onclick="showCopilot('etsy')"><span class="ico">🛍️</span><span>Etsy Studio</span></button>
+      <button class="routebtn" onclick="showCopilot('notes')"><span class="ico">🗒️</span><span>Notes</span></button>
+      <button id="b-reading" class="sec" onclick="show('reading')"><span class="ico">📚</span><span>Books</span></button>
+      <button id="b-beauty" class="sec" onclick="show('beauty')"><span class="ico">💄</span><span>Beauty</span></button>
+      <button id="b-wardrobe" class="sec" onclick="show('wardrobe')"><span class="ico">👗</span><span>Wardrobe</span></button>
+    </div>
+    <button id="b-hub" onclick="show('hub')"><span class="ico">🎛️</span><span>Command Centre</span></button>
     <button id="b-more" class="morebtn" onclick="toggleMore()"><span class="ico">🏡</span><span>Life</span></button>
     <button id="b-sync" class="syncbtn" onclick="toggleSync()"><span class="ico"><span class="dot" id="syncDot"></span></span><span>Sync</span></button>
     <span class="spacer"></span>
@@ -244,24 +281,30 @@
 
   <div class="morepanel" id="morePanel" hidden>
     <div class="life-head">🏡 Life</div>
-    <h2>Your day</h2>
+    <h2>My day</h2>
     <div class="tiles" id="lifeDay">
+      <button class="tile" data-keep="1" onclick="showFromMore('overview')"><span class="ico">📊</span>Overview</button>
       <button class="tile" data-keep="1" onclick="showCopilot('now')"><span class="ico">🎯</span>Now</button>
-      <button class="tile" data-keep="1" onclick="showCopilot('guides')"><span class="ico">🧭</span>Plan guides</button>
       <button class="tile" data-keep="1" onclick="showCopilot('shutdown')"><span class="ico">🌙</span>Shutdown</button>
     </div>
-    <h2>Family &amp; home</h2>
+    <h2>Plan</h2>
+    <div class="tiles" id="lifePlan">
+      <button class="tile" data-keep="1" onclick="showCopilot('guides')"><span class="ico">🧭</span>Plan guides</button>
+      <button class="tile" data-k="tasks" data-home="lifePlan" onclick="showFromMore('tasks')"><span class="ico">✅</span>Tasks</button>
+    </div>
+    <h2>Home &amp; family</h2>
     <div class="tiles" id="lifeHome">
-      <button class="tile" data-keep="1" onclick="markOpened('board');location.assign('./board/')"><span class="ico">🖥️</span>Family board</button>
-      <button class="tile" data-k="hub" data-home="lifeHome" onclick="showFromMore('hub')"><span class="ico">🏡</span>Life Hub</button>
-      <button class="tile" data-k="tasks" data-home="lifeHome" onclick="showFromMore('tasks')"><span class="ico">✅</span>Tasks</button>
+      <button class="tile" data-k="family" data-home="lifeHome" onclick="showFromMore('family')"><span class="ico">👨‍👩‍👧‍👦</span>Family</button>
+      <button class="tile" data-k="kids" data-home="lifeHome" onclick="showFromMore('kids')"><span class="ico">🧒</span>Kids</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('board')"><span class="ico">🖥️</span>Family board</button>
       <button class="tile" data-k="kitchen" data-home="lifeHome" onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
       <button class="tile" data-k="recipes" data-home="lifeHome" onclick="showFromMore('recipes')"><span class="ico">📖</span>Recipes</button>
       <button class="tile" data-k="home" data-home="lifeHome" onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
-      <button class="tile" data-k="admin" data-home="lifeHome" onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
-      <button class="tile" data-k="kids" data-home="lifeHome" onclick="showFromMore('kids')"><span class="ico">🧒</span>Kids</button>
-      <button class="tile" data-k="family" data-home="lifeHome" onclick="showFromMore('family')"><span class="ico">👨‍👩‍👧‍👦</span>Family</button>
+    </div>
+    <h2>Money &amp; paperwork</h2>
+    <div class="tiles" id="lifeMoney">
       <button class="tile" data-keep="1" onclick="showFromMore('finance')"><span class="ico">💰</span>Finance</button>
+      <button class="tile" data-k="admin" data-home="lifeMoney" onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
     </div>
     <h2>Just for me</h2>
     <div class="tiles" id="lifeMe">
@@ -273,6 +316,7 @@
       <button class="tile" data-k="reading" data-home="lifeMe" onclick="showFromMore('reading')"><span class="ico">📚</span>Books</button>
       <button class="tile" data-k="beauty" data-home="lifeMe" onclick="showFromMore('beauty')"><span class="ico">💄</span>Beauty</button>
       <button class="tile" data-k="wardrobe" data-home="lifeMe" onclick="showFromMore('wardrobe')"><span class="ico">👗</span>Wardrobe</button>
+      <button class="tile" data-k="hub" data-home="lifeMe" onclick="showFromMore('hub')"><span class="ico">🎛️</span>Command Centre</button>
     </div>
     <div id="lifeOld" hidden>
       <button class="oldbtn" onclick="const t=document.getElementById('lifeOldTiles');t.hidden=!t.hidden">⋯ Not used lately (<span id="lifeOldCount">0</span>)</button>
@@ -293,9 +337,9 @@
   </div>
 
 <script>
-  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html' };
+  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html' };
   const BUTTONS = { copilot:'b-copilot' };
-  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance']);
+  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board']);
 
   /* ---- Where am I, and Back ----
      Every section change is one step in the browser's history, so the phone's back gesture, the browser's back
@@ -303,9 +347,27 @@
   const PLACE_NAMES = {
     'cp:today':'☀️ Today','cp:now':'🎯 Now','cp:inbox':'📥 Inbox','cp:guides':'🧭 Plan guides','cp:shutdown':'🌙 Shutdown',
     'cp:ideas':'💡 Idea Vault','cp:etsy':'🛍️ Etsy Studio','cp:notes':'🗒️ Notes','cp:settings':'⚙️ Settings',
-    hub:'🏡 Life Hub',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Home',admin:'📋 Life Admin',
+    overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Home',admin:'📋 Life Admin',
     kids:'🧒 Kids',family:'👨‍👩‍👧‍👦 Family',course:'🧠 Brain',quest:'🌙 Quests',reading:'📚 Books',beauty:'💄 Beauty',wardrobe:'👗 Wardrobe',finance:'💰 Finance'
   };
+  /* Pages that belong together: the menu shows one door, and the strip shows the pages inside it. */
+  const NAV_GROUPS = [['plan','cp:guides'], ['family','kids','board'], ['kitchen','recipes']];
+  const NAV_ME = new Set(['course','quest','reading','beauty','wardrobe','cp:ideas','cp:etsy','cp:notes']);
+  function navOpen(k){ if (String(k).startsWith('cp:')) showCopilot(k.slice(3)); else show(k); }
+  function navMeSet(open){ try { const box = document.getElementById('navMe'), b = document.getElementById('navMeBtn'); box.hidden = !open; b.setAttribute('aria-expanded', String(!!open)); } catch(e){} }
+  function navMeToggle(){ const open = document.getElementById('navMe').hidden; navMeSet(open); try { localStorage.setItem('lifehub_nav_me', open ? '1' : ''); } catch(e){} }
+  /* Jump straight to a Planner day or a Life Admin item, from Search, the Overview or the other section. */
+  function goPlanDate(iso){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return show('plan');
+    try { sessionStorage.setItem('plan_goto', iso); } catch(e){}
+    show('plan');
+    try { const w = document.getElementById('f-plan').contentWindow; if (w && w.ppGoto) w.ppGoto(iso); } catch(e){}
+  }
+  function goAdminItem(id){
+    try { sessionStorage.setItem('la_open', String(id)); } catch(e){}
+    show('admin');
+    try { const w = document.getElementById('f-admin').contentWindow; if (w && w.lpOpen) w.lpOpen(String(id)); } catch(e){}
+  }
   let navCurrent = null, navSilent = false;
   const placeKey = p => p ? (p.cp ? 'cp:'+p.cp : p.sec) : '';
   const placeName = p => PLACE_NAMES[placeKey(p)] || (p && p.cp ? '🎯 Co-Pilot' : '🏡 Life Hub');
@@ -318,6 +380,14 @@
       if (label) label.textContent = back ? placeName(back) : 'Back';
       if (b.setAttribute) b.setAttribute('aria-label', back ? 'Back to ' + placeName(back).replace(/^\S+\s/, '') : 'Back');
     }
+    try { // light up the shortcut you are on, show the pages inside this group, and keep its menu door lit
+      const key = placeKey(navCurrent), group = NAV_GROUPS.find(g => g.includes(key)), sub = document.getElementById('crumbSub');
+      document.querySelectorAll('#crumbQuick [data-q]').forEach(q => q.classList.toggle('on', q.dataset.q === key));
+      sub.innerHTML = group ? group.map(k => '<button type="button" class="' + (k === key ? 'on' : '') + '" aria-current="' + (k === key ? 'page' : 'false') + '" onclick="navOpen(\'' + k + '\')">' + PLACE_NAMES[k] + '</button>').join('') : '';
+      document.body.classList.toggle('has-sub', !!group);
+      NAV_GROUPS.forEach(g => { const door = document.getElementById('b-' + g[0]); if (door) door.classList.toggle('active', g.includes(key)); });
+      if (NAV_ME.has(key)) navMeSet(true);
+    } catch(e){}
   }
   function navRecord(p){
     if (navSilent) return;
@@ -360,9 +430,9 @@
   function openFind(i){
     const r = findHits[i]; if (!r) return; document.getElementById('findPanel').hidden = true;
     if (r.go.cp) return showCopilot(r.go.cp);
+    if (r.go.sec === 'plan' && r.go.date) return goPlanDate(r.go.date); // a dated planner block opens on its day
+    if (r.go.sec === 'admin' && r.go.item) return goAdminItem(r.go.item); // a Life Admin hit opens the item itself
     show(r.go.sec);
-    // a dated planner block opens on its day (when the Planner is already loaded)
-    if (r.go.sec === 'plan' && /^\d{4}-\d{2}-\d{2}$/.test(r.go.date || '')) setTimeout(() => { try { document.getElementById('f-plan').contentWindow.eval("viewDate='" + r.go.date + "';setMode('day')"); } catch(e){} }, 400);
   }
   /* ---- Finance inside Life Hub ----
      Finance shares this page's one encrypted store and sync (bulk-storage.js and sync.js below), so there is only
@@ -425,6 +495,7 @@
       f.classList.toggle('active', on);
       if(b)b.classList.toggle('active', on);
     }
+    try { const key = which === 'copilot' ? 'cp:' + copilotRoute : which; NAV_GROUPS.forEach(g => { const door = document.getElementById('b-' + g[0]); if (door) door.classList.toggle('active', g.includes(key)); }); } catch(e){}
     try { localStorage.setItem('lifehub_tab', which); } catch(e){}
     try { document.body.classList.toggle('in-finance', which === 'finance'); } catch(e){}
     document.querySelector('meta[name=theme-color]').content = which === 'quest' ? '#0b0716' : '#F7F3EC';
@@ -434,6 +505,7 @@
     const mobileMore = document.getElementById('b-mobile-more'); if (mobileMore) mobileMore.classList.toggle('active', inMore && which !== 'plan');
     const mobilePlan = document.getElementById('b-mobile-plan'); if (mobilePlan) mobilePlan.classList.toggle('active', which === 'plan');
     markOpened(which);
+    if (which === 'overview') try { document.getElementById('f-overview').contentWindow.ovDraw(); } catch(e){}
     document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===copilotRoute));
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
@@ -459,6 +531,7 @@
     booted = true;
     let saved = null;
     try { saved = localStorage.getItem('lifehub_tab'); } catch(e){}
+    try { if (localStorage.getItem('lifehub_nav_me')) navMeSet(true); } catch(e){}
     // Finance is a section like any other: a saved Finance tab, or ?tab=finance, opens it here, never in a new tab.
     const query=new URLSearchParams(location.search);
     const requested=query.get('tab')==='copilot'?location.hash.slice(1)||'now':null;

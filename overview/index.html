@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Overview — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--paper:#F7F3EC;--card:#fff;--ink:#2B2722;--ink-soft:#6B655C;--ink-faint:#A39C90;--line:#E7E0D3;--line-soft:#EEE9DF;--coral:#E8927C;--good:#3F7D5C;--bad:#C75B45;--warn:#B98A1F}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(30px + env(safe-area-inset-bottom,0px))}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:2px 2px 12px}
+  .grid{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+  @media(min-width:700px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide{grid-column:1/-1}}
+  .ov{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;min-width:0}
+  .ov>h2{font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;display:flex;align-items:center;gap:6px}
+  .ov>h2 button{margin-left:auto;border:0;background:var(--line-soft);border-radius:999px;min-height:32px;padding:0 12px;font:800 12px inherit;font-family:inherit;color:var(--ink-soft);cursor:pointer}
+  .row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;border:0;background:transparent;text-align:left;padding:9px 2px;border-top:1px solid var(--line-soft);font-family:inherit;color:var(--ink);cursor:pointer;min-height:44px}
+  .row:first-of-type{border-top:0}.row i{font-style:normal;font-size:19px;text-align:center}.row b{font-size:14.5px;overflow-wrap:anywhere}
+  .row em{font:800 11.5px system-ui,sans-serif;font-style:normal;color:var(--ink-soft);white-space:nowrap;background:var(--line-soft);border-radius:999px;padding:4px 9px}
+  .row em.bad{background:#F8E1DB;color:var(--bad)}.row em.warn{background:#FCF4DC;color:#7A5B10}.row em.hot{background:#FCE9E3;color:var(--bad)}
+  .row small{display:block;font-size:12px;color:var(--ink-faint);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .none{color:var(--ink-faint);font-weight:700;font-size:13.5px;padding:6px 2px}
+  .bar{height:8px;border-radius:6px;background:var(--line-soft);overflow:hidden;margin:5px 0 2px}.bar u{display:block;height:100%;background:#7FB79B;border-radius:6px}
+  .goal{padding:8px 2px;border-top:1px solid var(--line-soft)}.goal:first-of-type{border-top:0}.goal b{font-size:14.5px}.goal small{color:var(--ink-soft);font-weight:600;font-size:12.5px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--line);background:var(--paper);border-radius:14px;padding:9px 12px;font:700 13.5px inherit;font-family:inherit;color:var(--ink);cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:44px}
+  .chip.on{background:#EAF3EE;border-color:#BFDCCB;color:var(--good)}.chip strong{font-family:'Fraunces',serif;font-size:19px}
+  a.row{text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📊 Overview</h1>
+  <div class="grid" id="root" aria-live="polite"></div>
+</div>
+<script type="module">
+import * as Day from '../plan/core.mjs';
+import { snapshot } from './core.mjs';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch { return d; } };
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const dayWord = (iso, today) => iso === today ? 'Today' : iso === Day.addDays(today, 1) ? 'Tomorrow' : new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' });
+const st = document.createElement('style'); st.textContent = Day.SHARED_CSS; document.head.appendChild(st);
+
+function draw() {
+  const today = todayISO(), now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
+  const s = snapshot({ blocks: read('plan_blocks', []), done: read('plan_done', {}), money: read('plan_money_dates', []), admin: read('la_items', []), goals: read('plan_goals_v1', []), habits: read('cp_habits_v1', null), tasks: read('hq_task_engine_v1', null), inbox: read('cp_inbox_v1', []), calendar: read('lhcache_cal_v1', []), today, nowMin });
+  const card = (title, go, body, cls = '') => `<section class="ov ${cls}"><h2>${title}${go ? `<button type="button" data-go="${go}">Open ›</button>` : ''}</h2>${body}</section>`;
+  document.getElementById('root').innerHTML =
+    card('🎯 Right now', 'cp:now', Day.nowNextHtml(s.nowNext, { esc, nowMin, at: Date.now() }) + `<div class="chips" style="margin-top:10px"><button type="button" class="chip" data-go="plan"><strong>${s.day.done}/${s.day.total}</strong> today</button><button type="button" class="chip" data-go="cp:inbox">📥 <strong>${s.counts.inbox}</strong> inbox</button><button type="button" class="chip" data-go="tasks">✅ <strong>${s.counts.tasks}</strong> tasks</button><button type="button" class="chip" data-go="finance">💰 Money</button></div>`, 'wide')
+    + card('📅 Coming up', 'plan', s.coming.length ? s.coming.map(e => `<button type="button" class="row" data-go="plan" data-date="${esc(e.date)}"><i aria-hidden="true">📅</i><span><b>${esc(e.title)}</b><small>${e.start ? esc(Day.to12(e.start)) : 'All day'}</small></span><em class="${e.today ? 'hot' : ''}">${esc(dayWord(e.date, today))}</em></button>`).join('') : '<div class="none">Nothing on the calendar this week</div>')
+    + card('⭐ Musts this week', 'plan', s.musts.length ? s.musts.map(m => `<button type="button" class="row" data-go="plan" data-date="${esc(m.date)}"><i aria-hidden="true">${esc(m.icon)}</i><b>${esc(m.title)}</b><em class="${m.today ? 'hot' : ''}">${esc(dayWord(m.date, today))}</em></button>`).join('') + (s.mustsMore ? `<div class="none">＋ ${s.mustsMore} more</div>` : '') : '<div class="none">✨ No musts left this week</div>')
+    + card('📋 Due soon', 'admin', s.due.length ? s.due.map(d => `<button type="button" class="row" data-item="${esc(d.id)}"><i aria-hidden="true">📋</i><b>${esc(d.name)}</b><em class="${d.tone}">${esc(d.words)}</em></button>`).join('') + (s.dueMore ? `<div class="none">＋ ${s.dueMore} more</div>` : '') : '<div class="none">✨ Nothing due for 2 weeks</div>')
+    + card('📌 Pinned', 'admin', s.pinned.length ? s.pinned.map(p => `<button type="button" class="row" data-item="${esc(p.id)}"><i aria-hidden="true">📌</i><span><b>${esc(p.name)}</b>${p.note ? `<small>${esc(p.note)}</small>` : ''}</span>${p.link ? '<em>🔗</em>' : '<span></span>'}</button>`).join('') : '<div class="none">Pin things in Life Admin to keep them here</div>')
+    + card('🎯 Goals', 'plan', s.goals.length ? s.goals.map(g => `<div class="goal"><b>${esc(g.icon)} ${esc(g.name)}</b><div class="bar"><u style="width:${g.pct}%"></u></div><small>${g.finished ? '🎉 done' : g.next ? '➜ ' + esc(g.next) : ''}</small></div>`).join('') : '<div class="none">Add a goal on the Planner week</div>')
+    + card('🌱 Habits today', 'cp:today', s.habits.length ? `<div class="chips">${s.habits.map(h => `<span class="chip ${h.doneToday ? 'on' : ''}">${h.doneToday ? '✓' : esc(h.icon)} ${esc(h.name)} · ${h.last7}/7</span>`).join('')}</div>` : '<div class="none">Add habits on Today</div>', 'wide');
+  Day.startCountdowns(document, window);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-item],[data-go]'); if (!t) return;
+  try {
+    if (t.dataset.item) return parent.goAdminItem(t.dataset.item);
+    const go = t.dataset.go;
+    if (go === 'plan' && t.dataset.date) return parent.goPlanDate(t.dataset.date);
+    if (go.startsWith('cp:')) parent.showCopilot(go.slice(3)); else parent.show(go);
+  } catch { /* opened on its own, outside Life Hub: nothing to jump to */ }
+});
+window.addEventListener('storage', draw);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) draw(); });
+window.addEventListener('focus', draw);
+setInterval(draw, 60000);
+window.ovDraw = draw;
+draw();
+</script>
+</body>
+</html>
