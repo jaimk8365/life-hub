@@ -233,6 +233,8 @@
     <iframe id="f-board" title="Family board"></iframe>
     <iframe id="f-plants" title="Plants"></iframe>
     <iframe id="f-wish" title="Wishlist"></iframe>
+    <iframe id="f-brain" title="Brain: journal and toolbox"></iframe>
+    <iframe id="f-health" title="Health"></iframe>
   </div>
 
   <nav aria-label="Life Hub sections">
@@ -258,9 +260,12 @@
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Finance</span></button>
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Life Admin</span></button>
     <button id="b-wish" class="sec" onclick="show('wish')"><span class="ico">🛍️</span><span>Wishlist</span></button>
-    <button id="navMeBtn" class="nav-fold" type="button" onclick="navMeToggle()" aria-expanded="false" aria-controls="navMe"><span>Just for me</span><b aria-hidden="true">›</b></button>
+    <span class="nav-label">Me</span>
+    <button id="b-brain" class="sec" onclick="show('brain')"><span class="ico">🧠</span><span>Brain</span></button>
+    <button id="b-health" class="sec" onclick="show('health')"><span class="ico">❤️</span><span>Health</span></button>
+    <button id="navMeBtn" class="nav-fold" type="button" onclick="navMeToggle()" aria-expanded="false" aria-controls="navMe"><span>More for me</span><b aria-hidden="true">›</b></button>
     <div id="navMe" class="nav-me" hidden>
-      <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
+      <button id="b-course" class="navsub" onclick="show('course')"><span class="ico">🎓</span><span>Brain course</span></button>
       <button id="b-quest" onclick="show('quest')"><span class="ico">🌙</span><span>Quests</span></button>
       <button class="routebtn" onclick="showCopilot('ideas')"><span class="ico">💡</span><span>Idea Vault</span></button>
       <button class="routebtn" onclick="showCopilot('etsy')"><span class="ico">🛍️</span><span>Etsy Studio</span></button>
@@ -316,7 +321,9 @@
     </div>
     <h2>Just for me</h2>
     <div class="tiles" id="lifeMe">
-      <button class="tile" data-k="course" data-home="lifeMe" onclick="showFromMore('course')"><span class="ico">🧠</span>Brain</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('brain')"><span class="ico">🧠</span>Brain</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('health')"><span class="ico">❤️</span>Health</button>
+      <button class="tile" data-k="course" data-home="lifeMe" onclick="showFromMore('course')"><span class="ico">🎓</span>Brain course</button>
       <button class="tile" data-k="quest" data-home="lifeMe" onclick="showFromMore('quest')"><span class="ico">🌙</span>Quests</button>
       <button class="tile" data-k="cp:ideas" data-home="lifeMe" onclick="showCopilot('ideas')"><span class="ico">💡</span>Idea Vault</button>
       <button class="tile" data-k="cp:etsy" data-home="lifeMe" onclick="showCopilot('etsy')"><span class="ico">🛍️</span>Etsy Studio</button>
@@ -345,9 +352,9 @@
   </div>
 
 <script>
-  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html', plants:'./plants/index.html', wish:'./wish/index.html' };
+  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html', plants:'./plants/index.html', wish:'./wish/index.html', brain:'./brain/index.html', health:'./health/index.html' };
   const BUTTONS = { copilot:'b-copilot' };
-  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board','plants','wish']);
+  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board','plants','wish','brain','health']);
 
   /* ---- Where am I, and Back ----
      Every section change is one step in the browser's history, so the phone's back gesture, the browser's back
@@ -355,12 +362,12 @@
   const PLACE_NAMES = {
     'cp:today':'☀️ Today','cp:now':'🎯 Now','cp:inbox':'📥 Inbox','cp:guides':'🧭 Plan guides','cp:shutdown':'🌙 Shutdown',
     'cp:ideas':'💡 Idea Vault','cp:etsy':'🛍️ Etsy Studio','cp:notes':'🗒️ Notes','cp:settings':'⚙️ Settings',
-    plants:'🪴 Plants',wish:'🛍️ Wishlist',overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Old Home page',admin:'📋 Life Admin',
-    kids:'🧒 Kids',family:'👨‍👩‍👧‍👦 Family',course:'🧠 Brain',quest:'🌙 Quests',reading:'📚 Books',beauty:'💄 Beauty',wardrobe:'👗 Wardrobe',finance:'💰 Finance'
+    plants:'🪴 Plants',wish:'🛍️ Wishlist',brain:'🧠 Brain',health:'❤️ Health',overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Old Home page',admin:'📋 Life Admin',
+    kids:'🧒 Kids',family:'👨‍👩‍👧‍👦 Family',course:'🎓 Brain course',quest:'🌙 Quests',reading:'📚 Books',beauty:'💄 Beauty',wardrobe:'👗 Wardrobe',finance:'💰 Finance'
   };
   /* Pages that belong together: the menu shows one door, and the strip shows the pages inside it. */
-  const NAV_GROUPS = [['plan','cp:guides','home'], ['family','kids','board'], ['kitchen','recipes']];
-  const NAV_ME = new Set(['hub','course','quest','reading','beauty','wardrobe','cp:ideas','cp:etsy','cp:notes']);
+  const NAV_GROUPS = [['plan','cp:guides','home'], ['family','kids','board'], ['kitchen','recipes'], ['brain','course']];
+  const NAV_ME = new Set(['hub','quest','reading','beauty','wardrobe','cp:ideas','cp:etsy','cp:notes']);
   /* Light up the menu button for the page you are on. Today, Inbox and the other Co-Pilot pages each get their own light, not all "Now". */
   function navLight(key){
     try {
@@ -533,6 +540,8 @@
     if (which === 'overview') try { document.getElementById('f-overview').contentWindow.ovDraw(); } catch(e){}
     if (which === 'plants') try { document.getElementById('f-plants').contentWindow.plDraw(); } catch(e){}
     if (which === 'wish') try { document.getElementById('f-wish').contentWindow.wlDraw(); } catch(e){}
+    if (which === 'brain') try { document.getElementById('f-brain').contentWindow.brDraw(); } catch(e){}
+    if (which === 'health') try { document.getElementById('f-health').contentWindow.hlDraw(); } catch(e){}
     document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===copilotRoute));
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }

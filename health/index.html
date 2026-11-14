@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Health — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--paper:#FFF8E8;--card:#fff;--ink:#15384D;--ink-soft:#3F5C6B;--ink-faint:#5F7A88;--line:#F1E1BD;--line-soft:#F8EFD9;--coral:#FF7A45;--good:#1F9A62;--sun:#FFC93C;--sun-soft:#FFF3C4;--sea:#1A7FBD;--sea-soft:#DFF0FA}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:0}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 2px 12px;flex-wrap:wrap}
+  button{font-family:inherit;cursor:pointer;color:var(--ink)}
+  .btn{border:0;border-radius:13px;min-height:44px;padding:0 15px;background:var(--ink);color:#fff;font:800 14px inherit;font-family:inherit}
+  .btn.soft{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .rings{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px 8px;margin:0 0 12px}
+  .ring{display:grid;justify-items:center;gap:2px;border:0;background:transparent;padding:0}
+  .ring svg{width:100%;max-width:84px;height:auto;display:block}.ring b{font:600 15px 'Fraunces',serif}.ring small{font:800 10.5px system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint)}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}@media(min-width:620px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .m{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px}
+  .m .top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
+  .m h2{font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin:0}
+  .m .big{font:600 30px 'Fraunces',serif;line-height:1.1;margin-top:2px}.m .big small{font:700 13px 'Hanken Grotesk',sans-serif;color:var(--ink-soft)}
+  .m .sub{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-top:2px}.up{color:var(--good)}.down{color:var(--coral)}
+  .bars{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px;align-items:end;height:64px;margin-top:10px}
+  .bars i{display:block;border-radius:4px 4px 2px 2px;background:var(--sea-soft);min-height:3px}.bars i.has{background:#8CC8EC}.bars i.hit{background:var(--good)}.bars i.today{outline:2px solid var(--coral);outline-offset:1px}
+  .plus{border:1px solid var(--line);background:var(--sun-soft);border-radius:12px;min-width:46px;min-height:46px;font:800 18px inherit}
+  .none{text-align:center;color:var(--ink-soft);font-weight:700;padding:22px 10px;background:var(--card);border:1px dashed var(--line);border-radius:18px;margin-bottom:12px}
+  .scrim{position:fixed;inset:0;background:rgba(21,56,77,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}.scrim.on{display:flex}@media(min-width:620px){.scrim{align-items:center}}
+  .sheet{background:var(--paper);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:18px 16px calc(22px + env(safe-area-inset-bottom,0px));max-height:92vh;overflow-y:auto}@media(min-width:620px){.sheet{border-radius:22px}}
+  .sheet h2{font:600 20px 'Fraunces',serif;margin:0 0 4px}.close{float:right;border:0;background:var(--line-soft);width:36px;height:36px;border-radius:50%;font-size:16px;color:var(--ink-soft)}
+  .f{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line-soft)}.f:first-of-type{border-top:0}
+  .f label{font-weight:700;font-size:15px}.f small{display:block;font-size:12px;color:var(--ink-faint);font-weight:600}
+  input,textarea{font-family:inherit;color:var(--ink)}
+  .f input[type=number],.date{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;padding:0 12px;font-size:16px;background:var(--card);text-align:right}.date{text-align:left;margin:10px 0 4px}
+  textarea{width:100%;min-height:120px;border:1.5px solid var(--line);border-radius:14px;padding:12px;font:500 15px/1.4 inherit;font-family:inherit;background:var(--card);outline:none}
+  .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.row .btn{flex:1}
+  .hint{font-size:12.5px;color:var(--ink-faint);margin-top:8px;line-height:1.45}
+  details.how{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:4px 14px;margin-top:12px}details.how summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;align-items:center}
+  details.how ol{margin:0 0 10px;padding-left:20px}details.how li{margin:6px 0;font-size:14px;line-height:1.4}code{background:var(--sun-soft);border-radius:6px;padding:1px 5px;font-size:13px}
+  .said{font-weight:800;color:var(--good);min-height:20px;margin-top:8px}
+  button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="../theme-jaimi.css" />
+</head>
+<body>
+<div class="wrap"><div id="root"></div></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<input type="file" id="pick" accept=".txt,.csv,.json,text/plain,text/csv" hidden>
+<script type="module">
+import * as H from './core.mjs';
+const K = 'health_v1';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const read = () => { try { const v = JSON.parse(localStorage.getItem(K) || 'null'); return v && typeof v === 'object' ? v : { days: {} }; } catch { return { days: {} }; } };
+const write = s => { try { localStorage.setItem(K, JSON.stringify(s)); return true; } catch { alert('That could not be saved. Storage may be full.'); return false; } };
+const ringSvg = (pct, colour) => { const r = 34, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, pct || 0)); return `<svg viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="${r}" fill="none" stroke="#F3E6C8" stroke-width="9"/><circle cx="42" cy="42" r="${r}" fill="none" stroke="${colour}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * p / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 42 42)"/></svg>`; };
+function draw() {
+  const today = todayISO(), state = read(), views = H.overview(state, today), rings = views.filter(v => v.goal).slice(0, 4), any = Object.keys(state.days || {}).length;
+  document.getElementById('root').innerHTML = `<div class="head"><h1>❤️ Health</h1><div style="display:flex;gap:6px"><button type="button" class="btn soft" data-import>📲 Import</button><button type="button" class="btn" data-log>＋ Log</button><button type="button" class="btn soft" data-set aria-label="Choose what to track">⚙️</button></div></div>
+    ${any ? '' : '<div class="none">Nothing logged yet. Tap ＋ Log for today, or 📲 Import to bring numbers in from your phone.</div>'}
+    ${rings.length ? `<div class="rings" style="grid-template-columns:repeat(${rings.length},minmax(0,1fr))">${rings.map(v => `<button type="button" class="ring" data-log aria-label="${esc(v.n)} today: ${esc(H.fmt(v.k, v.today))} of ${esc(H.fmt(v.k, v.goal))}">${ringSvg(v.pct, v.ring)}<b>${v.e} ${esc(H.fmt(v.k, v.today))}</b><small>${esc(v.n)}</small></button>`).join('')}</div>` : ''}
+    <div class="grid">${views.map(v => `<section class="m"><div class="top"><div><h2>${v.e} ${esc(v.n)}</h2><div class="big">${esc(H.fmt(v.k, v.latest ? v.latest.value : null))} <small>${esc(v.unit)}${v.latest && !v.latest.today ? ' · ' + esc(new Date(v.latest.iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' })) : ''}</small></div>
+        <div class="sub">${v.avg == null ? 'No readings this week' : '7-day average ' + esc(H.fmt(v.k, v.avg)) + (v.unit ? ' ' + esc(v.unit) : '')}${v.trend === 'flat' || v.avg == null ? '' : ` <span class="${v.good === null ? '' : v.good ? 'up' : 'down'}">${v.trend === 'up' ? '↑' : '↓'}</span>`}${v.goal ? ' · goal ' + esc(H.fmt(v.k, v.goal)) : ''}</div></div>
+        ${v.tap ? `<button type="button" class="plus" data-bump="${v.k}" aria-label="Add one ${esc(v.n)}">＋1</button>` : ''}</div>
+        <div class="bars" role="img" aria-label="${esc(v.n)}, last 14 days, ${v.logged} logged">${v.bars.map(b => `<i class="${b.value == null ? '' : 'has'}${b.hit ? ' hit' : ''}${b.today ? ' today' : ''}" style="height:${b.h || 4}%" title="${esc(b.iso)}: ${esc(H.fmt(v.k, b.value))}"></i>`).join('')}</div></section>`).join('')}</div>
+    <p class="hint">Bars are the last 14 days. Green means you met your goal. This shows your own numbers and is not medical advice.</p>`;
+}
+const sheet = html => { document.getElementById('sheet').innerHTML = '<button type="button" class="close" data-close aria-label="Close">✕</button>' + html; document.getElementById('scrim').classList.add('on'); };
+const closeSheet = () => document.getElementById('scrim').classList.remove('on');
+function logSheet(iso) {
+  const state = read(), day = (state.days || {})[iso] || {};
+  sheet(`<h2>＋ Log</h2><input class="date" type="date" id="logdate" value="${iso}" max="${todayISO()}" aria-label="Day"><form data-form="log">${H.shown(state).map(k => { const m = H.METRICS[k]; return `<div class="f"><label for="h-${k}">${m.e} ${esc(m.n)}${m.unit ? `<small>${esc(m.unit)}</small>` : ''}</label><input id="h-${k}" name="${k}" type="number" inputmode="decimal" step="${m.dp ? '0.1' : '1'}" value="${day[k] == null ? '' : esc(day[k])}"></div>`; }).join('')}<div class="row"><button type="submit" class="btn">Save</button></div></form>`);
+}
+function importSheet(note) {
+  sheet(`<h2>📲 Bring in from your phone</h2><div class="hint" style="margin-top:0">Paste what your phone Shortcut copied, or type lines like <code>2026-11-14 steps 8432</code>.</div>
+    <textarea id="imp" placeholder="2026-11-14 steps 8432&#10;2026-11-14 sleep 7h 20m&#10;2026-11-14 resting heart rate 58" aria-label="Health readings, one per line"></textarea><div class="said" id="said" role="status">${esc(note || '')}</div>
+    <div class="row"><button type="button" class="btn soft" data-paste>📋 Paste</button><button type="button" class="btn soft" data-file>📄 File</button><button type="button" class="btn" data-doimport>Bring in</button></div>
+    <details class="how"><summary>📱 Set up the iPhone Shortcut (once, about 10 minutes)</summary><ol>
+      <li><b>RingConn app</b> → settings → Apple Health → turn sharing on. Your ring's sleep, steps and heart rate then land in Apple Health.</li>
+      <li><b>Shortcuts app</b> → ＋ → name it <b>Health to Life Hub</b>.</li>
+      <li>Add <b>Find Health Samples</b>. Type: <b>Steps</b>. Add filter: Start Date <b>is in the last 7 days</b>. Group by: <b>Day</b>.</li>
+      <li>Add <b>Repeat with Each</b>. Inside it add <b>Text</b>: the sample's <b>Start Date</b> (format <code>yyyy-MM-dd</code>), then the word <code>steps</code>, then its <b>Value</b>. Then <b>Add to Variable</b> called Lines.</li>
+      <li>Do steps 3 and 4 again for <b>Sleep</b> (word <code>sleep</code>) and <b>Resting Heart Rate</b> (word <code>resting heart rate</code>).</li>
+      <li>Last: <b>Copy to Clipboard</b> (Lines), then <b>Open URLs</b> with your Life Hub link.</li>
+      <li>Run it, open ❤️ Health here, tap 📲 Import → 📋 Paste → Bring in.</li></ol>
+      <div class="hint">These steps were written without an iPhone to test on, so a name may differ slightly. If one does, send Claude a screenshot.</div></details>`);
+}
+function setSheet() {
+  const state = read(), on = H.shown(state);
+  sheet(`<h2>⚙️ What to track</h2><form data-form="set">${Object.entries(H.METRICS).map(([k, m]) => `<div class="f"><label><input type="checkbox" name="show" value="${k}" ${on.includes(k) ? 'checked' : ''}> ${m.e} ${esc(m.n)}<small>${m.goal ? 'daily goal' : 'no goal'}</small></label>${m.goal ? `<input type="number" name="goal-${k}" inputmode="decimal" step="${m.dp ? '0.5' : '1'}" value="${esc(H.goalOf(state, k))}" aria-label="${esc(m.n)} goal">` : '<span></span>'}</div>`).join('')}<div class="row"><button type="submit" class="btn">Save</button></div></form>`);
+}
+function doImport(text) {
+  const got = H.parseImport(text); if (!got.rows.length) return importSheet(got.skipped ? 'I could not read those lines. Each needs a date, a measure and a number.' : 'Nothing to bring in yet.');
+  const out = H.merge(read(), got.rows); if (!write(out.state)) return;
+  draw(); importSheet(`✓ ${out.added} new, ${out.changed} updated${got.skipped ? ', ' + got.skipped + ' skipped' : ''}.`);
+}
+document.addEventListener('click', async e => {
+  if (e.target.id === 'scrim') return closeSheet();
+  const t = e.target.closest('[data-close],[data-log],[data-import],[data-set],[data-bump],[data-paste],[data-file],[data-doimport]'); if (!t) return; const d = t.dataset;
+  if ('close' in d) return closeSheet();
+  if ('log' in d) return logSheet(todayISO());
+  if ('import' in d) return importSheet('');
+  if ('set' in d) return setSheet();
+  if (d.bump) { write(H.bump(read(), todayISO(), d.bump, 1)); return draw(); }
+  if ('paste' in d) { try { document.getElementById('imp').value = await navigator.clipboard.readText(); } catch { document.getElementById('said').textContent = 'Press and hold in the box, then choose Paste.'; } return; }
+  if ('file' in d) { const input = document.getElementById('pick'); input.value = ''; input.onchange = async () => { const f = input.files && input.files[0]; if (!f) return; if (f.size > 2e6) return importSheet('That file is too big. Use the Shortcut text.'); document.getElementById('imp').value = await f.text(); }; return input.click(); }
+  if ('doimport' in d) return doImport(document.getElementById('imp').value);
+});
+document.addEventListener('change', e => { if (e.target.id === 'logdate' && /^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) logSheet(e.target.value); });
+document.addEventListener('submit', e => {
+  const f = e.target, kind = f.dataset.form; if (!kind) return; e.preventDefault();
+  try {
+    let state = read();
+    if (kind === 'log') { const iso = document.getElementById('logdate').value; for (const k of H.shown(state)) state = H.setValue(state, iso, k, f[k].value); }
+    else { state = H.setShown(state, [...f.querySelectorAll('[name=show]:checked')].map(i => i.value)); for (const k of Object.keys(H.METRICS)) if (f['goal-' + k]) state = H.setGoal(state, k, f['goal-' + k].value); }
+    if (!write(state)) return; closeSheet(); draw();
+  } catch (err) { alert(err.message); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+window.addEventListener('storage', e => { if ((!e.key || e.key === K) && !document.getElementById('scrim').classList.contains('on')) draw(); });
+window.hlDraw = draw;
+draw();
+</script>
+</body>
+</html>

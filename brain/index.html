@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Brain — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--paper:#FFF8E8;--card:#fff;--ink:#15384D;--ink-soft:#3F5C6B;--ink-faint:#5F7A88;--line:#F1E1BD;--line-soft:#F8EFD9;--coral:#FF7A45;--good:#1F9A62;--sun:#FFC93C;--sun-soft:#FFF3C4;--sea:#1A7FBD;--sea-soft:#DFF0FA;--mint:#14B8A6;--mint-soft:#D9F7F1;--rose-soft:#FFE8DC}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:2px 2px 10px}
+  button{font-family:inherit;cursor:pointer;color:var(--ink)}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line-soft);border-radius:16px;padding:4px;margin:0 0 14px}
+  .seg button{border:0;border-radius:12px;min-height:46px;background:transparent;font:800 15px inherit;font-family:inherit;color:var(--ink-soft)}.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.07)}
+  .flows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 14px}
+  .flow{border:1px solid var(--line);border-radius:22px;padding:16px 12px;background:var(--sun-soft);text-align:left;display:grid;gap:2px;min-height:112px}
+  .flow.night{background:var(--sea-soft)}.flow.hard{background:var(--rose-soft)}.flow.win{background:var(--mint-soft)}
+  .flow i{font-style:normal;font-size:34px;line-height:1.1}.flow b{font:600 19px 'Fraunces',serif}.flow small{font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;margin:0 0 12px}
+  .card>h2{font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px}
+  .strip{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px}
+  .strip span{aspect-ratio:1;border-radius:50%;background:var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:clamp(11px,3.6vw,19px)}
+  .strip span.wrote{background:var(--mint-soft)}.strip span.hard{background:var(--rose-soft)}.strip span.today{outline:2.5px solid var(--coral);outline-offset:1px}
+  details.en{border-top:1px solid var(--line-soft);padding:2px 0}details.en:first-of-type{border-top:0}
+  details.en summary{cursor:pointer;list-style:none;min-height:46px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px}details.en summary::-webkit-details-marker{display:none}
+  details.en summary small{margin-left:auto;color:var(--ink-faint);font-weight:700;font-size:12.5px;white-space:nowrap}
+  .qa{margin:0 0 10px}.qa small{display:block;font-size:12px;font-weight:700;color:var(--ink-faint)}.qa p{margin:2px 0 0;font-size:15px;overflow-wrap:anywhere;white-space:pre-wrap}
+  .btn{border:0;border-radius:14px;min-height:48px;padding:0 18px;background:var(--ink);color:#fff;font:800 15px inherit;font-family:inherit}
+  .btn.soft{background:var(--card);color:var(--ink);border:1px solid var(--line)}.btn.small{min-height:40px;font-size:13px;padding:0 12px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px 16px}
+  .dots{display:flex;gap:6px;margin:0 0 14px}.dots i{flex:1;height:6px;border-radius:4px;background:var(--line-soft)}.dots i.on{background:var(--coral)}
+  .step h2{font:600 22px/1.25 'Fraunces',serif;margin:0 0 14px}
+  .moods{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+  .moods button{border:2px solid var(--line);border-radius:16px;background:var(--paper);padding:10px 2px;display:grid;gap:2px;justify-items:center;font:700 11.5px inherit;font-family:inherit}.moods button i{font-style:normal;font-size:30px}
+  .moods button.on,.opts button.on{border-color:var(--coral);background:var(--sun-soft)}
+  .opts{display:flex;gap:8px;flex-wrap:wrap}.opts button{border:2px solid var(--line);border-radius:999px;background:var(--paper);min-height:46px;padding:0 14px;font:700 14.5px inherit;font-family:inherit}
+  textarea,input[type=text]{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:13px;font:500 16px/1.45 inherit;font-family:inherit;color:var(--ink);background:var(--paper);outline:none}textarea{min-height:110px;resize:vertical}
+  textarea:focus,input[type=text]:focus{border-color:var(--coral)}.three{display:grid;gap:8px}
+  .nav{display:flex;gap:8px;margin-top:16px}.nav .btn{flex:1}.chk{display:flex;align-items:center;gap:10px;font-weight:700;margin-top:10px;min-height:44px}
+  .states{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
+  @media(min-width:560px){.states{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  .states button{border:1px solid var(--line);border-radius:18px;background:var(--card);padding:12px 6px;display:grid;gap:2px;justify-items:center;font:700 13.5px inherit;font-family:inherit;min-height:84px}.states button i{font-style:normal;font-size:30px}.states button.on{background:var(--sun-soft);border-color:var(--coral)}
+  .tool{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 0;border-top:1px solid var(--line-soft)}.tool:first-of-type{border-top:0}
+  .tool>i{font-style:normal;font-size:28px;text-align:center}.tool b{font-size:16px}.tool p{margin:3px 0 0;font-size:14.5px;line-height:1.4}
+  .tool details{margin-top:4px;font-size:13.5px;color:var(--ink-soft)}.tool summary{cursor:pointer;font-weight:800;color:var(--sea);padding:6px 0}
+  .star{border:0;background:transparent;font-size:22px;min-width:44px;min-height:44px;opacity:.35}.star.on{opacity:1}
+  .help{background:var(--sea-soft);border-radius:18px;padding:12px 14px;font-size:13.5px;font-weight:700;line-height:1.5}.help a{color:var(--ink);white-space:nowrap}
+  .play{position:fixed;inset:0;z-index:60;background:var(--paper);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center}.play.on{display:flex}
+  .circle{width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,var(--mint-soft),var(--mint));transform:scale(.6);transition:transform 4s ease-in-out;display:flex;align-items:center;justify-content:center}
+  .circle.big{transform:scale(1.05)}@media(prefers-reduced-motion:reduce){.circle{transition:none;transform:none!important}}
+  .play h2{font:600 30px 'Fraunces',serif;margin:0}.play p{font-size:17px;font-weight:700;max-width:340px;margin:0}.count{font:600 64px 'Fraunces',serif}
+  .menu h3{font:800 12px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin:12px 0 6px}
+  .menu .opts button{min-height:40px;font-size:13.5px}.add{display:flex;gap:6px;margin-top:8px}.add input{height:44px;padding:0 12px}
+  .none{color:var(--ink-faint);font-weight:700;font-size:13.5px}
+  button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="../theme-jaimi.css" />
+</head>
+<body>
+<div class="wrap"><div id="root"></div></div>
+<div class="play" id="play" role="dialog" aria-modal="true" aria-live="polite"></div>
+<script type="module">
+import * as B from './core.mjs';
+const KJ = 'brain_journal_v1', KM = 'brain_menu_v1', KF = 'brain_fav_v1';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const nice = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch { return d; } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { alert('That could not be saved. Storage may be full.'); return false; } };
+const st = { tab: 'journal', flow: null, feel: null, after: null };
+const supportHtml = () => `<div class="help">Too heavy to carry alone? Talk to someone now: ${B.SUPPORT.map(s => `<a href="tel:${s.tel}">${esc(s.n)} ${esc(s.say)}</a>`).join(' · ')}</div>`;
+
+/* ---------- journal ---------- */
+function journalHome(today) {
+  const state = read(KJ, { entries: [] }), strip = B.moodStrip(state, today), list = (state.entries || []).slice(0, 30);
+  return `<div class="flows">${Object.entries(B.FLOWS).map(([k, f]) => `<button type="button" class="flow ${k}" data-flow="${k}"><i aria-hidden="true">${f.e}</i><b>${esc(f.n)}</b><small>${esc(f.sub)}</small></button>`).join('')}</div>
+    <section class="card"><h2>🗓️ Last 2 weeks · ${B.weekCount(state, today)} this week</h2><div class="strip" role="img" aria-label="Mood for the last 14 days">${strip.map(d => `<span class="${d.wrote ? 'wrote' : ''}${d.hard ? ' hard' : ''}${d.today ? ' today' : ''}" title="${esc(nice(d.iso))}">${d.mood ? B.MOODS.find(m => m.v === d.mood).e : d.wrote ? '✎' : ''}</span>`).join('')}</div></section>
+    <section class="card"><h2>📖 What you wrote</h2>${list.map(e => { const f = B.FLOWS[e.kind] || B.FLOWS.win, mood = e.a && e.a.mood ? B.MOODS.find(m => m.v === e.a.mood).e : ''; return `<details class="en"><summary><span aria-hidden="true">${f.e}</span>${esc(f.n)} ${mood}<small>${esc(nice(e.date))}</small></summary>${B.entryLines(e).map(l => `<div class="qa"><small>${esc(l.q)}</small><p>${esc(l.a)}</p></div>`).join('')}<button type="button" class="btn soft small" data-unentry="${esc(e.id)}">Remove</button></details>`; }).join('') || '<div class="none">Nothing yet. Pick one above. Two minutes is plenty.</div>'}</section>`;
+}
+function flowStep() {
+  const f = B.FLOWS[st.flow.kind], s = f.steps[st.flow.i], a = st.flow.answers[s.k], last = st.flow.i === f.steps.length - 1;
+  let input = '';
+  if (s.type === 'mood') input = `<div class="moods">${B.MOODS.map(m => `<button type="button" class="${a === m.v ? 'on' : ''}" data-mood="${m.v}" aria-pressed="${a === m.v}"><i aria-hidden="true">${m.e}</i>${m.n}</button>`).join('')}</div>`;
+  else if (s.type === 'chips') input = `<div class="opts">${s.opts.map(o => `<button type="button" class="${(a || []).includes(o) ? 'on' : ''}" data-opt="${esc(o)}" aria-pressed="${(a || []).includes(o)}">${esc(o)}</button>`).join('')}</div>`;
+  else if (s.type === 'list') input = `<div class="three">${[0, 1, 2].map(n => `<input type="text" data-line="${n}" value="${esc((a || [])[n] || '')}" placeholder="${esc(s.ph[n])}" aria-label="Win ${n + 1}">`).join('')}</div>`;
+  else input = `<textarea data-text placeholder="${esc(s.ph || '')}" aria-label="${esc(s.q)}">${esc(a || '')}</textarea>${s.k === 'tomorrow' ? `<label class="chk"><input type="checkbox" id="park" ${st.flow.park !== false ? 'checked' : ''}> 📥 Park it in my Inbox</label>` : ''}`;
+  return `<div class="step"><div class="dots" aria-hidden="true">${f.steps.map((_, n) => `<i class="${n <= st.flow.i ? 'on' : ''}"></i>`).join('')}</div><h2>${f.e} ${esc(s.q)}</h2>${input}
+    <div class="nav"><button type="button" class="btn soft" data-back>${st.flow.i ? '‹ Back' : '✕ Close'}</button><button type="button" class="btn" data-next>${last ? '✓ Save' : 'Next ›'}</button></div></div>
+    ${st.flow.kind === 'hard' ? '<div style="height:12px"></div>' + supportHtml() : ''}`;
+}
+function afterHard() { const ids = st.after; return `<div class="step"><h2>💛 Saved. That took something.</h2><p style="margin:0 0 12px;font-weight:700">One of these might help right now:</p>${ids.map(toolHtml).join('')}<div class="nav"><button type="button" class="btn" data-done>Done</button></div></div><div style="height:12px"></div>${supportHtml()}`; }
+
+/* ---------- toolbox ---------- */
+function toolHtml(id) {
+  const t = B.TOOLS[id], favs = read(KF, []), run = t.kind === 'breathe' || t.kind === 'ground' || t.kind === 'timer' ? '▶ Start' : t.kind === 'menu' ? '🍭 Open' : t.kind === 'dump' ? '🧠 Open' : '';
+  return `<div class="tool"><i aria-hidden="true">${t.e}</i><div><b>${esc(t.n)}</b><p>${esc(t.does)}</p>${run ? `<button type="button" class="btn small" style="margin-top:8px" data-run="${id}">${run}</button>` : ''}<details><summary>Why it helps</summary>${esc(t.why)}</details></div><button type="button" class="star${favs.includes(id) ? ' on' : ''}" data-fav="${id}" aria-pressed="${favs.includes(id)}" aria-label="${favs.includes(id) ? 'Remove from' : 'Add to'} my go-tos: ${esc(t.n)}">⭐</button></div>`;
+}
+function toolbox() {
+  const favs = read(KF, []).filter(id => B.TOOLS[id]), state = B.STATES.find(s => s.id === st.feel);
+  return `${favs.length ? `<section class="card"><h2>⭐ My go-tos</h2>${favs.map(toolHtml).join('')}</section>` : ''}
+    <section class="card"><h2>How does it feel right now?</h2><div class="states">${B.STATES.map(s => `<button type="button" class="${st.feel === s.id ? 'on' : ''}" data-feel="${s.id}" aria-pressed="${st.feel === s.id}"><i aria-hidden="true">${s.e}</i>${esc(s.n)}</button>`).join('')}</div>
+      ${state ? state.tools.map(toolHtml).join('') : '<div class="none">Tap one. You will get 4 things to try, shortest first.</div>'}</section>
+    <details class="card"><summary style="cursor:pointer;font-weight:800;min-height:30px">🧰 Every tool (${Object.keys(B.TOOLS).length})</summary>${Object.keys(B.TOOLS).map(toolHtml).join('')}</details>
+    ${supportHtml()}<p class="none" style="margin:10px 2px 0;font-size:12px">Ideas to try, not medical advice. Keep what works for you.</p>`;
+}
+function draw() {
+  const el = document.activeElement; if (el && el.matches && el.matches('textarea,input[type=text]') && document.getElementById('root').contains(el)) return;
+  const today = todayISO();
+  document.getElementById('root').innerHTML = st.after ? afterHard() : st.flow ? flowStep() : `<h1>🧠 Brain</h1><div class="seg" role="group" aria-label="Section"><button type="button" class="${st.tab === 'journal' ? 'on' : ''}" data-tab="journal">📓 Journal</button><button type="button" class="${st.tab === 'tools' ? 'on' : ''}" data-tab="tools">🧰 Toolbox</button></div>${st.tab === 'journal' ? journalHome(today) : toolbox()}`;
+}
+const redraw = () => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); draw(); };
+
+/* ---------- the little tools that run ---------- */
+let ticker = 0;
+const play = document.getElementById('play');
+const stopPlay = () => { clearInterval(ticker); play.classList.remove('on'); play.innerHTML = ''; };
+function breathe() {
+  const phases = [['Breathe in', true], ['Hold', true], ['Breathe out', false], ['Hold', false]]; let n = 0, rounds = 0;
+  play.innerHTML = `<div class="circle" id="circle"></div><h2 id="phase">Ready</h2><p id="rounds">4 rounds is plenty</p><button type="button" class="btn soft" data-stop>Done</button>`; play.classList.add('on');
+  const step = () => { const [word, big] = phases[n % 4]; document.getElementById('phase').textContent = word; document.getElementById('circle').classList.toggle('big', big); if (n % 4 === 0 && n) { rounds++; document.getElementById('rounds').textContent = rounds + (rounds === 1 ? ' round' : ' rounds'); } n++; };
+  setTimeout(step, 300); ticker = setInterval(step, 4000);
+}
+function ground() {
+  const steps = [['5', 'things you can see', '👀'], ['4', 'things you can feel', '✋'], ['3', 'things you can hear', '👂'], ['2', 'things you can smell', '👃'], ['1', 'thing you can taste', '👅']]; let n = 0;
+  const show = () => { if (n >= steps.length) { play.innerHTML = `<div class="count">🌿</div><h2>You are here.</h2><button type="button" class="btn" data-stop>Done</button>`; return; } play.innerHTML = `<div class="count">${steps[n][2]} ${steps[n][0]}</div><h2>${steps[n][1]}</h2><p>Name them out loud or in your head.</p><button type="button" class="btn" id="gnext">Next ›</button><button type="button" class="btn soft small" data-stop>Stop</button>`; document.getElementById('gnext').onclick = () => { n++; show(); }; };
+  play.classList.add('on'); show();
+}
+function timer() {
+  let left = 300; const paint = () => { const c = document.getElementById('count'); if (c) c.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'); };
+  play.innerHTML = `<p>Only the first tiny bit.</p><div class="count" id="count">5:00</div><h2 id="tmsg">Go. You can stop when it ends.</h2><button type="button" class="btn soft" data-stop>Stop</button>`; play.classList.add('on');
+  ticker = setInterval(() => { left--; paint(); if (left <= 0) { clearInterval(ticker); document.getElementById('tmsg').textContent = '⏰ Time. Keep going or stop. Both count.'; document.getElementById('count').textContent = '✓'; } }, 1000);
+}
+function menu() {
+  const m = read(KM, B.MENU_START), groups = [['quick', '⚡ Quick (5 minutes)'], ['medium', '🌤️ Medium (15–30 minutes)'], ['big', '🌴 Big (plan it)']];
+  play.innerHTML = `<div class="menu" style="width:100%;max-width:520px;text-align:left;overflow-y:auto;max-height:100%"><h2 style="font:600 24px 'Fraunces',serif;margin:0">🍭 Feel-good menu</h2><p class="none" style="margin:4px 0 0">Pick one. Tap ✕ to take one off.</p>${groups.map(([k, n]) => `<h3>${n}</h3><div class="opts">${(m[k] || []).map(x => `<button type="button" data-unmenu="${k}" data-x="${esc(x)}" aria-label="Remove ${esc(x)}">${esc(x)} ✕</button>`).join('')}</div><form class="add" data-menu="${k}"><input type="text" name="t" placeholder="＋ add your own" aria-label="Add to ${n}"><button type="submit" class="btn small">＋</button></form>`).join('')}<div class="nav"><button type="button" class="btn" data-stop>Done</button></div></div>`;
+  play.classList.add('on');
+}
+const RUN = { breathe, ground, timer, menu };
+
+/* ---------- taps ---------- */
+function keepAnswer() {
+  if (!st.flow) return; const s = B.FLOWS[st.flow.kind].steps[st.flow.i], root = document.getElementById('root');
+  if (s.type === 'text') { const t = root.querySelector('[data-text]'); if (t) st.flow.answers[s.k] = t.value; const p = document.getElementById('park'); if (p) st.flow.park = p.checked; }
+  if (s.type === 'list') st.flow.answers[s.k] = [...root.querySelectorAll('[data-line]')].map(i => i.value);
+}
+function saveFlow() {
+  const today = todayISO(), kind = st.flow.kind, a = st.flow.answers;
+  try { if (!write(KJ, B.entryAdd(read(KJ, { entries: [] }), B.entryMake(kind, a, uid(), today, new Date().toISOString())))) return; } catch (err) { return alert(err.message); }
+  if (kind === 'night' && String(a.tomorrow || '').trim() && st.flow.park !== false) { try { const raw = localStorage.getItem('cp_inbox_v1'), inbox = JSON.parse(raw === null ? '[]' : raw); if (Array.isArray(inbox)) localStorage.setItem('cp_inbox_v1', JSON.stringify([...inbox, { id: uid(), text: String(a.tomorrow).trim().slice(0, 500), at: new Date().toISOString(), source: 'park' }])); } catch { /* the journal itself is saved */ } }
+  st.after = kind === 'hard' ? B.suggest(a.feel) : null; st.flow = null; redraw(); window.scrollTo(0, 0);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab],[data-flow],[data-mood],[data-opt],[data-back],[data-next],[data-done],[data-unentry],[data-feel],[data-fav],[data-run],[data-stop],[data-unmenu]'); if (!t) return;
+  const d = t.dataset;
+  if ('stop' in d) return stopPlay();
+  if (d.unmenu) { write(KM, B.menuRemove(read(KM, B.MENU_START), d.unmenu, d.x)); return menu(); }
+  if (d.tab) { st.tab = d.tab; return redraw(); }
+  if (d.flow) { st.flow = { kind: d.flow, i: 0, answers: {} }; redraw(); return window.scrollTo(0, 0); }
+  if (d.feel) { st.feel = st.feel === d.feel ? null : d.feel; return redraw(); }
+  if (d.fav) { write(KF, B.favToggle(read(KF, []), d.fav)); return redraw(); }
+  if (d.run) { const tool = B.TOOLS[d.run]; if (tool.kind === 'dump') { try { parent.show('overview'); } catch { alert('Open the Overview and use the Brain dump box.'); } return; } return RUN[tool.kind] && RUN[tool.kind](); }
+  if ('done' in d) { st.after = null; st.tab = 'journal'; return redraw(); }
+  if (d.unentry) { if (confirm('Remove this entry?')) { write(KJ, B.entryRemove(read(KJ, { entries: [] }), d.unentry)); redraw(); } return; }
+  if (!st.flow) return;
+  const s = B.FLOWS[st.flow.kind].steps[st.flow.i];
+  if (d.mood) { st.flow.answers[s.k] = Number(d.mood); return redraw(); }
+  if (d.opt) { const cur = st.flow.answers[s.k] || []; st.flow.answers[s.k] = s.multi ? (cur.includes(d.opt) ? cur.filter(x => x !== d.opt) : [...cur, d.opt]) : (cur.includes(d.opt) ? [] : [d.opt]); return redraw(); }
+  keepAnswer();
+  if ('back' in d) { if (st.flow.i) st.flow.i--; else st.flow = null; return redraw(); }
+  if ('next' in d) { if (st.flow.i < B.FLOWS[st.flow.kind].steps.length - 1) { st.flow.i++; redraw(); return window.scrollTo(0, 0); } return saveFlow(); }
+});
+document.addEventListener('submit', e => { const f = e.target; if (!f.dataset.menu) return; e.preventDefault(); try { write(KM, B.menuAdd(read(KM, B.MENU_START), f.dataset.menu, f.t.value)); menu(); } catch (err) { alert(err.message); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') stopPlay(); });
+window.addEventListener('storage', e => { if (!e.key || e.key.startsWith('brain_')) draw(); });
+window.brDraw = draw;
+draw();
+</script>
+</body>
+</html>
