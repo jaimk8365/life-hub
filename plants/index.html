@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Plants — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--paper:#FFF8E8;--card:#fff;--ink:#15384D;--ink-soft:#3F5C6B;--ink-faint:#5F7A88;--line:#F1E1BD;--line-soft:#F8EFD9;--coral:#FF7A45;--good:#1F9A62;--bad:#D2452F;--leaf:#35B36B;--leaf-soft:#E1F6EA;--water:#4FB3E8;--sun:#FFC93C;--sun-soft:#FFF3C4}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:0}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 2px 10px}
+  button{font-family:inherit;cursor:pointer}
+  .btn{border:0;border-radius:13px;min-height:44px;padding:0 16px;background:var(--ink);color:#fff;font:800 14px inherit;font-family:inherit}
+  .btn.soft{background:var(--card);color:var(--ink);border:1px solid var(--line)}.btn.pip{background:var(--sun);color:var(--ink)}
+  .tipline{background:var(--leaf-soft);border-radius:14px;padding:10px 14px;font-weight:700;font-size:13.5px;margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;margin:0 0 12px}
+  .card>h2{font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 8px}
+  .job{display:grid;grid-template-columns:46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line-soft)}
+  .job:first-of-type{border-top:0}.job b{font-size:15px;overflow-wrap:anywhere;display:block}.job small{font-size:12.5px;font-weight:700;color:var(--ink-faint)}
+  .job.late small{color:var(--bad)}.job.done b{opacity:.5;text-decoration:line-through}
+  .ph{width:46px;height:46px;border-radius:14px;background:var(--leaf-soft) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:24px}
+  .tick{width:46px;height:46px;min-height:46px!important;border-radius:50%;border:2.5px solid var(--leaf);background:transparent;color:#fff;font-weight:900;font-size:18px;display:flex;align-items:center;justify-content:center;padding:0}
+  .tick.on{background:var(--leaf)}.tick:focus-visible,.tile:focus-visible,.btn:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 14px}
+  @media(min-width:620px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:0;overflow:hidden;text-align:left;color:var(--ink);display:flex;flex-direction:column;border-bottom:6px solid var(--leaf)}
+  .tile.due{border-bottom-color:var(--sun)}.tile.late{border-bottom-color:var(--bad)}
+  .tile .pic{height:104px;background:var(--leaf-soft) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:50px}
+  .tile .in{padding:9px 11px 10px;display:grid;gap:5px}.tile b{font-size:15px;overflow-wrap:anywhere}.tile small{font-size:12px;font-weight:700;color:var(--ink-faint)}
+  .th{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;align-items:center;font-size:13px}
+  .th i{display:block;height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden}.th u{display:block;height:100%;border-radius:5px;background:var(--water)}
+  .th.feed u{background:var(--leaf)}.th.prune u{background:var(--coral)}.th.full u{background:var(--bad)}
+  .tile.new{border:2px dashed var(--line);border-bottom:2px dashed var(--line);align-items:center;justify-content:center;min-height:170px;font-weight:800;color:var(--ink-soft);gap:4px;font-size:15px}
+  .none{text-align:center;font-weight:700;color:var(--good);padding:6px}
+  .hero{display:grid;grid-template-columns:110px minmax(0,1fr);gap:14px;align-items:center;margin:8px 0 12px}
+  .hero .pic{width:110px;height:110px;border-radius:24px;background:var(--leaf-soft) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:54px;border:0;padding:0}
+  .hero h1{font-size:23px;overflow-wrap:anywhere}.hero small{display:block;font-weight:700;color:var(--ink-soft);font-size:13px;margin-top:3px}
+  .acts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .care{display:grid;grid-template-columns:30px minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--line-soft)}
+  .care:first-of-type{border-top:0}.care b{font-size:15px}.care small{display:block;font-size:12.5px;font-weight:700;color:var(--ink-faint)}.care.late small{color:var(--bad)}
+  .care .th{grid-template-columns:minmax(0,1fr);margin-top:4px}.mini{border:1px solid var(--line);background:var(--card);border-radius:11px;min-width:40px;min-height:40px!important;font-size:15px;color:var(--ink);padding:0 8px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chips button{border:1px dashed var(--line);background:transparent;border-radius:999px;min-height:38px!important;padding:0 12px;font:700 13px inherit;font-family:inherit;color:var(--ink-soft)}
+  .chips.solid button{border-style:solid;background:var(--card);color:var(--ink)}
+  textarea,input,select{font-family:inherit;color:var(--ink)}
+  .likes{width:100%;min-height:84px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:500 15px/1.45 inherit;font-family:inherit;background:var(--paper);resize:vertical;outline:none}
+  .log{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:start;padding:9px 0;border-top:1px solid var(--line-soft)}
+  .log time{font:800 11.5px system-ui,sans-serif;color:var(--ink-faint);display:block}.log p{margin:2px 0 0;font-size:14.5px;overflow-wrap:anywhere}
+  .log img{display:block;margin-top:6px;width:96px;height:96px;object-fit:cover;border-radius:12px;cursor:pointer}.x{border:0;background:transparent;color:var(--ink-faint);min-width:36px;min-height:36px!important;font-size:15px}
+  .scrim{position:fixed;inset:0;background:rgba(21,56,77,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}.scrim.on{display:flex}
+  @media(min-width:620px){.scrim{align-items:center}}
+  .sheet{background:var(--paper);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:18px 16px calc(22px + env(safe-area-inset-bottom,0px));max-height:92vh;overflow-y:auto}
+  @media(min-width:620px){.sheet{border-radius:22px}}
+  .sheet h2{font:600 20px 'Fraunces',serif;margin:0 0 4px}.close{float:right;border:0;background:var(--line-soft);width:36px;height:36px;border-radius:50%;font-size:16px;color:var(--ink-soft)}
+  .field{margin-top:12px}.field>label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;font-size:16px;background:var(--card);outline:none}
+  .row{display:flex;gap:8px;margin-top:16px}.row .btn{flex:1}
+  .ans{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--sun);border-radius:16px;padding:12px 14px;margin-top:12px}
+  .ans b{font-size:16px;display:block}.ans ol{margin:8px 0 4px;padding-left:20px}.ans li{margin:4px 0;font-size:14.5px}.ans details{font-size:14px;color:var(--ink-soft)}.ans summary{cursor:pointer;font-weight:800;color:var(--ink);padding:6px 0}
+  .hint{font-size:12px;color:var(--ink-faint);margin-top:8px;line-height:1.4}
+</style>
+<link rel="stylesheet" href="../theme-jaimi.css" />
+</head>
+<body>
+<div class="wrap"><div id="root" aria-live="polite"></div></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<input type="file" id="pick" accept="image/*" hidden>
+<script type="module">
+import * as P from './core.mjs';
+import * as Pip from './pip.mjs';
+const K = 'plants_v1';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const nice = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: iso.slice(0, 4) === String(new Date().getFullYear()) ? undefined : 'numeric' });
+const read = () => { try { const v = JSON.parse(localStorage.getItem(K) || 'null'); return v && Array.isArray(v.plants) ? v : { plants: [] }; } catch { return { plants: [] }; } };
+const write = s => { try { localStorage.setItem(K, JSON.stringify(s)); return true; } catch { say('That could not be saved. Storage may be full.'); return false; } };
+let view = null, said = '', draftPhoto = null;
+const say = msg => { said = msg; const t = document.getElementById('toast'); if (t) { t.textContent = msg; clearTimeout(say.t); say.t = setTimeout(() => { t.textContent = ''; }, 2600); } };
+const bg = thumb => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(thumb || '') ? ` style="background-image:url(${thumb})"` : '';
+
+/* ---------- photos: the full picture stays on this device; a small copy travels with the plant ---------- */
+const idb = () => new Promise((res, rej) => { const r = indexedDB.open('lifehub_plant_photos', 1); r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'id' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const tx = (mode, fn) => idb().then(db => new Promise((res, rej) => { const t = db.transaction('photos', mode), q = fn(t.objectStore('photos')); t.oncomplete = () => { db.close(); res(q && q.result); }; t.onerror = () => { db.close(); rej(t.error); }; }));
+function shrink(img, max, quality, asBlob) {
+  const scale = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return asBlob ? new Promise(res => c.toBlob(res, 'image/jpeg', quality)) : c.toDataURL('image/jpeg', quality);
+}
+function pickPhoto() {
+  return new Promise(resolve => {
+    const input = document.getElementById('pick'); input.value = '';
+    input.onchange = async () => {
+      const file = input.files && input.files[0]; if (!file) return resolve(null);
+      try { const img = await createImageBitmap(file), id = uid(), blob = await shrink(img, 1200, 0.82, true); await tx('readwrite', s => s.put({ id, blob })); resolve({ id, thumb: shrink(img, 220, 0.7, false) }); }
+      catch { say('That photo could not be read.'); resolve(null); }
+    };
+    input.click();
+  });
+}
+async function openPhoto(id) { try { const row = await tx('readonly', s => s.get(id)); if (!row) return say('The full photo is on another device.'); const url = URL.createObjectURL(row.blob), a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); } catch { say('That photo could not be opened.'); } }
+
+/* ---------- drawing ---------- */
+const bars = cares => cares.slice(0, 2).map(c => `<span class="th ${c.kind}${c.late ? ' full' : ''}" title="${esc(c.name)}: ${esc(c.words)}"><span aria-hidden="true">${c.icon}</span><i><u style="width:${c.pct}%"></u></i></span>`).join('');
+function home(today) {
+  const state = read(), jobs = P.due(state, today), shelf = P.shelf(state, today), left = jobs.filter(j => !j.done).length;
+  return `<div class="head"><h1>🪴 Plants</h1><button type="button" class="btn pip" data-pip>🍊 Ask Pip</button></div>
+    <div class="tipline">${esc(Pip.SEASON_TIP[Pip.seasonOf(today)])}</div>
+    ${shelf.length ? `<section class="card"><h2>💧 Today · ${left} to do</h2>${jobs.length ? jobs.map(j => `<div class="job${j.late ? ' late' : ''}${j.done ? ' done' : ''}"><span class="ph"${bg(j.thumb)} aria-hidden="true">${j.thumb ? '' : esc(j.emoji)}</span><div><b>${j.icon} ${esc(j.name)} · ${esc(j.plant)}</b><small>${j.done ? 'done' : j.late ? j.late + (j.late === 1 ? ' day late' : ' days late') : 'today'}</small></div><button type="button" class="tick${j.done ? ' on' : ''}" data-do="${esc(j.plantId)}" data-kind="${esc(j.kind)}" aria-pressed="${j.done}" aria-label="${j.done ? 'Undo' : 'Done'}: ${esc(j.name)} ${esc(j.plant)}">${j.done ? '✓' : ''}</button></div>`).join('') : '<div class="none">✨ Everyone is looked after</div>'}</section>` : ''}
+    <div class="grid">${shelf.map(p => `<button type="button" class="tile ${p.status}" data-open="${esc(p.id)}" aria-label="${esc(p.name)}: ${p.dueCount ? p.dueCount + ' to do' : 'all good'}"><span class="pic"${bg(p.thumb)} aria-hidden="true">${p.thumb ? '' : esc(p.emoji || '🪴')}</span><span class="in"><b>${esc(p.name)}</b>${bars(p.cares)}<small>${p.cares[0] ? p.cares[0].icon + ' ' + esc(p.cares[0].words) : 'no care set'}</small></span></button>`).join('')}
+      <button type="button" class="tile new" data-new><span style="font-size:30px" aria-hidden="true">＋</span>Add a plant</button></div>`;
+}
+function plantPage(p, today) {
+  const v = P.plantView(p, today), type = Pip.typeById(p.type), missing = Object.keys(P.KINDS).filter(k => !v.cares.some(c => c.kind === k));
+  return `<button type="button" class="btn soft" data-home>‹ Plants</button>
+    <div class="hero"><button type="button" class="pic"${bg(p.thumb)} data-cover aria-label="Change the photo">${p.thumb ? '' : esc(p.emoji || '🪴')}</button><div><h1>${esc(p.name)}</h1><small>${esc(P.WHERE[p.where] || '')}${p.spot ? ' · ' + esc(p.spot) : ''}</small>${type ? `<small>${esc(type.n)}</small>` : ''}</div></div>
+    <div class="acts"><button type="button" class="btn pip" data-pip>🍊 Ask Pip</button><button type="button" class="btn soft" data-cover>📷 Photo</button><button type="button" class="btn soft" data-edit>✏️ Edit</button></div>
+    <section class="card"><h2>🗓️ Care</h2>${v.cares.map(c => `<div class="care${c.late ? ' late' : ''}"><span aria-hidden="true" style="font-size:20px">${c.icon}</span><div><b>${esc(c.name)}</b><small>every ${c.every} day${c.every === 1 ? '' : 's'} · ${esc(c.words)}${c.note ? ' · ' + esc(c.note) : ''}</small><span class="th ${c.kind}${c.late ? ' full' : ''}"><i><u style="width:${c.pct}%"></u></i></span></div><button type="button" class="mini" data-care="${c.kind}" aria-label="Change ${esc(c.name)}">✎</button><button type="button" class="tick${c.done ? ' on' : ''}" data-do="${esc(p.id)}" data-kind="${c.kind}" aria-pressed="${c.done}" aria-label="${c.done ? 'Undo' : 'Done'}: ${esc(c.name)}">${c.done ? '✓' : ''}</button></div>`).join('')}
+      ${missing.length ? `<div class="chips">${missing.map(k => `<button type="button" data-care="${k}">＋ ${P.KINDS[k].e} ${P.KINDS[k].n}</button>`).join('')}</div>` : ''}</section>
+    <section class="card"><h2>💛 What it likes</h2><textarea class="likes" data-likes placeholder="Light, water, when to move or prune, anything you have learned" aria-label="What it likes">${esc(p.likes || '')}</textarea></section>
+    <section class="card"><h2>📖 History</h2><div class="chips solid">${['photo', 'issue', 'note', 'repot', 'move'].map(k => `<button type="button" data-log="${k}">${P.LOG_KINDS[k].e} ${k === 'repot' ? 'Repotted' : k === 'move' ? 'Moved' : P.LOG_KINDS[k].n}</button>`).join('')}</div>
+      ${(p.log || []).map(l => `<div class="log"><span aria-hidden="true" style="font-size:19px">${(P.LOG_KINDS[l.kind] || P.LOG_KINDS.note).e}</span><div><time>${esc(nice(l.date))} · ${esc((P.LOG_KINDS[l.kind] || P.LOG_KINDS.note).did)}</time>${l.text ? `<p>${esc(l.text)}</p>` : ''}${l.thumb && bg(l.thumb) ? `<img src="${l.thumb}" alt="Photo from ${esc(nice(l.date))}" data-photo="${esc(l.photo || '')}">` : ''}</div><button type="button" class="x" data-unlog="${esc(l.id)}" aria-label="Remove this entry">✕</button></div>`).join('') || '<div class="hint">Nothing yet. Add a photo or a note to start its story.</div>'}</section>
+    <button type="button" class="btn soft" data-archive style="width:100%">Archive this plant</button>`;
+}
+function draw() {
+  if (document.activeElement && document.activeElement.matches && document.activeElement.matches('.likes')) return; // never redraw under your typing
+  const today = todayISO(), state = read(), p = view && state.plants.find(x => x.id === view && !x.archived);
+  if (view && !p) view = null;
+  document.getElementById('root').innerHTML = (p ? plantPage(p, today) : home(today)) + '<div id="toast" class="none" role="status" style="min-height:22px"></div>';
+}
+const sheet = html => { document.getElementById('sheet').innerHTML = '<button type="button" class="close" data-close aria-label="Close">✕</button>' + html; document.getElementById('scrim').classList.add('on'); };
+const closeSheet = () => { document.getElementById('scrim').classList.remove('on'); draftPhoto = null; };
+
+/* ---------- sheets ---------- */
+function plantForm(p) {
+  sheet(`<h2>${p ? '✏️ ' + esc(p.name) : '🪴 New plant'}</h2><form data-form="${p ? 'edit' : 'new'}" autocomplete="off">
+    <div class="field"><label for="f-name">Name</label><input id="f-name" name="name" value="${p ? esc(p.name) : ''}" placeholder="e.g. Monty the monstera"></div>
+    ${p ? '' : `<div class="field"><label for="f-type">What is it? (fills in a care plan)</label><input id="f-type" name="type" list="types" placeholder="Start typing, or leave blank"><datalist id="types">${Pip.TYPES.map(t => `<option value="${esc(t.n)}">`).join('')}</datalist></div>`}
+    <div class="field"><label for="f-where">Where it lives</label><select id="f-where" name="where">${Object.entries(P.WHERE).map(([k, n]) => `<option value="${k}" ${p && p.where === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div class="field"><label for="f-spot">Spot (optional)</label><input id="f-spot" name="spot" value="${p ? esc(p.spot || '') : ''}" placeholder="e.g. Lounge, by the window"></div>
+    ${p ? '' : '<div class="row"><button type="button" class="btn soft" data-formphoto>📷 Add a photo</button></div><div class="hint" id="photohint"></div>'}
+    <div class="row"><button type="submit" class="btn">Save</button></div></form>`);
+  if (!p) setTimeout(() => document.getElementById('f-name')?.focus(), 60);
+}
+function careForm(p, kind) {
+  const c = (p.care || []).find(x => x.kind === kind), type = Pip.typeById(p.type), guess = c ? c.every : kind === 'water' ? (type ? type.water : 7) : kind === 'feed' ? (type && type.feed ? type.feed : 30) : kind === 'prune' ? (type && type.prune ? type.prune : 180) : kind === 'repot' ? 540 : kind === 'mist' ? 3 : kind === 'check' ? 14 : 90;
+  sheet(`<h2>${P.KINDS[kind].e} ${P.KINDS[kind].n}</h2><form data-form="care" data-kind="${kind}" autocomplete="off">
+    <div class="field"><label for="f-every">Every how many days</label><input id="f-every" name="every" type="number" min="1" max="730" inputmode="numeric" value="${guess}"></div>
+    <div class="field"><label for="f-note">Note (optional)</label><input id="f-note" name="note" value="${c ? esc(c.note || '') : ''}" placeholder="e.g. half strength, rainwater only"></div>
+    <div class="hint">A reminder to check, not an order. It shows on your Planner day too.</div>
+    <div class="row"><button type="submit" class="btn">Save</button>${c ? `<button type="button" class="btn soft" data-uncare="${kind}">Remove</button>` : ''}</div></form>`);
+}
+function logForm(kind) {
+  const k = P.LOG_KINDS[kind];
+  sheet(`<h2>${k.e} ${kind === 'repot' ? 'Repotted' : kind === 'move' ? 'Moved' : k.n}</h2><form data-form="log" data-kind="${kind}" autocomplete="off">
+    <div class="field"><label for="f-date">When</label><input id="f-date" name="date" type="date" value="${todayISO()}" max="${todayISO()}"></div>
+    <div class="field"><label for="f-text">${kind === 'issue' ? 'What is wrong, and what you tried' : kind === 'move' ? 'Where to, and why' : 'A few words'}</label><textarea id="f-text" name="text" rows="3"></textarea></div>
+    <div class="row"><button type="button" class="btn soft" data-formphoto>📷 ${kind === 'photo' ? 'Choose the photo' : 'Add a photo'}</button></div><div class="hint" id="photohint"></div>
+    <div class="row"><button type="submit" class="btn">Save</button></div></form>`);
+}
+function pipSheet(p) {
+  const type = p && Pip.typeById(p.type);
+  sheet(`<h2>🍊 Ask Pip</h2><div class="hint" style="margin-top:0">Quick plant help, built in. ${p ? 'About ' + esc(p.name) + '.' : ''}</div>
+    <form data-form="ask" autocomplete="off" style="display:flex;gap:8px;margin-top:10px"><input name="q" placeholder="e.g. why are the leaves yellow?" aria-label="Your question" style="flex:1;min-width:0;height:46px;border:1.5px solid var(--line);border-radius:13px;padding:0 12px;font-size:16px;background:var(--card)"><button type="submit" class="btn">Ask</button></form>
+    <div class="chips solid">${Pip.TOPICS.map(t => `<button type="button" data-topic="${t.id}">${esc(t.q)}</button>`).join('')}</div>
+    <div id="pipout">${type ? `<div class="ans"><b>${esc(type.e)} ${esc(type.n)}</b><p style="margin:6px 0 0;font-size:14.5px">${esc(type.likes)}</p></div>` : ''}</div>`);
+}
+function pipAnswer(t, question) {
+  const out = document.getElementById('pipout'), state = read(), p = view && state.plants.find(x => x.id === view);
+  if (t) out.innerHTML = `<div class="ans"><b>${esc(t.short)}</b><ol>${t.do.map(d => `<li>${esc(d)}</li>`).join('')}</ol><details><summary>More</summary>${esc(t.more)}</details></div>`;
+  else { const text = Pip.askElsewhere(question, p ? P.plantView(p, todayISO()) : null); out.innerHTML = `<div class="ans"><b>I do not know that one yet.</b><p style="margin:6px 0;font-size:14.5px">Try one of the buttons, or copy your question with this plant’s details to ask Claude.</p><button type="button" class="btn soft" data-copy="${esc(text)}">📋 Copy my question</button></div>`; }
+}
+
+/* ---------- doing things ---------- */
+document.addEventListener('click', async e => {
+  if (e.target.id === 'scrim') return closeSheet();
+  const t = e.target.closest('[data-close],[data-do],[data-open],[data-home],[data-new],[data-pip],[data-edit],[data-cover],[data-care],[data-uncare],[data-log],[data-unlog],[data-photo],[data-archive],[data-formphoto],[data-topic],[data-copy]'); if (!t) return;
+  const d = t.dataset, today = todayISO(), state = read(), p = view && state.plants.find(x => x.id === view);
+  if ('close' in d) return closeSheet();
+  if (d.do) { write(P.careToggle(state, d.do, d.kind, today, uid())); return draw(); }
+  if (d.open) { view = d.open; draw(); return window.scrollTo(0, 0); }
+  if ('home' in d) { view = null; draw(); return window.scrollTo(0, 0); }
+  if ('new' in d) return plantForm(null);
+  if ('pip' in d) return pipSheet(p);
+  if (d.topic) return pipAnswer(Pip.TOPICS.find(x => x.id === d.topic), '');
+  if (d.copy) { try { await navigator.clipboard.writeText(d.copy); t.textContent = '✓ Copied'; } catch { say('Copying is blocked here.'); } return; }
+  if ('formphoto' in d) { const got = await pickPhoto(); if (got) { draftPhoto = got; const h = document.getElementById('photohint'); if (h) h.textContent = '✓ Photo added'; } return; }
+  if (!p) return;
+  if ('edit' in d) return plantForm(p);
+  if ('cover' in d) { const got = await pickPhoto(); if (got) { let next = P.plantSave(state, p.id, { thumb: got.thumb }); next = P.logAdd(next, p.id, { kind: 'photo', text: '', photo: got.id, thumb: got.thumb }, uid(), today); write(next); draw(); } return; }
+  if (d.care) return careForm(p, d.care);
+  if (d.uncare) { write(P.careRemove(state, p.id, d.uncare)); closeSheet(); return draw(); }
+  if (d.log) return logForm(d.log);
+  if (d.unlog) { if (confirm('Remove this entry?')) { write(P.logRemove(state, p.id, d.unlog)); draw(); } return; }
+  if ('photo' in d) return d.photo ? openPhoto(d.photo) : say('The full photo is on another device.');
+  if ('archive' in d) { if (confirm('Archive ' + p.name + '? Its history is kept.')) { write(P.plantArchive(state, p.id)); view = null; draw(); } }
+});
+document.addEventListener('submit', e => {
+  const f = e.target, kind = f.dataset.form; if (!kind) return; e.preventDefault();
+  const state = read(), today = todayISO();
+  try {
+    if (kind === 'ask') return pipAnswer(Pip.answer(f.q.value), f.q.value);
+    if (kind === 'new') { const id = uid(), preset = Pip.typeByName(f.type.value); let next = P.plantAdd(state, { name: f.name.value, where: f.where.value, spot: f.spot.value, thumb: draftPhoto ? draftPhoto.thumb : '' }, id, preset, today); if (draftPhoto) next = P.logAdd(next, id, { kind: 'photo', text: 'First photo', photo: draftPhoto.id, thumb: draftPhoto.thumb }, uid(), today); if (!write(next)) return; view = id; }
+    else if (kind === 'edit') write(P.plantSave(state, view, { name: f.name.value, where: f.where.value, spot: f.spot.value }));
+    else if (kind === 'care') write(P.careSet(state, view, f.dataset.kind, f.every.value, f.note.value, today));
+    else if (kind === 'log') write(P.logAdd(state, view, { kind: f.dataset.kind, date: f.date.value, text: f.text.value, photo: draftPhoto ? draftPhoto.id : '', thumb: draftPhoto ? draftPhoto.thumb : '' }, uid(), today));
+    closeSheet(); draw();
+  } catch (err) { say(err.message); alert(err.message); }
+});
+let likesTimer = 0;
+document.addEventListener('input', e => { if (!e.target.matches('.likes') || !view) return; const value = e.target.value; clearTimeout(likesTimer); likesTimer = setTimeout(() => write(P.plantSave(read(), view, { likes: value })), 500); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+window.addEventListener('storage', e => { if (!e.key || e.key === K) draw(); });
+window.plDraw = draw;
+draw();
+</script>
+</body>
+</html>

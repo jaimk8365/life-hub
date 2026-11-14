@@ -79,7 +79,7 @@ test('Overview: a short snapshot, each card capped', () => {
 test('Life Hub strip and menu: shortcuts always there, grouped pages, every section still reachable', () => {
   const html = read('index.html');
   for (const q of ['overview', 'cp:today', 'plan', 'tasks', 'finance']) assert.match(html, new RegExp(`data-q="${q}"`));
-  assert.match(html, /id="crumbSub"/); assert.match(html, /const NAV_GROUPS = \[\['plan','cp:guides'\], \['family','kids','board'\], \['kitchen','recipes'\]\]/);
+  assert.match(html, /id="crumbSub"/); assert.match(html, /const NAV_GROUPS = \[\['plan','cp:guides','home'\], \['family','kids','board'\], \['kitchen','recipes'\]\]/);
   for (const id of ['f-overview', 'f-board', 'b-overview', 'navMe', 'navMeBtn']) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(html, /function goPlanDate\(iso\)/); assert.match(html, /function goAdminItem\(id\)/);
   const nav = html.slice(html.indexOf('<nav aria-label'), html.indexOf('</nav>'));

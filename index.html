@@ -231,6 +231,8 @@
     <iframe id="f-family" title="Family"></iframe>
     <iframe id="f-overview" title="Overview"></iframe>
     <iframe id="f-board" title="Family board"></iframe>
+    <iframe id="f-plants" title="Plants"></iframe>
+    <iframe id="f-wish" title="Wishlist"></iframe>
   </div>
 
   <nav aria-label="Life Hub sections">
@@ -249,10 +251,13 @@
     <a id="b-board" class="finance-link navsub" href="./board/" onclick="show('board');return false"><span class="ico" aria-hidden="true">🖥️</span><span>Family board</span></a>
     <button id="b-kitchen" class="sec" onclick="show('kitchen')"><span class="ico">🍳</span><span>Food</span></button>
     <button id="b-recipes" class="sec navsub" onclick="show('recipes')"><span class="ico">📖</span><span>Recipes</span></button>
-    <button id="b-home" class="sec" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
+    <button id="b-homecare" class="sec" onclick="goHomeCare()"><span class="ico">🏠</span><span>Home care</span></button>
+    <button id="b-plants" class="sec" onclick="show('plants')"><span class="ico">🪴</span><span>Plants</span></button>
+    <button id="b-home" class="sec navsub" onclick="show('home')"><span class="ico">🏠</span><span>Home</span></button>
     <span class="nav-label">Money &amp; paperwork</span>
     <button id="b-finance" onclick="show('finance')"><span class="ico">💰</span><span>Finance</span></button>
     <button id="b-admin" class="sec" onclick="show('admin')"><span class="ico">📋</span><span>Life Admin</span></button>
+    <button id="b-wish" class="sec" onclick="show('wish')"><span class="ico">🛍️</span><span>Wishlist</span></button>
     <button id="navMeBtn" class="nav-fold" type="button" onclick="navMeToggle()" aria-expanded="false" aria-controls="navMe"><span>Just for me</span><b aria-hidden="true">›</b></button>
     <div id="navMe" class="nav-me" hidden>
       <button id="b-course" onclick="show('course')"><span class="ico">🧠</span><span>Brain</span></button>
@@ -299,11 +304,14 @@
       <button class="tile" data-keep="1" onclick="showFromMore('board')"><span class="ico">🖥️</span>Family board</button>
       <button class="tile" data-k="kitchen" data-home="lifeHome" onclick="showFromMore('kitchen')"><span class="ico">🍳</span>Kitchen</button>
       <button class="tile" data-k="recipes" data-home="lifeHome" onclick="showFromMore('recipes')"><span class="ico">📖</span>Recipes</button>
-      <button class="tile" data-k="home" data-home="lifeHome" onclick="showFromMore('home')"><span class="ico">🏠</span>Home</button>
+      <button class="tile" data-keep="1" onclick="document.getElementById('morePanel').hidden=true;goHomeCare()"><span class="ico">🏠</span>Home care</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('plants')"><span class="ico">🪴</span>Plants</button>
+      <button class="tile" data-k="home" data-home="lifeHome" onclick="showFromMore('home')"><span class="ico">🏠</span>Old Home page</button>
     </div>
     <h2>Money &amp; paperwork</h2>
     <div class="tiles" id="lifeMoney">
       <button class="tile" data-keep="1" onclick="showFromMore('finance')"><span class="ico">💰</span>Finance</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('wish')"><span class="ico">🛍️</span>Wishlist</button>
       <button class="tile" data-k="admin" data-home="lifeMoney" onclick="showFromMore('admin')"><span class="ico">📋</span>Life Admin</button>
     </div>
     <h2>Just for me</h2>
@@ -337,9 +345,9 @@
   </div>
 
 <script>
-  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html' };
+  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html', plants:'./plants/index.html', wish:'./wish/index.html' };
   const BUTTONS = { copilot:'b-copilot' };
-  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board']);
+  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board','plants','wish']);
 
   /* ---- Where am I, and Back ----
      Every section change is one step in the browser's history, so the phone's back gesture, the browser's back
@@ -347,11 +355,11 @@
   const PLACE_NAMES = {
     'cp:today':'☀️ Today','cp:now':'🎯 Now','cp:inbox':'📥 Inbox','cp:guides':'🧭 Plan guides','cp:shutdown':'🌙 Shutdown',
     'cp:ideas':'💡 Idea Vault','cp:etsy':'🛍️ Etsy Studio','cp:notes':'🗒️ Notes','cp:settings':'⚙️ Settings',
-    overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Home',admin:'📋 Life Admin',
+    plants:'🪴 Plants',wish:'🛍️ Wishlist',overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Old Home page',admin:'📋 Life Admin',
     kids:'🧒 Kids',family:'👨‍👩‍👧‍👦 Family',course:'🧠 Brain',quest:'🌙 Quests',reading:'📚 Books',beauty:'💄 Beauty',wardrobe:'👗 Wardrobe',finance:'💰 Finance'
   };
   /* Pages that belong together: the menu shows one door, and the strip shows the pages inside it. */
-  const NAV_GROUPS = [['plan','cp:guides'], ['family','kids','board'], ['kitchen','recipes']];
+  const NAV_GROUPS = [['plan','cp:guides','home'], ['family','kids','board'], ['kitchen','recipes']];
   const NAV_ME = new Set(['hub','course','quest','reading','beauty','wardrobe','cp:ideas','cp:etsy','cp:notes']);
   /* Light up the menu button for the page you are on. Today, Inbox and the other Co-Pilot pages each get their own light, not all "Now". */
   function navLight(key){
@@ -359,6 +367,8 @@
       document.querySelectorAll('nav .routebtn').forEach(b => { const m = (b.getAttribute('onclick') || '').match(/showCopilot\('([^']+)'\)/); if (m) b.classList.toggle('active', key === 'cp:' + m[1]); });
       NAV_GROUPS.forEach(g => { const door = document.getElementById('b-' + g[0]); if (door) door.classList.toggle('active', g.includes(key)); });
       if (NAV_ME.has(key)) navMeSet(true);
+      const care = document.getElementById('b-homecare'), plan = document.getElementById('b-plan'); // Home care is a page of the Planner with its own door
+      if (care) { const on = key === 'plan' && homeCareOn; care.classList.toggle('active', on); if (on && plan) plan.classList.remove('active'); }
     } catch(e){}
   }
   function navOpen(k){ if (String(k).startsWith('cp:')) showCopilot(k.slice(3)); else show(k); }
@@ -370,6 +380,13 @@
     try { sessionStorage.setItem('plan_goto', iso); } catch(e){}
     show('plan');
     try { const w = document.getElementById('f-plan').contentWindow; if (w && w.ppGoto) w.ppGoto(iso); } catch(e){}
+  }
+  /* Home care lives in the Planner (its Home tab). This door opens it there and keeps its own menu light on. */
+  let homeCareOn = false;
+  function goHomeCare(){
+    try { sessionStorage.setItem('plan_goto_lists', '1'); } catch(e){}
+    show('plan'); homeCareOn = true; navLight('plan');
+    try { const w = document.getElementById('f-plan').contentWindow; if (w && w.ppLists) w.ppLists(); } catch(e){}
   }
   function goAdminItem(id){
     try { sessionStorage.setItem('la_open', String(id)); } catch(e){}
@@ -493,6 +510,7 @@
   }
   function show(which){
     if (!Object.prototype.hasOwnProperty.call(SRC, which)) which = 'hub';
+    homeCareOn = false;
     if (which === 'finance') loadFinanceFeed();
     if (which !== 'copilot') navRecord({ sec:which }); else if (!navSilent) navRecord({ cp:copilotRoute });
     for (const k of Object.keys(SRC)){
@@ -513,6 +531,8 @@
     const mobilePlan = document.getElementById('b-mobile-plan'); if (mobilePlan) mobilePlan.classList.toggle('active', which === 'plan');
     markOpened(which);
     if (which === 'overview') try { document.getElementById('f-overview').contentWindow.ovDraw(); } catch(e){}
+    if (which === 'plants') try { document.getElementById('f-plants').contentWindow.plDraw(); } catch(e){}
+    if (which === 'wish') try { document.getElementById('f-wish').contentWindow.wlDraw(); } catch(e){}
     document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===copilotRoute));
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }

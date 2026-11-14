@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Wishlist — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--paper:#FFF8E8;--card:#fff;--ink:#15384D;--ink-soft:#3F5C6B;--ink-faint:#5F7A88;--line:#F1E1BD;--line-soft:#F8EFD9;--coral:#FF7A45;--good:#1F9A62;--bad:#D2452F;--sun:#FFC93C;--sun-soft:#FFF3C4;--sea:#1A7FBD;--sea-soft:#DFF0FA;--mint-soft:#D9F7F1}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-family:'Fraunces',serif;font-weight:600;font-size:24px;margin:0}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 2px 10px}
+  button{font-family:inherit;cursor:pointer}
+  .btn{border:0;border-radius:13px;min-height:44px;padding:0 16px;background:var(--ink);color:#fff;font:800 14px inherit;font-family:inherit}
+  .btn.soft{background:var(--card);color:var(--ink);border:1px solid var(--line)}.btn.go{background:var(--good)}.btn.warm{background:var(--sun);color:var(--ink)}
+  .sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 12px}
+  .sum button{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 6px;text-align:center;color:var(--ink);border-bottom:5px solid var(--sea)}
+  .sum button:nth-child(2){border-bottom-color:var(--good)}.sum button:nth-child(3){border-bottom-color:var(--sun)}
+  .sum button.on{background:var(--sun-soft)}.sum b{display:block;font:600 19px 'Fraunces',serif}.sum small{font:800 11px system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint)}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:0 0 10px;scrollbar-width:none}
+  .chips button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;min-height:40px!important;padding:0 13px;font:700 13.5px inherit;font-family:inherit;color:var(--ink);white-space:nowrap}
+  .chips button.on{background:var(--ink);border-color:var(--ink);color:#fff}.chips button.dash{border-style:dashed;color:var(--ink-soft)}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  @media(min-width:620px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  .it{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:0;overflow:hidden;text-align:left;color:var(--ink);display:flex;flex-direction:column}
+  .it .pic{height:112px;background:var(--sea-soft) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:46px;position:relative}
+  .it .tag{position:absolute;top:8px;left:8px;background:#fff;border-radius:999px;padding:3px 9px;font:800 11px system-ui,sans-serif}
+  .it .tag.drop{left:auto;right:8px;background:var(--good);color:#fff}
+  .it .in{padding:9px 11px 11px;display:grid;gap:4px}.it b{font-size:14.5px;overflow-wrap:anywhere;line-height:1.25}.it strong{font:600 19px 'Fraunces',serif}.it small{font-size:12px;font-weight:700;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cool{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;font:800 11.5px system-ui,sans-serif;color:var(--ink-soft)}
+  .cool i{display:block;height:8px;border-radius:5px;background:var(--line-soft);overflow:hidden}.cool u{display:block;height:100%;border-radius:5px;background:var(--sun)}.cool.ready u{background:var(--good)}.cool.ready{color:var(--good)}
+  .it:focus-visible,.btn:focus-visible,.sum button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+  .none{text-align:center;color:var(--ink-soft);font-weight:700;padding:26px 10px;background:var(--card);border:1px dashed var(--line);border-radius:18px;grid-column:1/-1}
+  .scrim{position:fixed;inset:0;background:rgba(21,56,77,.45);z-index:50;display:none;align-items:flex-end;justify-content:center}.scrim.on{display:flex}
+  @media(min-width:620px){.scrim{align-items:center}}
+  .sheet{background:var(--paper);width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:18px 16px calc(22px + env(safe-area-inset-bottom,0px));max-height:92vh;overflow-y:auto}
+  @media(min-width:620px){.sheet{border-radius:22px}}
+  .sheet h2{font:600 20px 'Fraunces',serif;margin:0 0 4px;overflow-wrap:anywhere}.close{float:right;border:0;background:var(--line-soft);width:36px;height:36px;border-radius:50%;font-size:16px;color:var(--ink-soft)}
+  .big{height:190px;border-radius:18px;background:var(--sea-soft) center/contain no-repeat;display:flex;align-items:center;justify-content:center;font-size:70px;margin:10px 0}
+  .field{margin-top:12px}.field>label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;font:500 16px inherit;font-family:inherit;color:var(--ink);background:var(--card);outline:none}
+  .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.row .btn{flex:1}
+  .ask{background:var(--mint-soft);border-radius:16px;padding:12px 14px;margin-top:12px;font-weight:700}
+  .trail{font-size:13px;color:var(--ink-soft);font-weight:700;margin-top:8px}.hint{font-size:12px;color:var(--ink-faint);margin-top:8px;line-height:1.4}
+  a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+</style>
+<link rel="stylesheet" href="../theme-jaimi.css" />
+</head>
+<body>
+<div class="wrap"><div id="root" aria-live="polite"></div></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<input type="file" id="pick" accept="image/*" hidden>
+<script type="module">
+import * as W from './core.mjs';
+const K = 'wish_v1';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const read = () => { try { const v = JSON.parse(localStorage.getItem(K) || 'null'); return v && Array.isArray(v.items) ? v : { items: [], cats: [] }; } catch { return { items: [], cats: [] }; } };
+const write = s => { try { localStorage.setItem(K, JSON.stringify(s)); return true; } catch { alert('That could not be saved. Storage may be full.'); return false; } };
+const bg = thumb => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(thumb || '') ? ` style="background-image:url(${thumb})"` : '';
+const st = { cat: 'all', pile: 'want', sort: 'new' };
+let open = null, draftThumb = '';
+
+function pickThumb() { // a small picture only: it travels with the item to your other devices
+  return new Promise(resolve => {
+    const input = document.getElementById('pick'); input.value = '';
+    input.onchange = async () => {
+      const file = input.files && input.files[0]; if (!file) return resolve('');
+      try { const img = await createImageBitmap(file), scale = Math.min(1, 240 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); resolve(c.toDataURL('image/jpeg', 0.68)); }
+      catch { alert('That picture could not be read.'); resolve(''); }
+    };
+    input.click();
+  });
+}
+const coolHtml = c => `<span class="cool${c.ready ? ' ready' : ''}"><i><u style="width:${c.pct}%"></u></i>${c.ready ? '✓ decide' : c.left + (c.left === 1 ? ' day' : ' days')}</span>`;
+function draw() {
+  const today = todayISO(), v = W.view(read(), today, st);
+  const pile = (id, n, label, amount) => `<button type="button" class="${st.pile === id ? 'on' : ''}" data-pile="${id}" aria-pressed="${st.pile === id}"><b>${esc(W.money(amount) || '$0')}</b><small>${n} ${label}</small></button>`;
+  document.getElementById('root').innerHTML = `<div class="head"><h1>🛍️ Wishlist</h1><button type="button" class="btn" data-new>＋ Add</button></div>
+    <div class="sum">${pile('want', v.count, 'wanted', v.total)}${pile('bought', v.bought.count, 'bought', v.bought.total)}${pile('passed', v.passed.count, 'let go', v.passed.total)}</div>
+    ${st.pile === 'want' ? `<div class="chips"><button type="button" class="${st.cat === 'all' ? 'on' : ''}" data-cat="all">All ${v.count}</button>${v.cats.map(c => `<button type="button" class="${st.cat === c.id ? 'on' : ''}" data-cat="${esc(c.id)}">${esc(c.e)} ${esc(c.n)} ${c.count}</button>`).join('')}<button type="button" class="dash" data-newcat>＋</button></div>
+    <div class="chips">${[['new', '🆕 Newest'], ['ready', '⏳ Waited longest'], ['price', '💲 Price']].map(([k, n]) => `<button type="button" class="${st.sort === k ? 'on' : ''}" data-sort="${k}">${n}</button>`).join('')}</div>` : ''}
+    <div class="grid">${v.items.map(i => `<button type="button" class="it" data-open="${esc(i.id)}" aria-label="${esc(i.name)}${i.price != null ? ', ' + esc(W.money(i.price)) : ''}"><span class="pic"${bg(i.thumb)}>${i.thumb ? '' : esc(i.icon)}${i.move < 0 ? `<span class="tag drop">↓ ${esc(W.money(-i.move))}</span>` : ''}</span><span class="in"><b>${esc(i.name)}</b><strong>${esc(W.money(i.price) || '—')}</strong><small>${esc(i.store || ' ')}</small>${i.status === 'want' ? coolHtml(i.cool) : `<small>${i.status === 'bought' ? '🛒 bought' : '👋 let go'}</small>`}</span></button>`).join('')
+      || `<div class="none">${st.pile === 'want' ? 'Nothing here yet. See something you like? Tap ＋ Add and let it wait a week.' : st.pile === 'bought' ? 'Nothing bought from the list yet.' : 'Nothing let go yet.'}</div>`}</div>
+    ${st.pile === 'passed' && v.passed.total ? `<div class="ask">👋 You let go of ${esc(W.money(v.passed.total))}. That stayed in your pocket.</div>` : ''}`;
+}
+const sheet = html => { document.getElementById('sheet').innerHTML = '<button type="button" class="close" data-close aria-label="Close">✕</button>' + html; document.getElementById('scrim').classList.add('on'); };
+const closeSheet = () => { document.getElementById('scrim').classList.remove('on'); open = null; draftThumb = ''; };
+function form(i) {
+  const state = read();
+  sheet(`<h2>${i ? '✏️ Change it' : '🛍️ Add to wishlist'}</h2><form data-form="${i ? 'edit' : 'new'}" autocomplete="off">
+    <div class="field"><label for="f-url">Link (paste it from the shop)</label><input id="f-url" name="url" inputmode="url" value="${i ? esc(i.url || '') : ''}" placeholder="https://…"></div>
+    <div class="field"><label for="f-name">What is it</label><input id="f-name" name="name" value="${i ? esc(i.name) : ''}" placeholder="e.g. Linen dress, sage"></div>
+    <div class="field"><label for="f-price">Price</label><input id="f-price" name="price" inputmode="decimal" value="${i && i.price != null ? esc(i.price) : ''}" placeholder="e.g. 89.95"></div>
+    <div class="field"><label for="f-cat">Category</label><select id="f-cat" name="cat">${W.allCats(state).map(c => `<option value="${esc(c.id)}" ${(i ? i.cat : st.cat) === c.id ? 'selected' : ''}>${esc(c.e)} ${esc(c.n)}</option>`).join('')}</select></div>
+    <div class="field"><label for="f-note">Note (optional)</label><input id="f-note" name="note" value="${i ? esc(i.note || '') : ''}" placeholder="Size, colour, why you want it"></div>
+    <div class="row"><button type="button" class="btn soft" data-formphoto>📷 ${i && i.thumb ? 'Change picture' : 'Add a picture'}</button></div><div class="hint" id="photohint">A screenshot works well.</div>
+    <div class="row"><button type="submit" class="btn">Save</button></div></form>`);
+  if (!i) setTimeout(() => document.getElementById('f-url')?.focus(), 60);
+}
+function detail(id) {
+  const today = todayISO(), i = W.view(read(), today, { pile: (read().items.find(x => x.id === id) || {}).status || 'want' }).items.find(x => x.id === id); if (!i) return; open = id;
+  const trail = (i.prices || []).length > 1 ? `<div class="trail">Price: ${i.prices.map(p => esc(W.money(p.price))).join(' → ')}${i.move < 0 ? ' · down ' + esc(W.money(-i.move)) + ' 🎉' : i.move > 0 ? ' · up ' + esc(W.money(i.move)) : ''}</div>` : '';
+  sheet(`<h2>${esc(i.name)}</h2><div class="big"${bg(i.thumb)}>${i.thumb ? '' : esc(i.icon)}</div>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><strong style="font:600 28px 'Fraunces',serif">${esc(W.money(i.price) || 'No price yet')}</strong><small style="font-weight:700;color:var(--ink-faint)">${esc(i.store)}</small></div>${trail}
+    ${i.note ? `<p style="margin:8px 0 0">${esc(i.note)}</p>` : ''}
+    ${i.status === 'want' ? `<div class="ask">${i.cool.ready ? '⏳ It has waited a week. Still want it?' : `⏳ Day ${i.cool.day} of ${i.cool.of}. Let it sit ${i.cool.left} more day${i.cool.left === 1 ? '' : 's'}.`}<div style="margin-top:8px">${coolHtml(i.cool)}</div></div>` : ''}
+    <div class="row">${i.url ? `<a class="btn soft" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">🔗 Open shop</a>` : ''}<button type="button" class="btn soft" data-edit>✏️ Change</button></div>
+    <div class="row">${i.status === 'want' ? '<button type="button" class="btn go" data-set="bought">🛒 Bought it</button><button type="button" class="btn warm" data-set="passed">👋 Let it go</button>' : '<button type="button" class="btn soft" data-set="want">↩︎ Back on the list</button>'}</div>
+    <div class="hint">Prices do not update by themselves. Tap Change to save a new price and see if it has dropped.</div>`);
+}
+document.addEventListener('click', async e => {
+  if (e.target.id === 'scrim') return closeSheet();
+  const t = e.target.closest('[data-close],[data-new],[data-open],[data-pile],[data-cat],[data-sort],[data-newcat],[data-edit],[data-set],[data-formphoto]'); if (!t) return;
+  const d = t.dataset, today = todayISO();
+  if ('close' in d) return closeSheet();
+  if ('new' in d) return form(null);
+  if (d.open) return detail(d.open);
+  if (d.pile) { st.pile = d.pile; st.cat = 'all'; return draw(); }
+  if (d.cat) { st.cat = d.cat; return draw(); }
+  if (d.sort) { st.sort = d.sort; return draw(); }
+  if ('newcat' in d) { const name = prompt('Name the category. Start with an emoji if you like, e.g. 🚐 Caravan'); if (name === null) return; try { const next = W.catAdd(read(), name, 'c' + uid()); write(next); st.cat = next.cats[next.cats.length - 1].id; draw(); } catch (err) { alert(err.message); } return; }
+  if ('formphoto' in d) { const got = await pickThumb(); if (got) { draftThumb = got; const h = document.getElementById('photohint'); if (h) h.textContent = '✓ Picture added'; } return; }
+  if ('edit' in d && open) { const id = open, i = read().items.find(x => x.id === id); form(i); open = id; return; }
+  if (d.set && open) { write(W.itemSet(read(), open, d.set, today)); closeSheet(); return draw(); }
+});
+document.addEventListener('submit', e => {
+  const f = e.target, kind = f.dataset.form; if (!kind) return; e.preventDefault();
+  const fields = { url: f.url.value, name: f.name.value, price: f.price.value, cat: f.cat.value, note: f.note.value, thumb: draftThumb };
+  try { if (!write(kind === 'new' ? W.itemAdd(read(), fields, uid(), todayISO()) : W.itemSave(read(), open, fields, todayISO()))) return; closeSheet(); draw(); }
+  catch (err) { alert(err.message); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+window.addEventListener('storage', e => { if ((!e.key || e.key === K) && !document.getElementById('scrim').classList.contains('on')) draw(); });
+window.wlDraw = draw;
+draw();
+</script>
+</body>
+</html>

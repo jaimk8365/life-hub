@@ -6,6 +6,7 @@
 /* global BLOCKS, DONE, ENERGY, PLAN_FEED, PRI, K_BLOCKS, K_DONE, K_ENERGY, K_MONEY_DATES, viewDate:writable, mode, sortMode, weekCursor,
    todayISO, monthCursor, save, load, esc, uid, toast, render, setMode, setEnergy, clearEnergy, setSort, openBlock, catC, isDone, niceDate, dkey */
 import * as C from './core.mjs';
+import * as P from './pages.mjs';
 
 const K_CARRY = 'plan_carry_v1', K_HINT = 'plan_plus_hint_v1';
 const K_ROUT = 'plan_plus_routines_v1', K_GOALS = 'plan_goals_v1';
@@ -169,10 +170,7 @@ function weekHtml(start) {
   let admin = []; try { const a = JSON.parse(localStorage.getItem('la_items') || '[]'); admin = Array.isArray(a) ? a : (a.items || []); } catch { admin = []; }
   const musts = C.weekMusts({ blocks: BLOCKS, events: feedEvents(), done: DONE, start, money, admin });
   const dayName = iso => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][C.weekdayOf(iso)];
-  return `<div class="pp-wk" role="group" aria-label="This week at a glance"><div class="pp-wl" aria-hidden="true"><span>🌅</span><span>☀️</span><span>🌙</span></div>`
-    + grid.map(d => `<button type="button" class="pp-wd${d.today ? ' today' : ''}${d.past ? ' past' : ''}" data-pp-day="${d.iso}" aria-label="${d.name} ${d.num}: ${d.load.pct}% full, ${d.extras} extra thing${d.extras === 1 ? '' : 's'}"><b>${d.name}</b><em>${d.num}</em><span class="pp-load ${d.load.tone}"><u style="width:${Math.min(100, Math.round(d.load.pct / 85 * 100))}%"></u></span>
-       <span class="pp-part">${part(d.parts.am)}</span><span class="pp-part">${part(d.parts.pm)}</span><span class="pp-part">${part(d.parts.eve)}</span><span class="pp-flag">${d.allday.length ? '🗓️' : ''}${d.money.length ? '💵' : ''}</span></button>`).join('') + '</div>'
-    + `<div class="pp-key" aria-hidden="true">${KEY.map(([k, n]) => `<span><u style="--pc:${C.CAT_COLOURS[k]}"></u>${n}</span>`).join('')}<span>▁ routine</span><span>▣ must</span></div>`
+  return P.spreadHtml(start)
     + (musts.length ? `<section class="pp-musts"><h3>★ MUSTS THIS WEEK</h3>${musts.slice(0, 8).map(m => `<div class="pp-mu${m.done ? ' done' : ''}${m.late ? ' late' : ''}"><time>${m.late ? 'late' : dayName(m.date)}</time><span aria-hidden="true">${esc(m.icon)}</span><span>${esc(m.title)}</span></div>`).join('')}</section>` : '');
 }
 function enhanceWeek() {
@@ -283,9 +281,12 @@ document.addEventListener('submit', e => {
   const v = f.querySelector('input').value;
   try { save(K_GOALS, 'ppNewgoal' in f.dataset ? C.goalAdd(load(K_GOALS, []), v, uid()) : C.goalStepAdd(load(K_GOALS, []), f.dataset.ppStep, v, uid())); render(); } catch (err) { say(err.message); }
 });
-document.addEventListener('input', e => { if (e.target.id === 'pp-add-in') draft = e.target.value; });
+document.addEventListener('input', e => { if (P.onInput(e)) return; if (e.target.id === 'pp-add-in') draft = e.target.value; });
+document.addEventListener('submit', e => { P.onSubmit(e); });
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.pg-body')) { e.preventDefault(); viewDate = e.target.dataset.ppDay; setMode('day'); } });
 document.addEventListener('change', e => { const id = e.target.dataset?.ppCarryday; if (id) carry(id, 'day', e.target.value); });
 document.addEventListener('click', e => {
+  if (P.onClick(e)) return;
   const t = e.target.closest?.('[data-pp-carry],[data-pp-energy],[data-pp-more],[data-pp-day],[data-pp-routines],[data-pp-goal]'); if (!t) return;
   if (t.dataset.ppRoutines) { save(K_ROUT, load(K_ROUT, 'show') === 'hide' ? 'show' : 'hide'); return render(); }
   if (t.dataset.ppGoal) return goalAct(t.dataset.ppGoal, t.dataset.id, t.dataset.step);
@@ -298,16 +299,19 @@ document.addEventListener('click', e => {
 /* ---------- wire in ---------- */
 try { const w = document.getElementById('mt-week'); if (w) w.textContent = 'Week'; const d = document.getElementById('mt-day'); if (d) d.textContent = 'Day'; } catch { /* labels stay */ }
 try { Object.assign(PRI.high, { n: C.WORDS.high, e: '★' }); Object.assign(PRI.med, { n: C.WORDS.med, e: '·' }); Object.assign(PRI.low, { n: C.WORDS.low, e: '○' }); } catch { /* labels stay as they were */ }
-const style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
+const style = document.createElement('style'); style.textContent = CSS + P.CSS; document.head.appendChild(style);
 /* Life Hub can ask for a day (from Search, the Overview or a Life Admin link). */
 window.ppGoto = iso => { try { sessionStorage.setItem('plan_goto', ''); } catch { /* fine */ } if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) { viewDate = iso; setMode('day'); } };
+P.installTab();
 const baseRender = window.render, baseOpen = window.openBlock;
 window.render = function () {
+  if (P.typing()) return; // a note is being typed: leave the page alone until it is saved
+  P.sync();
   const typing = document.activeElement?.id === 'pp-add-in', pos = typing ? document.activeElement.selectionStart : 0;
   // energy answered in the morning check-in is not asked again here
   try { const t = todayISO(); if (viewDate === t && !ENERGY[t]) { const e = checkinEnergy(t); if (e) { ENERGY[t] = e; save(K_ENERGY, ENERGY); } } } catch { /* optional */ }
   baseRender.apply(this, arguments);
-  try { if (mode === 'day') enhanceDay(); else if (mode === 'week') enhanceWeek(); } catch (err) { console.warn('Planner extras skipped: ' + err.message); }
+  try { if (P.listsOn()) P.drawLists(); else if (mode === 'day') { enhanceDay(); P.dayExtras(); } else if (mode === 'week') enhanceWeek(); } catch (err) { console.warn('Planner extras skipped: ' + err.message); }
   if (typing) { const i = document.getElementById('pp-add-in'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch { /* fine */ } } }
 };
 const baseMonth = window.renderMonth;
@@ -316,3 +320,4 @@ window.openBlock = function (id) { baseOpen.apply(this, arguments); try { enhanc
 C.startCountdowns(document, window);
 window.render();
 try { const want = sessionStorage.getItem('plan_goto'); if (want) window.ppGoto(want); } catch { /* fine */ }
+try { if (sessionStorage.getItem('plan_goto_lists')) P.openHomeCare(); } catch { /* fine */ }
