@@ -52,7 +52,7 @@ test('health import: one reading a line in almost any shape; what cannot be read
 
 test('Brain and Health are wired into Life Hub', () => {
   const html = read('index.html'), sync = read('sync.js'), sw = read('sw.js');
-  for (const bit of ["brain:'./brain/index.html'", "health:'./health/index.html'", 'id="f-brain"', 'id="f-health"', 'id="b-brain"', 'id="b-health"', "['brain','course']"]) assert.ok(html.includes(bit), bit);
+  for (const bit of ["brain:'./brain/index.html'", "health:'./health/index.html'", 'id="f-brain"', 'id="f-health"', 'id="b-brain"', 'id="b-health"', '<span class="nav-label">Old pages</span>']) assert.ok(html.includes(bit), bit);
   assert.match(sync, /prefix: 'brain_'/); assert.match(sync, /prefix: 'health_'/);
   for (const f of ['./brain/index.html', './brain/core.mjs', './health/index.html', './health/core.mjs']) assert.ok(sw.includes(`'${f}'`), f);
   assert.ok(!/fetch\(|localStorage\.(clear|removeItem)/.test(read('health/index.html')), 'health numbers never leave the device from this page');

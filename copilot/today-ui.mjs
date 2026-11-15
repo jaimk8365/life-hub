@@ -213,9 +213,9 @@ export function publishAhead(events, today, ls = globalThis.localStorage) {
 
 /* ---------- Inbox sorts itself: each parked thought is filed where it belongs, and a short list shows where it went ---------- */
 export const K_SORTED = 'cp_autosort_v1';
-export const SORT_NAMES = { home: '🏠 Home task', work: '💼 Work task', idea: '💡 Idea', etsy: '🛍️ Etsy', note: '🗒️ Note', admin: '📋 Life Admin' };
+export const SORT_NAMES = { home: '🏠 Home task', work: '💼 Work task', idea: '💡 Idea', etsy: '🛍️ Etsy', note: '🗒️ Note', admin: '📋 Life Admin', wish: '🛍️ Wishlist' };
 /** Where a thought goes, from the choice made when parking or from its words. */
-export function autoTarget(suggested) { const s = suggested || {}; return s.kind === 'idea' ? 'idea' : s.kind === 'note' ? 'note' : s.kind === 'etsy' ? 'etsy' : s.area === 'work' ? 'work' : 'home'; }
+export function autoTarget(suggested) { const s = suggested || {}; return s.kind === 'idea' && s.ideaCat === 'buy' ? 'wish' : s.kind === 'idea' ? 'idea' : s.kind === 'note' ? 'note' : s.kind === 'etsy' ? 'etsy' : s.area === 'work' ? 'work' : 'home'; }
 /** True when the same words are already waiting in the place this thought would go (so two devices never file it twice). */
 export function alreadyFiled(text, target, store, tasks) {
   const t = String(text || '').trim().toLowerCase(); if (!t) return false;
@@ -246,3 +246,20 @@ export function sortedCard(esc, ls = globalThis.localStorage) {
   return `<section class="card tg-sorted"><h3>✅ Sorted for you</h3>${list.slice(0, 5).map(row).join('')}${list.length > 5 ? `<details><summary>All ${list.length}</summary>${list.slice(5).map(row).join('')}</details>` : ''}<p class="hint">Wrong place? Tap ↩︎ and choose yourself.</p></section>`;
 }
 export const SORTED_CSS = '.tg-sorted-row{display:grid;grid-template-columns:minmax(0,1fr) auto 44px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.07)}.tg-sorted-row:first-of-type{border-top:0}.tg-sorted-row span{overflow-wrap:anywhere;font-weight:600}.tg-sorted-row b{font-size:12px;white-space:nowrap;background:rgba(0,0,0,.06);border-radius:999px;padding:4px 9px}.tg-sorted-row button{min-width:44px;min-height:40px;padding:0}.tg-sorted details summary{cursor:pointer;font-weight:800;padding:8px 0}';
+
+/* ---------- things to buy go to the Wishlist (wish_v1), where they wait a week ---------- */
+export function wishFromInbox(text, id, today) {
+  const t = String(text || '').trim(), m = t.match(/https?:\/\/[^\s<>"']+/i); let url = '', store = '';
+  if (m) { try { const u = new URL(m[0]); if (u.protocol === 'https:' || u.protocol === 'http:') { url = u.href; store = u.hostname.replace(/^www\./, ''); } } catch { /* not a link after all */ } }
+  const name = (m ? t.replace(m[0], ' ') : t).replace(/\s+/g, ' ').trim().slice(0, 80) || store || 'From Inbox';
+  return { id, name, url, store, price: null, cat: 'other', note: 'From your Inbox', thumb: '', added: today, status: 'want', prices: [] };
+}
+const wishRead = ls => { try { const v = JSON.parse(ls.getItem('wish_v1') || 'null'); return v && Array.isArray(v.items) ? v : { items: [], cats: [] }; } catch { return null; } };
+/** Add it unless the same thing is already wanted. Returns false when nothing was added. */
+export function wishAdd(item, ls = globalThis.localStorage) {
+  const state = wishRead(ls); if (!state) return false;
+  if (state.items.some(i => i && i.status === 'want' && String(i.name).trim().toLowerCase() === item.name.toLowerCase())) return false;
+  try { ls.setItem('wish_v1', JSON.stringify({ ...state, items: [item, ...state.items] })); return true; } catch { return false; }
+}
+export function wishTakeBack(id, ls = globalThis.localStorage) { const state = wishRead(ls); if (!state) return false; try { ls.setItem('wish_v1', JSON.stringify({ ...state, items: state.items.filter(i => i.id !== id) })); return true; } catch { return false; } }
+

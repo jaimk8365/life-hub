@@ -9,7 +9,7 @@ export const METRICS = {
   spo2: { e: '🫁', n: 'Blood oxygen', unit: '%', max: 100, min: 50, dp: 0 },
   weight: { e: '⚖️', n: 'Weight', unit: 'kg', max: 400, min: 20, dp: 1, quiet: true },
 };
-export const DEFAULT_SHOW = ['steps', 'sleep', 'move', 'water', 'rhr'];
+export const DEFAULT_SHOW = ['steps', 'sleep', 'move', 'rhr']; // water is a habit on Today; it can still be switched on here
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const days = s => (s && s.days && typeof s.days === 'object' ? s.days : {});

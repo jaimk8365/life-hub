@@ -48,3 +48,18 @@ export function dumpToInbox(text, inbox, { at, id }) {
   const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^[\s•*-]+/, '').trim()).filter(Boolean).slice(0, 30);
   return { added: lines.length, inbox: [...(Array.isArray(inbox) ? inbox : []), ...lines.map((line, n) => ({ id: id(n), text: line.slice(0, 500), at, source: 'park' }))] };
 }
+
+/** The week at a glance: what you did, how you felt, how your body went, and what is coming. Short numbers only. */
+export function weekReview({ journal, habits, health, homeLog, plants, wish, admin, today }) {
+  const from = Day.addDays(today, -6), inWeek = d => d >= from && d <= today, entries = (journal && Array.isArray(journal.entries) ? journal.entries : []).filter(e => e && inWeek(e.date));
+  const wins = entries.flatMap(e => [...(e.a && Array.isArray(e.a.wins) ? e.a.wins : []), ...(e.a && e.a.win ? [e.a.win] : [])]).slice(0, 6);
+  const moods = Array.from({ length: 7 }, (_, i) => { const iso = Day.addDays(from, i), hit = entries.find(e => e.date === iso && e.a && e.a.mood); return { iso, mood: hit ? hit.a.mood : null }; });
+  const hab = Day.habitWeek(habits, today).map(h => ({ icon: h.icon, name: h.name, done: h.last7 }));
+  const days = (health && health.days) || {}, avgOf = k => { const v = Array.from({ length: 7 }, (_, i) => (days[Day.addDays(from, i)] || {})[k]).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const chores = new Set((Array.isArray(homeLog) ? homeLog : []).filter(e => e && inWeek(String(e.date))).map(e => e.tid + '|' + e.date)).size;
+  const plantCare = (plants && Array.isArray(plants.plants) ? plants.plants : []).reduce((n, p) => n + (p.log || []).filter(l => l.auto && inWeek(l.date)).length, 0);
+  const ready = (wish && Array.isArray(wish.items) ? wish.items : []).filter(i => i.status === 'want' && Day.addDays(i.added || today, 7) <= today).length;
+  const next = Day.addDays(today, 7), due = (Array.isArray(admin) ? admin : []).filter(a => a && !a.done && a.freq !== 'none' && a.nextDue && a.nextDue <= next).length;
+  return { wins, moods, wrote: entries.length, habits: hab, steps: avgOf('steps'), sleep: avgOf('sleep'), move: avgOf('move'), chores, plantCare, ready, due };
+}
+

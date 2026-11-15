@@ -112,9 +112,11 @@ export function dayExtras() {
   const today = todayISO(), iso = viewDate, chores = iso < today ? [] : H.choresOn(arr(K_TASKS), iso, today, arr(K_LISTS)), left = chores.filter(c => !c.done).length;
   const notes = load(K_NOTES, {}), stickers = load(K_STICK, {})[iso] || [];
   const plants = iso === today ? PL.due(load(K_PLANTS, { plants: [] }), today) : [], plantsLeft = plants.filter(j => !j.done).length;
+  const also = iso === today ? H.alsoToday({ tasks: (load('hq_task_engine_v1', {}) || {}).tasks, admin: load('la_items', []), today }) : [];
   strip.insertAdjacentHTML('afterend', `<section class="pg-dayx">${stickersHtml(iso, stickers, true)}${st.tray === iso ? trayHtml(iso) : ''}
     <input class="pg-dnote" data-pg-note="d" data-key="${iso}" value="${esc((notes.d || {})[iso] || '')}" placeholder="📝 Note for the day" aria-label="Note for the day">
     ${chores.length ? `<div class="pg-chores"><h3>🧺 ${iso === today ? "Today's list" : 'On the list'} · ${left} to do</h3>${chores.slice(0, 6).map(c => choreRow(c, iso === today, iso === today)).join('')}${chores.length > 6 ? `<button type="button" class="pp-rtchip" data-pg-tab style="margin:8px 0 0">＋${chores.length - 6} more in Lists</button>` : ''}</div>` : ''}
+    ${also.length ? `<div class="pg-chores"><h3>📌 Also today · ${also.length}</h3>${also.slice(0, 6).map(x => `<div class="pg-ch${x.late ? ' late' : ''}"><span></span><span aria-hidden="true">${x.icon}</span><button type="button" class="pg-edit" data-pg-go="${esc(x.go)}" data-id="${esc(x.id || '')}" aria-label="Open ${esc(x.title)}"><span class="t">${esc(x.title)}</span><small>${esc(x.sub)}</small></button><span aria-hidden="true" style="color:var(--ink-faint,#8A8377);font-weight:800">›</span></div>`).join('')}</div>` : ''}
     ${plants.length ? `<div class="pg-chores"><h3>🪴 Plants · ${plantsLeft} to do</h3>${plants.slice(0, 6).map(j => `<div class="pg-ch${j.done ? ' d' : ''}${j.late ? ' late' : ''}"><button type="button" class="pg-tick" data-pg-plant="${esc(j.plantId)}" data-kind="${esc(j.kind)}" aria-pressed="${j.done}" aria-label="${j.done ? 'Undo' : 'Done'}: ${esc(j.name)} ${esc(j.plant)}">${j.done ? '✓' : ''}</button><span aria-hidden="true">${j.icon}</span><span><span class="t">${esc(j.name)} · ${esc(j.plant)}</span>${j.late && !j.done ? `<small>${j.late} day${j.late === 1 ? '' : 's'} late</small>` : ''}</span><button type="button" class="pg-now" data-pg-plants aria-label="Open Plants" title="Open Plants">🪴</button></div>`).join('')}</div>` : ''}</section>`);
 }
 
@@ -223,11 +225,12 @@ function editSheet(id) {
 }
 
 export function onClick(e) {
-  const t = e.target.closest?.('[data-pg-tab],[data-pg-tick],[data-pg-now],[data-pg-edit],[data-pg-new],[data-pg-newlist],[data-pg-filter],[data-pg-del],[data-pg-tray],[data-pg-stick],[data-pg-unstick],[data-pg-plant],[data-pg-plants],[data-pg-change],[data-pg-group],[data-pg-addpic],[data-pg-unpic],[data-pg-pic],[data-pg-sheet-tick],[data-pg-goday]'); if (!t) return false;
+  const t = e.target.closest?.('[data-pg-tab],[data-pg-tick],[data-pg-now],[data-pg-edit],[data-pg-new],[data-pg-newlist],[data-pg-filter],[data-pg-del],[data-pg-tray],[data-pg-stick],[data-pg-unstick],[data-pg-plant],[data-pg-plants],[data-pg-change],[data-pg-group],[data-pg-addpic],[data-pg-unpic],[data-pg-pic],[data-pg-sheet-tick],[data-pg-goday],[data-pg-go]'); if (!t) return false;
   const d = t.dataset;
   if ('pgTab' in d) { st.lists = true; st.tray = null; render(); window.scrollTo(0, 0); }
   else if (d.pgPlant) { save(K_PLANTS, PL.careToggle(load(K_PLANTS, { plants: [] }), d.pgPlant, d.kind, todayISO(), uid())); render(); }
   else if ('pgPlants' in d) { try { parent.show('plants'); } catch { /* opened outside Life Hub */ } }
+  else if (d.pgGo) { try { if (d.pgGo === 'admin' && d.id) parent.goAdminItem(d.id); else parent.show(d.pgGo); } catch { /* opened outside Life Hub */ } }
   else if (d.pgTick) tick(d.pgTick);
   else if (d.pgNow) { try { closeSheet(); } catch { /* no sheet open */ } doNow(d.pgNow); }
   else if (d.pgEdit) taskSheet(d.pgEdit);

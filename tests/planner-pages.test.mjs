@@ -73,7 +73,7 @@ test('the Planner page: Lists tab, spread and day extras are wired in, and nothi
   for (const bit of ["'home_tasks'", "'home_log'", 'data-pg-tick', 'data-pg-now', 'data-pg-stick', 'choreRef: id', 'data-pp-day']) assert.ok(pages.includes(bit), bit);
   assert.ok(!/localStorage\.(clear|removeItem)|removeChild/.test(pages));
   const sw = read('sw.js'); for (const f of ['./plan/chores.mjs', './plan/pages.mjs']) assert.ok(sw.includes(`'${f}'`), f);
-  const html = read('index.html'); assert.match(html, /id="b-home" class="sec navsub"/); assert.match(html, /\['plan','cp:guides','home'\]/);
+  const html = read('index.html'); assert.match(html, /id="b-home" class="sec" onclick="show\('home'\)"/, 'the old Home page is still reachable, under Old pages');
 });
 
 test('Home care: tasks by how often, and each task remembers notes, photos, history and Planner dates', () => {

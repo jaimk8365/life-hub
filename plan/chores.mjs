@@ -169,3 +169,13 @@ export function scheduleBlock(task, { date, start, id, icon }) {
   return { id, title: task.name, icon: icon || '🧹', start: /^\d{2}:\d{2}$/.test(String(start || '')) ? start : '09:00', mins: 20, cat: 'clean', pri: 'med', note: 'From Home care', repeat: { type: 'once', date }, choreRef: task.id };
 }
 export const scheduledFor = (blocks, id, today) => (blocks || []).filter(b => b && b.choreRef === id && b.repeat && b.repeat.date >= today).map(b => ({ id: b.id, date: b.repeat.date, start: b.start })).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+
+/** What else needs doing today that lives in other sections: tasks set for today and Life Admin that is due. Links only: each is ticked where it lives. */
+export function alsoToday({ tasks, admin, today }) {
+  const out = [];
+  for (const t of Array.isArray(tasks) ? tasks : []) if (t && t.status === 'today' && !t.completed) out.push({ icon: '✅', title: t.title, sub: t.tier === 'essential' ? 'Task · must' : 'Task', go: 'tasks', late: false });
+  const items = Array.isArray(admin) ? admin : (admin && Array.isArray(admin.items) ? admin.items : []);
+  for (const a of items) if (a && !a.done && a.freq !== 'none' && ISO.test(String(a.nextDue || '')) && a.nextDue <= today) out.push({ icon: '📋', title: a.name, sub: a.nextDue < today ? 'Life Admin · ' + dueWords(a.nextDue, today) : 'Life Admin · today', go: 'admin', id: a.id, late: a.nextDue < today });
+  return out;
+}
+

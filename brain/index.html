@@ -72,13 +72,13 @@ const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + St
 const nice = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
 const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch { return d; } };
 const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { alert('That could not be saved. Storage may be full.'); return false; } };
-const st = { tab: 'journal', flow: null, feel: null, after: null };
+const st = { tab: 'journal', flow: null, feel: null, after: null, next: false };
 const supportHtml = () => `<div class="help">Too heavy to carry alone? Talk to someone now: ${B.SUPPORT.map(s => `<a href="tel:${s.tel}">${esc(s.n)} ${esc(s.say)}</a>`).join(' · ')}</div>`;
 
 /* ---------- journal ---------- */
 function journalHome(today) {
   const state = read(KJ, { entries: [] }), strip = B.moodStrip(state, today), list = (state.entries || []).slice(0, 30);
-  return `<div class="flows">${Object.entries(B.FLOWS).map(([k, f]) => `<button type="button" class="flow ${k}" data-flow="${k}"><i aria-hidden="true">${f.e}</i><b>${esc(f.n)}</b><small>${esc(f.sub)}</small></button>`).join('')}</div>
+  return `${st.next ? '<div class="help" style="margin-bottom:12px;display:flex;align-items:center;gap:10px;justify-content:space-between">☀️ Saved. Ready to plan the day?<button type="button" class="btn small" data-planday>Plan my day ›</button></div>' : ''}<div class="flows">${Object.entries(B.FLOWS).map(([k, f]) => `<button type="button" class="flow ${k}" data-flow="${k}"><i aria-hidden="true">${f.e}</i><b>${esc(f.n)}</b><small>${esc(f.sub)}</small></button>`).join('')}</div>
     <section class="card"><h2>🗓️ Last 2 weeks · ${B.weekCount(state, today)} this week</h2><div class="strip" role="img" aria-label="Mood for the last 14 days">${strip.map(d => `<span class="${d.wrote ? 'wrote' : ''}${d.hard ? ' hard' : ''}${d.today ? ' today' : ''}" title="${esc(nice(d.iso))}">${d.mood ? B.MOODS.find(m => m.v === d.mood).e : d.wrote ? '✎' : ''}</span>`).join('')}</div></section>
     <section class="card"><h2>📖 What you wrote</h2>${list.map(e => { const f = B.FLOWS[e.kind] || B.FLOWS.win, mood = e.a && e.a.mood ? B.MOODS.find(m => m.v === e.a.mood).e : ''; return `<details class="en"><summary><span aria-hidden="true">${f.e}</span>${esc(f.n)} ${mood}<small>${esc(nice(e.date))}</small></summary>${B.entryLines(e).map(l => `<div class="qa"><small>${esc(l.q)}</small><p>${esc(l.a)}</p></div>`).join('')}<button type="button" class="btn soft small" data-unentry="${esc(e.id)}">Remove</button></details>`; }).join('') || '<div class="none">Nothing yet. Pick one above. Two minutes is plenty.</div>'}</section>`;
 }
@@ -152,15 +152,16 @@ function saveFlow() {
   const today = todayISO(), kind = st.flow.kind, a = st.flow.answers;
   try { if (!write(KJ, B.entryAdd(read(KJ, { entries: [] }), B.entryMake(kind, a, uid(), today, new Date().toISOString())))) return; } catch (err) { return alert(err.message); }
   if (kind === 'night' && String(a.tomorrow || '').trim() && st.flow.park !== false) { try { const raw = localStorage.getItem('cp_inbox_v1'), inbox = JSON.parse(raw === null ? '[]' : raw); if (Array.isArray(inbox)) localStorage.setItem('cp_inbox_v1', JSON.stringify([...inbox, { id: uid(), text: String(a.tomorrow).trim().slice(0, 500), at: new Date().toISOString(), source: 'park' }])); } catch { /* the journal itself is saved */ } }
-  st.after = kind === 'hard' ? B.suggest(a.feel) : null; st.flow = null; redraw(); window.scrollTo(0, 0);
+  st.after = kind === 'hard' ? B.suggest(a.feel) : null; st.flow = null; st.next = kind === 'morning'; redraw(); window.scrollTo(0, 0);
 }
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab],[data-flow],[data-mood],[data-opt],[data-back],[data-next],[data-done],[data-unentry],[data-feel],[data-fav],[data-run],[data-stop],[data-unmenu]'); if (!t) return;
+  const t = e.target.closest('[data-tab],[data-flow],[data-mood],[data-opt],[data-back],[data-next],[data-done],[data-unentry],[data-feel],[data-fav],[data-run],[data-stop],[data-unmenu],[data-planday]'); if (!t) return;
   const d = t.dataset;
   if ('stop' in d) return stopPlay();
+  if ('planday' in d) { st.next = false; try { parent.showCopilot('morning'); } catch { redraw(); } return; }
   if (d.unmenu) { write(KM, B.menuRemove(read(KM, B.MENU_START), d.unmenu, d.x)); return menu(); }
   if (d.tab) { st.tab = d.tab; return redraw(); }
-  if (d.flow) { st.flow = { kind: d.flow, i: 0, answers: {} }; redraw(); return window.scrollTo(0, 0); }
+  if (d.flow) { st.next = false; st.flow = { kind: d.flow, i: 0, answers: {} }; redraw(); return window.scrollTo(0, 0); }
   if (d.feel) { st.feel = st.feel === d.feel ? null : d.feel; return redraw(); }
   if (d.fav) { write(KF, B.favToggle(read(KF, []), d.fav)); return redraw(); }
   if (d.run) { const tool = B.TOOLS[d.run]; if (tool.kind === 'dump') { try { parent.show('overview'); } catch { alert('Open the Overview and use the Brain dump box.'); } return; } return RUN[tool.kind] && RUN[tool.kind](); }

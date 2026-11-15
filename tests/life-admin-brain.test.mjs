@@ -79,11 +79,11 @@ test('Overview: a short snapshot, each card capped', () => {
 test('Life Hub strip and menu: shortcuts always there, grouped pages, every section still reachable', () => {
   const html = read('index.html');
   for (const q of ['overview', 'cp:today', 'plan', 'tasks', 'finance']) assert.match(html, new RegExp(`data-q="${q}"`));
-  assert.match(html, /id="crumbSub"/); assert.match(html, /const NAV_GROUPS = \[\['plan','cp:guides','home'\], \['family','kids','board'\], \['kitchen','recipes'\], \['brain','course'\]\]/);
+  assert.match(html, /id="crumbSub"/); assert.match(html, /const NAV_GROUPS = \[\['plan','cp:guides'\], \['family','kids','board'\], \['kitchen','recipes'\]\]/);
   for (const id of ['f-overview', 'f-board', 'b-overview', 'navMe', 'navMeBtn']) assert.match(html, new RegExp(`id="${id}"`));
   assert.match(html, /function goPlanDate\(iso\)/); assert.match(html, /function goAdminItem\(id\)/);
   const nav = html.slice(html.indexOf('<nav aria-label'), html.indexOf('</nav>'));
-  assert.deepEqual([...nav.matchAll(/class="nav-label">([^<]+)</g)].map(m => m[1]), ['My day', 'Plan', 'Home &amp; family', 'Money &amp; paperwork', 'Me']);
+  assert.deepEqual([...nav.matchAll(/class="nav-label">([^<]+)</g)].map(m => m[1]), ['My day', 'Plan', 'Home &amp; family', 'Money &amp; paperwork', 'Me', 'Old pages']);
   const sw = read('sw.js'); for (const f of ['./admin/core.mjs', './admin/plus.mjs', './overview/index.html', './overview/core.mjs']) assert.ok(sw.includes(`'${f}'`), f);
 });
 
@@ -175,5 +175,5 @@ test('Family hides the duplicate "What\'s due" card; Overview takes over weather
   const blocks = [{ id: 'm', title: 'Dentist', icon: '🦷', start: '15:00', mins: 30, cat: 'admin', pri: 'high', repeat: { type: 'once', date: today } }];
   const s = O.snapshot({ blocks, tasks: { tasks: [{ title: 'Excursion form', status: 'today', tier: 'essential' }, { title: 'Nice to do', status: 'today', tier: 'interesting' }] }, admin: items, today, nowMin: 0 });
   assert.deepEqual(s.top3.map(t => t.title), ['Dentist', 'Excursion form', 'Telstra']); assert.equal(s.top3From, 'today');
-  const html = read('index.html'); assert.match(html, /Old Command Centre/); assert.match(html, /const NAV_ME = new Set\(\['hub',/);
+  const html = read('index.html'); assert.match(html, /Old Command Centre/); assert.match(html, /const NAV_ME = new Set\(\['hub','home','course',/);
 });

@@ -305,6 +305,10 @@ export function search(query, sources) {
     const where = hit(a.name || a.title) ? (a.nextDue ? 'due ' + a.nextDue : '') : f ? f[0] + ': ' + f[1] : l ? '🔗 ' + l.title : String(a.body || a.note || '').replace(/\s+/g, ' ').slice(0, 60);
     out.push({ kind: 'Life Admin', icon: '📋', title: a.name || a.title, sub: where, go: { sec: 'admin', item: a.id || null } });
   }
+  for (const p of s.plants || []) if (p && !p.archived && hit([p.name, p.spot, p.likes, ...(p.log || []).map(l => l.text)].join(' '))) out.push({ kind: 'Plant', icon: p.emoji || '🪴', title: p.name, sub: p.spot || '', go: { sec: 'plants' } });
+  for (const w of s.wish || []) if (w && w.status === 'want' && hit([w.name, w.store, w.note].join(' '))) out.push({ kind: 'Wishlist', icon: '🛍️', title: w.name, sub: w.price != null ? '$' + w.price : (w.store || ''), go: { sec: 'wish' } });
+  for (const c of s.chores || []) if (c && !c.deleted && hit([c.name, c.desc].join(' '))) out.push({ kind: 'Home care', icon: '🧹', title: c.name, sub: c.last ? 'last done ' + c.last : '', go: { sec: 'homecare' } });
+  for (const j of s.journal || []) { if (!j || !j.a) continue; const text = Object.values(j.a).flat().filter(v => typeof v === 'string').join(' · '); if (hit(text)) out.push({ kind: 'Journal', icon: '📓', title: text.slice(0, 60), sub: j.date || '', go: { sec: 'brain' } }); }
   for (const i of s.inbox || []) if (i && hit(i.text)) out.push({ kind: 'Inbox', icon: '📥', title: i.text, sub: '', go: { cp: 'inbox' } });
   const rank = r => (String(r.title || '').toLowerCase().startsWith(words[0]) ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b)).slice(0, 20);

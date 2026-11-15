@@ -15,6 +15,12 @@ function autoSortInbox() {
     for (const item of allInbox().slice(0, 60)) {
       if (item.keep) continue; // put back by hand: it waits for a choice
       const suggested = item.suggested || Engine.suggestForInbox(item.text, store.settings), target = TodayUI.autoTarget(suggested);
+      if (target === 'wish') { // something to buy: it waits on the Wishlist, not in the task list
+        const wish = TodayUI.wishFromInbox(item.text, uid(), brDate(new Date())), added = TodayUI.wishAdd(wish);
+        if (item.reminderKey ? !persist('reminders', { ...store.reminders, [item.reminderKey]: { status: 'imported', at: nowISO() } }) : !persist('inbox', store.inbox.filter(entry => entry.id !== item.id))) break;
+        if (added) { TodayUI.sortedAdd({ key: uid(), text: item.text, target, tier: '', made: { kind: 'wish', id: wish.id }, parked: !item.reminderKey, at: nowISO() }); count++; }
+        continue;
+      }
       if (TodayUI.alreadyFiled(item.text, target, store, readTaskEngine().tasks)) { // another device filed it first: just clear it here, no double
         if (item.reminderKey ? !persist('reminders', { ...store.reminders, [item.reminderKey]: { status: 'imported', at: nowISO() } }) : !persist('inbox', store.inbox.filter(entry => entry.id !== item.id))) break;
         continue;
@@ -36,6 +42,7 @@ function unsortInbox(key) {
   if (!entry || !entry.made) return;
   if (entry.made.kind === 'task') { removeTask(entry.made.id); store.tasks = readTaskEngine().tasks; }
   else if (entry.made.kind === 'idea') { if (!persist('ideas', store.ideas.filter(e => e.id !== entry.made.id))) return; }
+  else if (entry.made.kind === 'wish') { if (!TodayUI.wishTakeBack(entry.made.id)) return; }
   else if (entry.made.kind === 'note') { if (!persist('notes', { ...store.notes, notes: (store.notes.notes || []).filter(e => e.id !== entry.made.id) })) return; }
   if (!persist('inbox', [...store.inbox, { id: uid(), text: entry.text, at: nowISO(), source: 'park', keep: true }])) return;
   TodayUI.sortedTake(key);
@@ -50,6 +57,11 @@ export function patchCopilotAutoSort(source) {
   s = once(s, "  else if (action === 'sort-inbox') sortInbox(button.dataset.id, button.dataset.target);", "  else if (action === 'sort-inbox') sortInbox(button.dataset.id, button.dataset.target);\n  else if (action === 'unsort') unsortInbox(button.dataset.key);", 'the Inbox taps');
   s = once(s, "    refreshState();\n    render();\n  }\n});\nwindow.addEventListener('hashchange'", "    refreshState();\n    render();\n    autoSortInbox();\n  }\n});\nwindow.addEventListener('hashchange'", 'the storage listener');
   s = once(s, "render();\nif (!store.settings.workFridayAnchor) askFridayAnchor();", "render();\nsetTimeout(autoSortInbox, 300);\nif (!store.settings.workFridayAnchor) askFridayAnchor();", 'the start-up');
-  s = once(s, "window.addEventListener('message', readRouteMessage);", FUNCS + "window.addEventListener('message', readRouteMessage);", 'the place for the functions');
+  const END = "window.addEventListener('message', readRouteMessage);", START = '/* Inbox sorts itself: every waiting thought';
+  if (!s.includes(FUNCS + END)) {
+    const from = s.indexOf(START), to = s.indexOf(END);
+    if (to < 0) throw new Error('Co-Pilot auto-sort patch: could not find the place for the functions');
+    s = from >= 0 && from < to ? s.slice(0, from) + FUNCS + s.slice(to) : s.slice(0, to) + FUNCS + s.slice(to); // an older copy is replaced, never doubled
+  }
   return s;
 }
