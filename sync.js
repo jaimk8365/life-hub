@@ -28,7 +28,8 @@ const TRACKED = [
   { prefix: 'plants_',     frame: 'f-plants'  },  // Plants — each plant, its care plan and history (photos stay on the device)
   { prefix: 'wish_',       frame: 'f-wish'    },  // Wishlist — things liked but not bought yet, with a small picture each
   { prefix: 'brain_',      frame: 'f-brain'   },  // Brain — journal entries, feel-good menu, favourite tools
-  { prefix: 'health_',     frame: 'f-health'  },  // Health — daily readings, goals, what to track
+  { prefix: 'health_',     frame: 'f-health'  },
+  { prefix: 'focus_',      frame: 'f-focus'   },  // Focus — sessions, shells and beach things  // Health — daily readings, goals, what to track
 ];
 const T_KEY = 'lifehub_gh_token', G_KEY = 'lifehub_gist_id',
       M_KEY = 'lifehub_sync_meta', LAST_KEY = 'lifehub_sync_last';

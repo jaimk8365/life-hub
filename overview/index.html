@@ -58,7 +58,7 @@ const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + St
 const dayWord = (iso, today) => iso === today ? 'Today' : iso === Day.addDays(today, 1) ? 'Tomorrow' : new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short' });
 const st = document.createElement('style'); st.textContent = Day.SHARED_CSS; document.head.appendChild(st);
 
-let draft = '', said = '', tab = 'today';
+let draft = '', said = '', tab = 'today', listening = false;
 const FACES = ['', '😣', '😕', '😐', '🙂', '😄'];
 function weekHtml(today) {
   const w = weekReview({ journal: read('brain_journal_v1', null), habits: read('cp_habits_v1', null), health: read('health_v1', null), homeLog: read('home_log', []), plants: read('plants_v1', null), wish: read('wish_v1', null), admin: read('la_items', []), today });
@@ -71,7 +71,7 @@ function weekHtml(today) {
     + card('👀 Coming up', `<div class="chips">${stat('📋', w.due, 'due in 7 days', 'admin')}${stat('🛍️', w.ready, 'to decide', 'wish')}</div>`);
 }
 function draw() {
-  const typing = document.activeElement && document.activeElement.matches && document.activeElement.matches('#dump textarea'); if (typing) return; // never redraw under your typing
+  const typing = listening || (document.activeElement && document.activeElement.matches && document.activeElement.matches('#dump textarea')); if (typing) return; // never redraw under your typing or talking
   const today = todayISO(), now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
   const s = snapshot({ blocks: read('plan_blocks', []), done: read('plan_done', {}), money: read('plan_money_dates', []), admin: read('la_items', []), goals: read('plan_goals_v1', []), habits: read('cp_habits_v1', null), tasks: read('hq_task_engine_v1', null), inbox: read('cp_inbox_v1', []), calendar: read('lhcache_cal_v1', []), guides: read('cp_guides_v1', null), today, nowMin });
   const plantState = read('plants_v1', null), plantJobs = plantState && Array.isArray(plantState.plants) && plantState.plants.some(p => !p.archived) ? plantsDue(plantState, today).filter(j => !j.done).length : null;
@@ -81,7 +81,7 @@ function draw() {
   document.getElementById('root').innerHTML =
     card('🎯 Right now', 'cp:now', Day.nowNextHtml(s.nowNext, { esc, nowMin, at: Date.now() }) + `<div class="chips" style="margin-top:10px"><button type="button" class="chip" data-go="plan"><strong>${s.day.done}/${s.day.total}</strong> today</button><button type="button" class="chip" data-go="cp:inbox">📥 <strong>${s.counts.inbox}</strong> inbox</button><button type="button" class="chip" data-go="tasks">✅ <strong>${s.counts.tasks}</strong> tasks</button>${plantJobs === null ? '' : `<button type="button" class="chip${plantJobs ? '' : ' on'}" data-go="plants">🪴 <strong>${plantJobs}</strong> plants</button>`}<button type="button" class="chip" data-go="finance">💰 Money</button></div>`, 'wide')
     + card(s.top3From === 'week' ? '⭐ Top 3 this week' : '⭐ Top 3 today', 'cp:now', s.top3.length ? `<div class="top">${s.top3.map((t, n) => `<div class="${t.done ? 'done' : ''}"><b>${n + 1}</b><span>${esc(t.title)}</span></div>`).join('')}</div>` : '<div class="none">Nothing urgent. Pick your three on Now.</div>')
-    + card('🧠 Brain dump', 'cp:inbox', `<form class="dump" id="dump"><textarea name="text" placeholder="Get it out of your head. One thought per line." aria-label="Brain dump">${esc(draft)}</textarea><button type="submit" aria-label="Park these thoughts">＋</button></form><div class="said" id="said" role="status">${esc(said)}</div>`)
+    + card('🧠 Brain dump', 'cp:inbox', `<form class="dump" id="dump"><button type="button" id="dumpMic" style="border:0;border-radius:14px;min-width:52px;background:var(--sun-soft,#FFF3C4);font-size:22px;cursor:pointer" aria-label="Speak instead of typing">🎤</button><textarea name="text" placeholder="Get it out of your head. One thought per line." aria-label="Brain dump">${esc(draft)}</textarea><button type="submit" aria-label="Park these thoughts">＋</button></form><div class="said" id="said" role="status">${esc(said)}</div>`)
     + card('📅 Coming up', 'plan', s.coming.length ? s.coming.map(e => `<button type="button" class="row" data-go="plan" data-date="${esc(e.date)}"><i aria-hidden="true">📅</i><span><b>${esc(e.title)}</b><small>${e.start ? esc(Day.to12(e.start)) : 'All day'}</small></span><em class="${e.today ? 'hot' : ''}">${esc(dayWord(e.date, today))}</em></button>`).join('') : '<div class="none">Nothing on the calendar this week</div>')
     + card('⭐ Musts this week', 'plan', s.musts.length ? s.musts.map(m => `<button type="button" class="row" data-go="plan" data-date="${esc(m.date)}"><i aria-hidden="true">${esc(m.icon)}</i><b>${esc(m.title)}</b><em class="${m.today ? 'hot' : ''}">${esc(dayWord(m.date, today))}</em></button>`).join('') + (s.mustsMore ? `<div class="none">＋ ${s.mustsMore} more</div>` : '') : '<div class="none">✨ No musts left this week</div>')
     + card('📋 Due soon', 'admin', s.due.length ? s.due.map(d => `<button type="button" class="row" data-item="${esc(d.id)}"><i aria-hidden="true">📋</i><b>${esc(d.name)}</b><em class="${d.tone}">${esc(d.words)}</em></button>`).join('') + (s.dueMore ? `<div class="none">＋ ${s.dueMore} more</div>` : '') : '<div class="none">✨ Nothing due for 2 weeks</div>')
@@ -89,6 +89,7 @@ function draw() {
     + card('🎯 Goals', 'plan', s.goals.length ? s.goals.map(g => `<div class="goal"><b>${esc(g.icon)} ${esc(g.name)}</b><div class="bar"><u style="width:${g.pct}%"></u></div><small>${g.finished ? '🎉 done' : g.next ? '➜ ' + esc(g.next) : ''}</small></div>`).join('') : '<div class="none">Add a goal on the Planner week</div>')
     + card('🌱 Habits today', 'cp:today', s.habits.length ? `<div class="chips">${s.habits.map(h => `<span class="chip ${h.doneToday ? 'on' : ''}">${h.doneToday ? '✓' : esc(h.icon)} ${esc(h.name)} · ${h.last7}/7</span>`).join('')}</div>` : '<div class="none">Add habits on Today</div>', 'wide');
   Day.startCountdowns(document, window);
+  const mic = document.getElementById('dumpMic'), box = document.querySelector('#dump textarea'); if (mic && box) import('../voice.mjs').then(v => v.attach(mic, box, { onState: on => { listening = on; } })).catch(() => { mic.hidden = true; });
 }
 document.addEventListener('click', e => {
   const seg = e.target.closest('[data-tab]'); if (seg) { tab = seg.dataset.tab; return draw(); }

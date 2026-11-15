@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Focus — Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--paper:#FFF8E8;--card:#fff;--ink:#15384D;--ink-soft:#3F5C6B;--ink-faint:#5F7A88;--line:#F1E1BD;--line-soft:#F8EFD9;--coral:#FF7A45;--good:#1F9A62;--sun:#FFC93C;--sun-soft:#FFF3C4;--sea:#1A7FBD;--sea-soft:#DFF0FA;--mint:#14B8A6;--mint-soft:#D9F7F1;--hour:56px}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;padding:14px 14px calc(40px + env(safe-area-inset-bottom,0px))}
+  .wrap{max-width:820px;margin:0 auto}
+  button{font-family:inherit;cursor:pointer;color:var(--ink)}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 2px 12px}
+  h1{font:600 24px 'Fraunces',serif;margin:0}
+  .btn{border:0;border-radius:14px;min-height:46px;padding:0 16px;background:var(--ink);color:#fff;font:800 15px inherit;font-family:inherit}
+  .btn.soft{background:var(--card);color:var(--ink);border:1px solid var(--line)}.btn.go{background:var(--mint);color:#04332E}
+  .friend{background:linear-gradient(180deg,var(--sea-soft) 0 55%,#FBE7B6 55% 100%);border:1px solid var(--line);border-radius:24px;padding:14px;margin:0 0 12px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center}
+  .friend .who{font-size:52px;line-height:1}.friend b{font:600 18px 'Fraunces',serif;display:block}.friend small{font-weight:700;color:var(--ink-soft);font-size:13px}
+  .stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.stats span{background:rgba(255,255,255,.85);border-radius:999px;padding:4px 10px;font:800 12.5px inherit}
+  .beach{grid-column:1/-1;font-size:24px;letter-spacing:4px;min-height:30px}
+  .start{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px;margin:0 0 12px}
+  .start h2,.cal h2{font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px}
+  .start input[type=text]{width:100%;height:48px;border:1.5px solid var(--line);border-radius:14px;padding:0 13px;font:600 16px inherit;font-family:inherit;color:var(--ink);background:var(--paper);outline:none}
+  .presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0}
+  .presets button{border:2px solid var(--line);border-radius:14px;background:var(--paper);min-height:52px;font:800 16px inherit;font-family:inherit}.presets button.on{border-color:var(--coral);background:var(--sun-soft)}
+  .presets small{display:block;font-size:11px;font-weight:700;color:var(--ink-faint)}
+  .cal{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px;margin:0 0 12px}
+  .daynav{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:6px;align-items:center;margin:0 0 8px}.daynav button{min-height:44px;border:1px solid var(--line);border-radius:12px;background:var(--paper);font-size:18px}
+  .daynav b{text-align:center;font:600 17px 'Fraunces',serif}
+  .allday{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}.allday span{background:var(--sea-soft);border-radius:999px;padding:4px 10px;font-weight:700;font-size:13px}
+  .grid{position:relative;display:grid;grid-template-columns:44px minmax(0,1fr)}
+  .hrs{display:grid}.hrs div{height:var(--hour);font:800 11px system-ui,sans-serif;color:var(--ink-faint);text-align:right;padding-right:8px;transform:translateY(-6px)}
+  .lane{position:relative;border-left:1px solid var(--line)}
+  .slot{display:block;width:100%;height:var(--hour);border:0;border-top:1px solid var(--line-soft);background:transparent;padding:0}.slot:hover,.slot:focus-visible{background:var(--sun-soft)}
+  .blk{position:absolute;border:0;border-radius:10px;padding:4px 7px;text-align:left;overflow:hidden;font:700 12.5px/1.25 inherit;font-family:inherit;color:var(--ink);background:var(--mint-soft);border-left:5px solid var(--mint);box-shadow:0 2px 6px rgba(0,0,0,.06)}
+  .blk.event{background:var(--sea-soft);border-left-color:var(--sea)}.blk.routine{opacity:.7}.blk.must{border-left-color:var(--coral);background:#FFE8DC}.blk.done{opacity:.45;text-decoration:line-through}
+  .blk small{display:block;font-weight:700;color:var(--ink-soft);font-size:11px}
+  .now{position:absolute;left:0;right:0;height:2px;background:var(--coral);pointer-events:none;z-index:2}.now::before{content:'';position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--coral)}
+  .timer{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:linear-gradient(180deg,var(--sea-soft) 0 58%,#FBE7B6 58% 100%)}.timer.on{display:flex}
+  .ring{position:relative;width:240px;height:240px}.ring svg{width:100%;height:100%}.ring .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .castle{font-size:70px;line-height:1}.ring .left{font:600 34px 'Fraunces',serif}
+  .timer h2{font:600 22px 'Fraunces',serif;margin:0;max-width:340px;overflow-wrap:anywhere}.timer p{margin:0;font-weight:700;max-width:340px}
+  .turtle{font-size:44px;line-height:1;transition:transform .6s}.turtle.sad{transform:rotate(-15deg)}
+  @media (prefers-reduced-motion:no-preference){.turtle.busy{animation:bob 2.4s ease-in-out infinite}@keyframes bob{50%{transform:translateY(-6px)}}}
+  .trow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .scrim{position:fixed;inset:0;background:rgba(21,56,77,.45);z-index:70;display:none;align-items:flex-end;justify-content:center}.scrim.on{display:flex}@media(min-width:620px){.scrim{align-items:center}}
+  .sheet{background:var(--paper);width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:18px 16px calc(22px + env(safe-area-inset-bottom,0px));max-height:90vh;overflow-y:auto}@media(min-width:620px){.sheet{border-radius:22px}}
+  .sheet h2{font:600 20px 'Fraunces',serif;margin:0 0 6px}.close{float:right;border:0;background:var(--line-soft);width:36px;height:36px;border-radius:50%;font-size:16px}
+  .field{margin-top:12px}.field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px}
+  .field input{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;padding:0 12px;font:500 16px inherit;font-family:inherit;color:var(--ink);background:var(--card)}
+  .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.row .btn{flex:1}
+  .shop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.shop button{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:10px;display:grid;justify-items:center;gap:2px;font:700 13px inherit;font-family:inherit}.shop button i{font-style:normal;font-size:30px}.shop button.own{background:var(--mint-soft)}
+  .log{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;padding:7px 0;border-top:1px solid var(--line-soft);font-size:14px;font-weight:600}.log:first-of-type{border-top:0}
+  .chk{display:flex;align-items:center;gap:10px;font-weight:700;margin-top:12px;min-height:44px}
+  button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+</style>
+<link rel="stylesheet" href="../theme-jaimi.css" />
+</head>
+<body>
+<div class="wrap"><div id="root"></div></div>
+<div class="timer" id="timer" role="dialog" aria-modal="true" aria-live="polite"></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<script type="module">
+import * as F from './core.mjs';
+import * as Day from '../plan/core.mjs';
+const KF = 'focus_v1', KS = 'focus_live_v1';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const read = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch { return d; } };
+const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { alert('That could not be saved. Storage may be full.'); return false; } };
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const st = { iso: todayISO(), mins: 25, title: '' };
+let live = read(KS, null), tick = 0;
+
+function draw() {
+  const el = document.activeElement; if (el && el.matches && el.matches('input') && document.getElementById('root').contains(el)) return;
+  const iso = st.iso, today = todayISO(), f = read(KF, { shells: 0, owned: [], sessions: [] }), t = F.today(f, today);
+  const g = F.grid({ blocks: read('plan_blocks', []), events: read('lhcache_cal_v1', []), done: read('plan_done', {}), iso });
+  const hour = 56, w = 100 / g.lanes, label = new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' });
+  const owned = (f.owned || []).map(id => F.SHOP.find(x => x.id === id)).filter(Boolean);
+  document.getElementById('root').innerHTML = `<div class="head"><h1>⏱️ Focus</h1><button type="button" class="btn soft" data-shop>🐚 ${f.shells || 0}</button></div>
+    <section class="friend"><div class="who" aria-hidden="true">🐢</div><div><b>Shelly is ready to build</b><small>${t.mins ? `You focused ${t.mins} min today. Nice.` : 'Pick something small and start.'}</small>
+      <div class="stats"><span>⏱️ ${t.mins} min</span><span>✅ ${t.done} done</span>${t.streak > 1 ? `<span>🔥 ${t.streak} days</span>` : ''}</div></div>
+      ${owned.length ? `<div class="beach" aria-label="Your beach">${owned.map(x => x.e).join('')}</div>` : ''}</section>
+    <section class="start"><h2>🎯 Focus now</h2><input type="text" id="ftitle" value="${esc(st.title)}" placeholder="What are you working on?" aria-label="What are you working on">
+      <div class="presets" role="group" aria-label="How long">${F.PRESETS.map(m => `<button type="button" class="${st.mins === m ? 'on' : ''}" data-mins="${m}" aria-pressed="${st.mins === m}">${m}<small>min</small></button>`).join('')}</div>
+      <button type="button" class="btn go" data-go style="width:100%">▶ Start ${st.mins} minutes</button></section>
+    <section class="cal"><h2>🗓️ Time blocks</h2><div class="daynav"><button type="button" data-day="-1" aria-label="Day before">‹</button><b>${iso === today ? 'Today' : esc(label)}</b><button type="button" data-day="1" aria-label="Next day">›</button></div>
+      ${g.allday.length ? `<div class="allday">${g.allday.map(x => `<span>📅 ${esc(x)}</span>`).join('')}</div>` : ''}
+      <div class="grid"><div class="hrs" aria-hidden="true">${g.hours.map(h => `<div>${h % 12 || 12}${h < 12 ? 'am' : 'pm'}</div>`).join('')}</div>
+      <div class="lane">${g.hours.map(h => `<button type="button" class="slot" data-slot="${String(h).padStart(2, '0')}:00" aria-label="Add a block at ${h % 12 || 12}${h < 12 ? 'am' : 'pm'}"></button>`).join('')}
+        ${g.items.map(x => `<button type="button" class="blk ${x.kind}${x.routine ? ' routine' : ''}${x.must ? ' must' : ''}${x.done ? ' done' : ''}" data-blk="${esc(x.id)}" data-title="${esc(x.title)}" data-len="${x.mins}" style="top:${x.top / 60 * hour}px;height:${Math.max(22, x.height / 60 * hour - 2)}px;left:calc(${x.lane * w}% + 3px);width:calc(${w}% - 6px)" aria-label="${esc(x.title)}, ${esc(Day.to12(x.start))}, ${x.mins} minutes. Tap to focus on it.">${esc(x.icon)} ${esc(x.title)}<small>${esc(Day.to12(x.start))} · ${x.mins}m</small></button>`).join('')}
+        ${iso === today && nowMin() >= F.FROM && nowMin() < F.TO ? `<div class="now" style="top:${(nowMin() - F.FROM) / 60 * hour}px" aria-hidden="true"></div>` : ''}</div></div>
+      <p style="font-size:12.5px;color:var(--ink-faint);font-weight:700;margin:10px 0 0">Tap a block to focus on it. Tap an empty hour to add one. Changes show in your Planner.</p></section>
+    ${t.list.length ? `<section class="cal"><h2>📖 Today's focus</h2>${t.list.map(x => `<div class="log"><span>${x.done ? '🏰' : '🏖️'}</span><span>${esc(x.title || 'Focus')}</span><span>${x.mins} min</span></div>`).join('')}</section>` : ''}`;
+  if (iso === today) { const lane = document.querySelector('.lane'); if (lane && !draw.scrolled) { draw.scrolled = true; window.scrollTo(0, Math.max(0, lane.getBoundingClientRect().top + window.scrollY + (nowMin() - F.FROM - 60) / 60 * hour - 120)); } }
+}
+
+/* ---------- the timer ---------- */
+const ringSvg = p => { const r = 108, c = 2 * Math.PI * r; return `<svg viewBox="0 0 240 240" aria-hidden="true"><circle cx="120" cy="120" r="${r}" fill="rgba(255,255,255,.7)" stroke="#F3E6C8" stroke-width="14"/><circle cx="120" cy="120" r="${r}" fill="none" stroke="#14B8A6" stroke-width="14" stroke-linecap="round" stroke-dasharray="${(c * p).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 120 120)"/></svg>`; };
+const clock = ms => { const s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+function paintTimer(msg) {
+  const now = Date.now(), box = document.getElementById('timer'); if (!live) { box.classList.remove('on'); box.innerHTML = ''; return; }
+  const left = F.remaining(live, now), p = F.progress(live, now), paused = !!live.pausedAt;
+  box.classList.add('on');
+  box.innerHTML = `<h2>${esc(live.title || 'Focus time')}</h2><div class="ring">${ringSvg(p)}<div class="mid"><div class="castle" aria-hidden="true">${F.castleAt(p)}</div><div class="left" aria-label="${clock(left)} left">${clock(left)}</div></div></div>
+    <div class="turtle ${paused ? 'sad' : 'busy'}" aria-hidden="true">🐢</div><p>${esc(msg || (paused ? 'Shelly is waiting for you.' : 'Shelly is building while you focus. Stay on this screen.'))}</p>
+    <div class="trow"><button type="button" class="btn soft" data-pause>${paused ? '▶ Keep going' : '⏸ Pause'}</button><button type="button" class="btn soft" data-stop>■ Stop</button></div>`;
+}
+function startTimer(mins, title) {
+  if (live) return paintTimer(); live = F.startSession({ mins, title, at: Date.now() }); write(KS, live); paintTimer(); run();
+}
+function run() { clearInterval(tick); tick = setInterval(() => { if (!live) return clearInterval(tick); if (F.remaining(live, Date.now()) <= 0) return end(true); if (!document.hidden && !live.pausedAt) { const left = document.querySelector('.ring .left'), castle = document.querySelector('.ring .castle'), svg = document.querySelector('.ring svg'); if (left) left.textContent = clock(F.remaining(live, Date.now())); if (castle) castle.textContent = F.castleAt(F.progress(live, Date.now())); if (svg) svg.outerHTML = ringSvg(F.progress(live, Date.now())); } }, 1000); }
+function end(done) {
+  if (!live) return; clearInterval(tick);
+  const out = F.finish(read(KF, null), live, { now: Date.now(), iso: todayISO(), id: uid(), done }); write(KF, out.state); live = null; try { localStorage.removeItem(KS); } catch { /* fine */ }
+  const box = document.getElementById('timer');
+  box.innerHTML = done ? `<div style="font-size:80px" aria-hidden="true">🏰</div><h2>Built it! ${out.mins} minutes.</h2><p>🐚 +${out.shells} shells. Shelly is very proud.</p><div class="trow"><button type="button" class="btn go" data-break>☕ 5-minute break</button><button type="button" class="btn soft" data-close-timer>Done</button></div>`
+    : `<div style="font-size:70px" aria-hidden="true">🏖️</div><h2>${out.mins ? out.mins + ' minutes still count.' : 'That is okay.'}</h2><p>Starting again is the skill. Shelly will be here.</p><div class="trow"><button type="button" class="btn soft" data-close-timer>Done</button></div>`;
+  box.classList.add('on'); draw();
+  try { if (done && navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch { /* no buzz here */ }
+}
+function brk() { let left = 300; const box = document.getElementById('timer'); box.innerHTML = `<div style="font-size:70px" aria-hidden="true">☕</div><div class="left" id="blft" style="font:600 44px 'Fraunces',serif">5:00</div><p>Stand up, stretch, have water. Not your phone.</p><div class="trow"><button type="button" class="btn soft" data-close-timer>Skip</button></div>`; clearInterval(tick); tick = setInterval(() => { left--; const el = document.getElementById('blft'); if (el) el.textContent = clock(left * 1000); if (left <= 0) { clearInterval(tick); box.innerHTML = `<div style="font-size:70px" aria-hidden="true">🐢</div><h2>Ready for another?</h2><div class="trow"><button type="button" class="btn go" data-again>▶ ${st.mins} more minutes</button><button type="button" class="btn soft" data-close-timer>Not now</button></div>`; } }, 1000); }
+
+/* leaving the screen: your friend notices if you are gone long; time away never counts */
+document.addEventListener('visibilitychange', () => {
+  if (!live) return;
+  if (document.hidden) { live = F.leave(live, Date.now()); write(KS, live); return; }
+  const back = F.come(live, Date.now()); live = back.s; write(KS, live);
+  if (F.remaining(live, Date.now()) <= 0) return end(true);
+  paintTimer(back.noticed ? `You wandered off for ${Math.round(back.away / 60000) || 1} min. Shelly saved your spot. Keep going?` : '');
+});
+
+/* ---------- sheets ---------- */
+const sheet = html => { document.getElementById('sheet').innerHTML = '<button type="button" class="close" data-close aria-label="Close">✕</button>' + html; document.getElementById('scrim').classList.add('on'); };
+const closeSheet = () => document.getElementById('scrim').classList.remove('on');
+function blockSheet(start) { sheet(`<h2>＋ Time block</h2><form data-form="block" autocomplete="off"><div class="field"><label for="b-title">What</label><input id="b-title" name="title" placeholder="e.g. Deep work: claims"></div>
+  <div class="field"><label for="b-start">Start</label><input id="b-start" name="start" type="time" value="${esc(start)}"></div><div class="field"><label for="b-mins">How long (minutes)</label><input id="b-mins" name="mins" type="number" min="5" max="240" value="30" inputmode="numeric"></div>
+  <label class="chk"><input type="checkbox" name="focus" checked> 🎯 A focus block</label><div class="row"><button type="submit" class="btn">Add to my day</button></div></form>`); setTimeout(() => document.getElementById('b-title')?.focus(), 60); }
+function focusSheet(title, len) { const mins = Math.max(5, Math.min(120, len)); sheet(`<h2>🎯 ${esc(title)}</h2><p style="font-weight:700;margin:0 0 4px">Focus on this now?</p><div class="presets">${[...new Set([5, 15, 25, mins])].sort((a, b) => a - b).slice(0, 4).map(m => `<button type="button" data-focusit="${m}">${m}<small>min</small></button>`).join('')}</div>`); focusSheet.title = title; }
+function shopSheet() { const f = read(KF, { shells: 0, owned: [] }); sheet(`<h2>🐚 ${f.shells || 0} shells</h2><p style="margin:0;font-weight:700;color:var(--ink-soft)">Finish a focus session to earn shells: 1 for every 5 minutes. Spend them on Shelly's beach.</p><div class="shop">${F.SHOP.map(x => { const own = (f.owned || []).includes(x.id); return `<button type="button" class="${own ? 'own' : ''}" data-buy="${x.id}" ${own ? 'aria-pressed="true"' : ''}><i aria-hidden="true">${x.e}</i>${esc(x.n)}<small>${own ? '✓ yours' : '🐚 ' + x.cost}</small></button>`; }).join('')}</div>`); }
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'scrim') return closeSheet();
+  const t = e.target.closest('[data-mins],[data-go],[data-day],[data-slot],[data-blk],[data-focusit],[data-shop],[data-buy],[data-close],[data-pause],[data-stop],[data-break],[data-again],[data-close-timer]'); if (!t) return; const d = t.dataset;
+  if (d.mins) { st.title = document.getElementById('ftitle')?.value || st.title; st.mins = Number(d.mins); return draw(); }
+  if ('go' in d) { st.title = document.getElementById('ftitle')?.value || ''; return startTimer(st.mins, st.title); }
+  if (d.day) { st.iso = Day.addDays(st.iso, Number(d.day)); return draw(); }
+  if (d.slot) return blockSheet(d.slot);
+  if (d.blk) return focusSheet(d.title, Number(d.len) || 25);
+  if (d.focusit) { closeSheet(); return startTimer(Number(d.focusit), focusSheet.title); }
+  if ('shop' in d) return shopSheet();
+  if (d.buy) { try { write(KF, F.buy(read(KF, null), d.buy)); shopSheet(); draw(); } catch (err) { alert(err.message); } return; }
+  if ('close' in d) return closeSheet();
+  if ('pause' in d) { live = live.pausedAt ? F.resume(live, Date.now()) : F.pause(live, Date.now()); write(KS, live); return paintTimer(); }
+  if ('stop' in d) { if (confirm('Stop now? The minutes you did still count.')) end(false); return; }
+  if ('break' in d) return brk();
+  if ('again' in d) { document.getElementById('timer').classList.remove('on'); return startTimer(st.mins, st.title); }
+  if ('closeTimer' in d) { clearInterval(tick); document.getElementById('timer').classList.remove('on'); document.getElementById('timer').innerHTML = ''; }
+});
+document.addEventListener('submit', e => {
+  const f = e.target; if (f.dataset.form !== 'block') return; e.preventDefault();
+  try { const blocks = read('plan_blocks', []); if (!Array.isArray(blocks)) throw new Error('Open your Planner once first.'); const b = F.newBlock({ title: f.title.value, start: f.start.value, mins: f.mins.value, focus: f.focus.checked }, { iso: st.iso, id: uid() }); if (!write('plan_blocks', [...blocks, b])) return; closeSheet(); draw(); }
+  catch (err) { alert(err.message); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+window.addEventListener('storage', e => { if (!e.key || e.key.startsWith('plan_') || e.key === 'lhcache_cal_v1' || e.key === KF) draw(); });
+setInterval(() => { if (!live && !document.hidden) draw(); }, 60000);
+window.fcDraw = draw;
+draw();
+if (live) { const back = F.come(live, Date.now()); live = back.s; write(KS, live); if (F.remaining(live, Date.now()) <= 0) end(true); else { paintTimer(back.noticed ? 'Welcome back. Shelly saved your spot.' : ''); run(); } }
+</script>
+</body>
+</html>

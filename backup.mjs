@@ -1,7 +1,7 @@
 // Back up everything on this device into one file: every Life Hub section's saved data, plus the photos and attached
 // files that only live on this device. Restoring puts photos and files back; it never overwrites or clears anything.
 // The file is NOT locked: it holds personal data in plain form, so the page says so before it is made.
-export const PREFIXES = ['cp_', 'hq_', 'steady_', 'nightcourt-', 'ncg_', 'lifehub_quest_', 'fin_', 'kit_', 'home_', 'la_', 'plan_', 'book_', 'bty_', 'kid_', 'wdr_', 'plants_', 'wish_', 'brain_', 'health_'];
+export const PREFIXES = ['cp_', 'hq_', 'steady_', 'nightcourt-', 'ncg_', 'lifehub_quest_', 'fin_', 'kit_', 'home_', 'la_', 'plan_', 'book_', 'bty_', 'kid_', 'wdr_', 'plants_', 'wish_', 'brain_', 'health_', 'focus_'];
 // Sign-in keys and tokens are never part of a backup, whatever they are called.
 const NEVER = /token|passcode|secret|password|_key\b|^lifehub_gh|^lifehub_gist|^fam_key/i;
 export const STORES = [{ db: 'lifehub_admin_files', store: 'files', name: 'Life Admin files' }, { db: 'lifehub_plant_photos', store: 'photos', name: 'Plant photos' }, { db: 'lifehub_home_photos', store: 'photos', name: 'Home care photos' }];

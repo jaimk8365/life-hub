@@ -235,6 +235,7 @@
     <iframe id="f-wish" title="Wishlist"></iframe>
     <iframe id="f-brain" title="Brain: journal and toolbox"></iframe>
     <iframe id="f-health" title="Health"></iframe>
+    <iframe id="f-focus" title="Focus and time blocks"></iframe>
   </div>
 
   <nav aria-label="Life Hub sections">
@@ -243,6 +244,7 @@
     <button class="routebtn" onclick="showCopilot('today')"><span class="ico">☀️</span><span>Today</span></button>
     <button id="b-copilot" class="routebtn" onclick="showCopilot('now')"><span class="ico">🎯</span><span>Now</span></button>
     <button class="routebtn" onclick="showCopilot('inbox')"><span class="ico">📥</span><span>Inbox</span><span class="count-badge" data-inbox-count hidden>0</span></button>
+    <button id="b-focus" class="sec" onclick="show('focus')"><span class="ico">⏱️</span><span>Focus</span></button>
     <span class="nav-label">Plan</span>
     <button id="b-plan" onclick="show('plan')"><span class="ico">🗓️</span><span>Planner</span></button>
     <button class="routebtn navsub" onclick="showCopilot('guides')"><span class="ico">🧭</span><span>Plan guides</span></button>
@@ -297,6 +299,7 @@
     <div class="tiles" id="lifeDay">
       <button class="tile" data-keep="1" onclick="showFromMore('overview')"><span class="ico">📊</span>Overview</button>
       <button class="tile" data-keep="1" onclick="showCopilot('now')"><span class="ico">🎯</span>Now</button>
+      <button class="tile" data-keep="1" onclick="showFromMore('focus')"><span class="ico">⏱️</span>Focus</button>
       <button class="tile" data-keep="1" onclick="showCopilot('shutdown')"><span class="ico">🌙</span>Shutdown</button>
     </div>
     <h2>Plan</h2>
@@ -358,9 +361,9 @@
   </div>
 
 <script>
-  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html', plants:'./plants/index.html', wish:'./wish/index.html', brain:'./brain/index.html', health:'./health/index.html' };
+  const SRC = { copilot:'./copilot/index.html', hub:'./hub/index.html', quest:'./quest/index.html', course:'./course/index.html', kitchen:'./kitchen/index.html', recipes:'./recipes/index.html', home:'./home/index.html', admin:'./admin/index.html', plan:'./plan/index.html', tasks:'./task-engine/index.html', reading:'./reading/index.html', beauty:'./beauty/index.html', kids:'./kids/index.html', wardrobe:'./wardrobe/index.html', family:'./family/index.html', finance:'./finance/index.html', overview:'./overview/index.html', board:'./board/index.html', plants:'./plants/index.html', wish:'./wish/index.html', brain:'./brain/index.html', health:'./health/index.html', focus:'./focus/index.html' };
   const BUTTONS = { copilot:'b-copilot' };
-  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board','plants','wish','brain','health']);
+  const MOBILE_SECTIONS = new Set(['hub','plan','tasks','course','quest','kitchen','recipes','home','admin','reading','beauty','kids','wardrobe','family','finance','overview','board','plants','wish','brain','health','focus']);
 
   /* ---- Where am I, and Back ----
      Every section change is one step in the browser's history, so the phone's back gesture, the browser's back
@@ -368,7 +371,7 @@
   const PLACE_NAMES = {
     'cp:today':'☀️ Today','cp:now':'🎯 Now','cp:inbox':'📥 Inbox','cp:guides':'🧭 Plan guides','cp:shutdown':'🌙 Shutdown',
     'cp:ideas':'💡 Idea Vault','cp:etsy':'🛍️ Etsy Studio','cp:notes':'🗒️ Notes','cp:settings':'⚙️ Settings',
-    plants:'🪴 Plants',wish:'🛍️ Wishlist',brain:'🧠 Brain',health:'❤️ Health',overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Old Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Old Home page',admin:'📋 Life Admin',
+    plants:'🪴 Plants',wish:'🛍️ Wishlist',brain:'🧠 Brain',health:'❤️ Health',focus:'⏱️ Focus',overview:'📊 Overview',board:'🖥️ Family board',hub:'🎛️ Old Command Centre',plan:'🗓️ My Planner',tasks:'✅ Tasks',kitchen:'🍳 Kitchen',recipes:'📖 Recipes',home:'🏠 Old Home page',admin:'📋 Life Admin',
     kids:'🧒 Kids',family:'👨‍👩‍👧‍👦 Family',course:'🎓 Brain course',quest:'🌙 Quests',reading:'📚 Books',beauty:'💄 Beauty',wardrobe:'👗 Wardrobe',finance:'💰 Finance'
   };
   /* Pages that belong together: the menu shows one door, and the strip shows the pages inside it. */
@@ -552,6 +555,7 @@
     if (which === 'wish') try { document.getElementById('f-wish').contentWindow.wlDraw(); } catch(e){}
     if (which === 'brain') try { document.getElementById('f-brain').contentWindow.brDraw(); } catch(e){}
     if (which === 'health') try { document.getElementById('f-health').contentWindow.hlDraw(); } catch(e){}
+    if (which === 'focus') try { document.getElementById('f-focus').contentWindow.fcDraw(); } catch(e){}
     document.querySelectorAll('.mobile-bar [data-route]').forEach(button=>button.classList.toggle('active',which==='copilot'&&button.dataset.route===copilotRoute));
     const mp = document.getElementById('morePanel'); if (mp && !mp.hidden) mp.hidden = true;
   }
@@ -712,8 +716,9 @@
     if(document.getElementById('parkSheet'))return;
     parkFocus=document.activeElement;
     parkSelection='later';
-    document.getElementById('parkRoot').innerHTML=`<div class="park-sheet" id="parkSheet"><section class="park-card" role="dialog" aria-modal="true" aria-labelledby="parkTitle"><p>Not now. It’s saved, so you won’t lose it.</p><h2 id="parkTitle">Park this thought</h2><label for="parkText">What came to mind?</label><textarea id="parkText" autofocus></textarea><div class="park-choices">${[['later','Sort later'],['home','Home task'],['work','Work task'],['idea','Idea'],['etsy','Etsy'],['note','Note']].map(([key,label])=>`<button data-park-choice="${key}" class="${key==='later'?'selected':''}" onclick="selectPark('${key}')">${label}</button>`).join('')}</div><div class="actions"><button class="cancel" onclick="closePark()">Cancel</button><button class="submit" onclick="savePark()">Park it and go back</button></div></section></div>`;
+    document.getElementById('parkRoot').innerHTML=`<div class="park-sheet" id="parkSheet"><section class="park-card" role="dialog" aria-modal="true" aria-labelledby="parkTitle"><p>Not now. It’s saved, so you won’t lose it.</p><h2 id="parkTitle">Park this thought</h2><label for="parkText">What came to mind?</label><div style="display:flex;gap:8px;align-items:stretch"><textarea id="parkText" autofocus style="flex:1;min-width:0"></textarea><button type="button" id="parkMic" style="flex:0 0 52px;border-radius:14px;font-size:22px" aria-label="Speak instead of typing">🎤</button></div><div class="park-choices">${[['later','Sort later'],['home','Home task'],['work','Work task'],['idea','Idea'],['etsy','Etsy'],['note','Note']].map(([key,label])=>`<button data-park-choice="${key}" class="${key==='later'?'selected':''}" onclick="selectPark('${key}')">${label}</button>`).join('')}</div><div class="actions"><button class="cancel" onclick="closePark()">Cancel</button><button class="submit" onclick="savePark()">Park it and go back</button></div></section></div>`;
     const input=document.getElementById('parkText');input?.focus();
+    import('./voice.mjs').then(v=>v.attach(document.getElementById('parkMic'),input)).catch(()=>{const m=document.getElementById('parkMic');if(m)m.hidden=true;});
   }
   function selectPark(value){
     parkSelection=value;
@@ -817,6 +822,22 @@
   });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  /* A newer Life Hub? Check now and then (and when you come back to the tab), and offer a one-tap refresh. */
+  let hubVersion=null;
+  async function checkVersion(){
+    try{ const t=await (await fetch('./sw.js?v='+Date.now(),{cache:'no-store'})).text(), m=t.match(/CACHE\s*=\s*'([^']+)'/); if(!m)return;
+      if(hubVersion===null){hubVersion=m[1];return;}
+      if(m[1]!==hubVersion&&!document.getElementById('hubUpdate')){const b=document.createElement('button');b.id='hubUpdate';b.type='button';b.textContent='✨ Life Hub has been updated · tap to refresh';b.style.cssText='position:fixed;z-index:80;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));border:0;border-radius:999px;padding:12px 18px;min-height:46px;font:800 14px inherit;font-family:inherit;background:var(--ink);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:92vw';b.onclick=()=>location.reload();document.body.appendChild(b);}
+    }catch(e){}
+  }
+  /* Co-Pilot can change its own page (a link inside it, the morning check-in). Follow it, so the menu always lights the page you are on. */
+  try { document.getElementById('f-copilot').addEventListener('load', e => {
+    try { const w = e.target.contentWindow; w.addEventListener('hashchange', () => {
+      const r = decodeURIComponent(String(w.location.hash || '').slice(1)) || 'now'; if (r === 'park' || r === copilotRoute) return;
+      copilotRoute = r; if (document.getElementById('f-copilot').classList.contains('active')) { navRecord({ cp: r }); navLight('cp:' + r); }
+    }); } catch(err){}
+  }); } catch(err){}
+  try { checkVersion(); window.setInterval(checkVersion,20*60000); document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkVersion();}); } catch(e){}
 </script>
 <script src="./finance/bulk-storage.js"></script>
 <script src="./sync.js"></script>
