@@ -230,20 +230,31 @@ function trustStatementOpen(acct){
   +'<label class="ck-row"><span>Statement date</span><input type="date" id="ts_date" value="'+eom+'"></label>'
   +'<label class="ck-row"><span>Closing balance</span><input id="ts_amt" inputmode="decimal" placeholder="e.g. 1,234.56 or -45.00"></label>'
   +'<button class="btn dark" style="margin-top:10px" onclick="trustStatementSave()">Compare</button><div id="ts_out" aria-live="polite"></div>'
+  +'<button class="btn ghost" style="margin-top:10px" onclick="trustCsvOpen()">📄 Or check with a bank CSV</button><p class="fx-small" style="margin-top:4px">Download the CSV for this account from your bank app. Every payment is matched one by one, so you can see exactly which ones are missing or doubled. Nothing is changed.</p>'
   +(Object.keys(last).length?'<details class="ck-ev"><summary>Last checks</summary>'+Object.values(last).map(s=>'<p class="fx-small">'+(s.ok?'✅ ':'❌ ')+esc((acctById(s.acct)||{}).name||s.acct)+' · '+esc(s.date)+' · statement '+FinFix.money(s.closing)+(s.ok?'':' · app '+FinFix.money(s.app))+'</p>').join('')+'</details>':'');
  openSheet();
 }
 async function trustStatementSave(){
- const a=acctById($('ts_acct').value);let r;
+ const a=acctById($('ts_acct').value),out=$('ts_out');let r;
+ if(out){out.innerHTML='<p class="fx-small">Checking…</p>';try{out.scrollIntoView({block:'nearest',behavior:'smooth'});}catch(e){}}
  try{r=FinFix.statementCheck(a,TXNS,$('ts_date').value,$('ts_amt').value,new Date().toISOString());}catch(e){$('ts_out').innerHTML='<p class="fx-small" style="color:var(--bad)">'+esc(e.message)+'</p>';return;}
  const s=load(K_STATEMENTS,{latest:{},history:[]})||{latest:{},history:[]};s.latest=s.latest||{};s.history=(s.history||[]);
  s.latest[a.id]=r;s.history.unshift(r);s.history=s.history.slice(0,60);
  try{await saveAtomic({[K_STATEMENTS]:s});}catch(e){$('ts_out').innerHTML='<p class="fx-small">Worked out, but could not be saved: '+esc(e.message||'')+'</p>';}
  $('ts_out').innerHTML=r.ok
   ?'<div class="tr-card tr-good"><div class="tr-h">✅ Matches your statement</div><p>'+esc(a.name)+' was '+FinFix.money(r.closing)+' on '+esc(r.date)+' in both the bank and the app. Every payment up to that day is right.</p></div>'
-  :'<div class="tr-card tr-bad"><div class="tr-h">❌ '+FinFix.money(Math.abs(r.difference))+' different</div><p>The statement says '+FinFix.money(r.closing)+'; the app says '+FinFix.money(r.app)+' for '+esc(r.date)+'. '+(r.difference>0?'The app is missing money coming in, or has a payment counted twice.':'The app is missing some spending, or has money coming in counted twice.')+'</p><button class="btn ghost" onclick="fixAcctOpen(\''+esc(a.id)+'\')">Look at '+esc(a.name)+'</button></div>';
+  :'<div class="tr-card tr-bad"><div class="tr-h">❌ '+FinFix.money(Math.abs(r.difference))+' different</div><p><button class="btn dark" onclick="trustCsvOpen(\''+esc(a.id)+'\')">📄 Find the difference with a bank CSV</button></p><p>The statement says '+FinFix.money(r.closing)+'; the app says '+FinFix.money(r.app)+' for '+esc(r.date)+'. '+(r.difference>0?'The app is missing money coming in, or has a payment counted twice.':'The app is missing some spending, or has money coming in counted twice.')+'</p><button class="btn ghost" onclick="fixAcctOpen(\''+esc(a.id)+'\')">Look at '+esc(a.name)+'</button></div>';
+ try{const box=$('ts_out');if(box&&box.firstElementChild)box.firstElementChild.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){}
  try{render();}catch(e){}
 }
+/* The bank CSV check (one payment at a time). It lives in the Finance page itself; the account chosen here is carried over. */
+function trustCsvOpen(id){
+ const acct=id||(($('ts_acct')||{}).value)||((ACCTS.find(a=>!a.hidden)||{}).id);
+ if(typeof window.openStatementCheck==='function'){window.openStatementCheck(acct);return;}
+ toastMsg('Open the account in Accounts and tap "Check bank CSV".');
+}
+/* Async functions inside this block are not global on their own, so every one a button calls is handed to the page here. */
+window.trustStatementSave=trustStatementSave;window.trustCsvOpen=trustCsvOpen;window.fixSaveTxns=fixSaveTxns;window.fixSoftDelete=fixSoftDelete;
 
 /* Screen 1: the starting point. */
 function fixOpen(){
@@ -255,6 +266,7 @@ function fixOpen(){
   +'<button class="fx-job" onclick="fixMiscOpen()"><b>1. Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
   +'<button class="fx-job" onclick="fixMatchOpen()"><b>2. Match to my bank</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
   +'<button class="fx-job" onclick="trustStatementOpen()"><b>3. Check against a statement (once a month)</b><span>The strongest check: type a statement\'s closing balance and see if the app agrees</span></button>'
+  +'<button class="fx-job" onclick="trustCsvOpen()"><b>4. Check with a bank CSV</b><span>Upload the bank\'s CSV and every payment is matched, so you see exactly which ones are missing or doubled</span></button>'
   +'<p class="fx-small">Nothing moves money. Every change can be undone.</p>';
  openSheet();
 }

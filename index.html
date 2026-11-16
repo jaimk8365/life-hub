@@ -575,13 +575,16 @@
   });
   document.addEventListener('click', (e)=>{ const p = document.getElementById('findPanel'); if (p && !p.hidden && !p.contains(e.target) && !e.target.closest('#crumbFind')) p.hidden = true; });
   // wait for the sync engine's first pull (or its ready signal) so sections open on fresh data
-  let booted = false;
+  let booted = false, navTouched = false;
+  // a tap on any menu button before start-up finishes wins: start-up never pulls you back to where it wanted to open
+  document.addEventListener('pointerdown', e => { if (!booted && e.target && e.target.closest && e.target.closest('button,a')) navTouched = true; }, true);
   const boot = () => {
     if (booted) return;
     booted = true;
     let saved = null;
     try { saved = localStorage.getItem('lifehub_tab'); } catch(e){}
     try { if (localStorage.getItem('lifehub_nav_me')) navMeSet(true); } catch(e){}
+    if (navTouched && document.querySelector('iframe.active')) return;
     // Finance is a section like any other: a saved Finance tab, or ?tab=finance, opens it here, never in a new tab.
     const query=new URLSearchParams(location.search);
     const requested=query.get('tab')==='copilot'?location.hash.slice(1)||'now':null;

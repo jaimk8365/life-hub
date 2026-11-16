@@ -166,3 +166,5 @@ function feedHtml(f){
  function act(a){if(hooks.act)hooks.act(a);}
  return{EXPLAIN,explainHtml,feedHtml,HELP,SECTIONS,setSections,sectionsFor,TABS,esc,aud,helpBtn,genericHelp,navHtml,everythingHtml,activeTab,weekPath,energy,homeHtml,hooks,help,tab,open,act};
 });
+/* Inside Life Hub (the hub page has its own left menu), Finance drops its sidebar so there is only one left menu. */
+(function(){try{if(typeof window==='undefined'||typeof document==='undefined'||window.parent===window)return;var p=window.parent.document;if(p&&p.getElementById('b-finance')&&p.getElementById('f-finance'))document.documentElement.classList.add('fin-in-hub');}catch(e){}})();
