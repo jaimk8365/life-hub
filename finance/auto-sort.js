@@ -112,14 +112,24 @@ function sortRow(t,withRight){
  return '<div class="fx-row fs-row"><span>'+esc(fixDay(t.date))+' · '+esc(FinFix.shopName(t.note))+'<small>→ '+esc((c.e||'')+' '+c.n)+' · '+esc(t.autoSort.why||'')+'</small></span><b>'+FinFix.money(-t.amount)+'</b>'
   +'<div class="fs-btns">'+(withRight?'<button type="button" class="btn soft" onclick="sortRight(\''+esc(t.id)+'\')">✓ Right</button>':'')+sortCatSelect(t.id,t.cat)+'</div></div>';
 }
+/* Same shop + same guess = one group: confirm or change the whole group at once, or open it and do them one by one. */
+function sortGroups(list){const by=new Map();list.forEach(t=>{const k=(FinFix.shopKey(t.note)||String(t.note||'').toLowerCase())+'|'+t.cat;if(!by.has(k))by.set(k,{key:k,name:FinFix.shopName(t.note),cat:t.cat,txns:[]});by.get(k).txns.push(t);});return [...by.values()].sort((a,b)=>b.txns.length-a.txns.length||a.name.localeCompare(b.name));}
+function sortGroupHtml(g,i){
+ const c=catOf(g.cat)||{e:'',n:g.cat},total=g.txns.reduce((n,t)=>n-(+t.amount||0),0),one=g.txns.length===1;
+ return '<details class="fx-group fs-group"'+(i<3&&!one?' open':'')+'><summary><span class="fx-shop">'+esc(g.name)+'</span><span class="fx-amt">'+FinFix.money(total)+'</span><span class="fx-count">'+g.txns.length+(one?' payment':' payments')+' → '+esc((c.e||'')+' '+c.n)+'</span></summary>'
+  +'<div class="fs-gbtns"><button type="button" class="btn dark" onclick="sortRightGroup('+i+')">✓ '+(one?'Right':'All '+g.txns.length+' right')+'</button>'
+  +'<select aria-label="Change all of these" onchange="sortChangeGroup('+i+',this.value)"><option value="">'+(one?'Change…':'Change all '+g.txns.length+' to…')+'</option>'+CATS.filter(c=>c.id!=='other'&&c.id!==g.cat).map(c=>'<option value="'+esc(c.id)+'">'+esc((c.e||'')+' '+c.n)+'</option>').join('')+'<option value="other">↩︎ Back to Miscellaneous</option></select></div>'
+  +(one?'':'<div class="fx-rows">'+g.txns.map(t=>sortRow(t,true)).join('')+'</div>')+'</details>';
+}
 function sortCheckOpen(){
- const list=FinSort.toCheck(TXNS),sure=FinSort.sortedSure(TXNS,FinDates.shift(todayISO(),-27)),shown=list.slice(0,40);
+ const list=FinSort.toCheck(TXNS),sure=FinSort.sortedSure(TXNS,FinDates.shift(todayISO(),-27)),groups=sortGroups(list);
+ window._sortGroups=groups;
  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixOpen()">‹ Fix my numbers</button><h2>Check what I sorted</h2>'
-  +'<p>I put these in a category myself, but I was not 100% sure. Tap ✓ Right, or change it. Your choice teaches me for next time.</p>'
-  +(shown.length?'<button class="btn dark" onclick="sortRightAll()">✓ All '+shown.length+' look right</button>'+shown.map(t=>sortRow(t,true)).join(''):'<p class="fx-done">✅ Nothing to check.</p>')
-  +(list.length>shown.length?'<p class="fx-small">'+(list.length-shown.length)+' more after these.</p>':'')
+  +'<p>I put these in a category myself, but I was not 100% sure. Same shop, same guess = one group. Confirm a whole group, or open it and check them one by one. Your choice teaches me for next time.</p>'
+  +(groups.length?(list.length>1?'<button class="btn soft" onclick="sortRightAll()">✓ All '+list.length+' look right</button>':'')+groups.map(sortGroupHtml).join(''):'<p class="fx-done">✅ Nothing to check.</p>')
   +(sure.length?'<details class="fx-group"><summary><span class="fx-shop">Sorted for sure · last 4 weeks ('+sure.length+')</span></summary><p class="fx-small">Well-known shops and shops you taught me. Change any that are wrong.</p><div class="fx-rows">'+sure.slice(0,60).map(t=>sortRow(t,false)).join('')+'</div></details>':'')
   +'<p class="fx-small">Payments I could not place stay in Miscellaneous for you to choose. Nothing moves money.</p>';
+ if(!document.getElementById('fs-css')){const st=document.createElement('style');st.id='fs-css';st.textContent='.fs-gbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.fs-gbtns .btn{flex:1;min-width:140px}.fs-gbtns select{flex:1;min-width:140px;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--card);color:var(--ink)}';document.head.appendChild(st);}
  openSheet();
 }
 async function sortSave(next,msg){
@@ -128,7 +138,15 @@ async function sortSave(next,msg){
  toastMsg(msg);if(typeof render==='function')render();sortCheckOpen();return true;
 }
 function sortRight(id){sortSave(FinSort.confirm(TXNS,[id],fixNow()),'Thanks ✓ I will remember');}
-function sortRightAll(){sortSave(FinSort.confirm(TXNS,FinSort.toCheck(TXNS).slice(0,40).map(t=>t.id),fixNow()),'All confirmed ✓');}
+function sortRightAll(){const ids=FinSort.toCheck(TXNS).map(t=>t.id);if(ids.length>3&&!confirm('Confirm all '+ids.length+' as they are?'))return;sortSave(FinSort.confirm(TXNS,ids,fixNow()),'All '+ids.length+' confirmed ✓');}
+function sortRightGroup(i){const g=(window._sortGroups||[])[i];if(!g)return;sortSave(FinSort.confirm(TXNS,g.txns.map(t=>t.id),fixNow()),(g.txns.length===1?'Thanks ✓':'All '+g.txns.length+' confirmed ✓')+' I will remember');}
+async function sortChangeGroup(i,cat){
+ const g=(window._sortGroups||[])[i];if(!g||!cat)return;
+ const key=FinFix.shopKey(g.txns[0].note),always=cat!=='other'&&key&&confirm('Move '+(g.txns.length===1?'it':'all '+g.txns.length)+' to '+(catOf(cat)?.n||cat)+'.\n\nAlways put '+g.name+' here from now on?');
+ if(always){const rules=FinFix.addRule(fixRules(),key,cat,g.name,fixNow());try{await saveAtomic({[K_CAT_RULES]:rules});}catch(e){}}
+ let next=TXNS;g.txns.forEach(t=>{next=FinSort.change(next,t.id,cat,fixNow());});
+ sortSave(next,(cat==='other'?'Back in Miscellaneous':'Moved '+g.txns.length+' to '+(catOf(cat)?.n||cat)+' ✓')+(always?' · remembered':''));
+}
 async function sortChange(id,cat){
  if(!cat)return;const t=TXNS.find(x=>String(x.id)===String(id));if(!t)return;
  const name=FinFix.shopName(t.note),key=FinFix.shopKey(t.note);
@@ -136,5 +154,5 @@ async function sortChange(id,cat){
  if(always){const rules=FinFix.addRule(fixRules(),key,cat,name,fixNow());try{await saveAtomic({[K_CAT_RULES]:rules});}catch(e){}}
  sortSave(FinSort.change(TXNS,id,cat,fixNow()),cat==='other'?'Back in Miscellaneous':'Moved to '+(catOf(cat)?.n||cat)+' ✓'+(always?' · remembered':''));
 }
-Object.assign(window,{sortCheckOpen,sortRight,sortRightAll,sortChange});
+Object.assign(window,{sortCheckOpen,sortRight,sortRightAll,sortChange,sortRightGroup,sortChangeGroup});
 }

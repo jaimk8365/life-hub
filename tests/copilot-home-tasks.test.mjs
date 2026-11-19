@@ -1,3 +1,4 @@
+import { patchCopilotFinanceLink } from '../tools/copilot-finance-link-patches.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
@@ -33,7 +34,7 @@ test('source page and patch agree, and bin keeps the task so Admin items do not 
   assert.match(src, /saveTask\(\{ \.\.\.task, status: 'binned' \}\)/);
   const backups = await readdir(new URL('../src/backups/', import.meta.url));
   const before = backups.find(name => /^copilot-2026-11-10-0545-pre-home-tasks\.html$/.test(name));
-  if (before) assert.equal(patchCopilotAutoSort(patchCopilotAdmin(patchCopilotDay(patchCopilotHomeTasks(await read('../src/backups/' + before))))), src, 'the patches reproduce the source page');
+  if (before) assert.equal(patchCopilotFinanceLink(patchCopilotAutoSort(patchCopilotAdmin(patchCopilotDay(patchCopilotHomeTasks(await read('../src/backups/' + before)))))), src, 'the patches reproduce the source page');
 });
 
 test('Life Admin done logic matches Admin: monthly bill moves to the next date after today', async () => {

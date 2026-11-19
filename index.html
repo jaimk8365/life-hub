@@ -517,6 +517,12 @@
     if (!bankFeedUiLoaded) bankFeedUiLoaded = new Promise(done => { const s = document.createElement('script'); s.src = './finance/bank-feed-ui.js'; s.onload = done; s.onerror = done; document.body.appendChild(s); });
     bankFeedUiLoaded.then(() => { try { window.BankFeedUI.open(); } catch(e){} });
   }
+  /* My Finance (the separate Finance page) was opened inside a section by an old link. It stops itself; here the section gets
+     its own page back and Finance opens as the Finance section, so there is only ever one Finance running. */
+  function lifeHubOpenFinance(win, hash){
+    try { for (const k of Object.keys(SRC)) { const f = document.getElementById('f-' + k); if (f && f.contentWindow === win) f.src = SRC[k] + (k === 'copilot' ? '#' + encodeURIComponent(copilotRoute || 'today') : ''); } } catch(e){}
+    show('finance'); if (hash === '#bankfeed') openBankFeed();
+  }
   /* A small message pill at the bottom of the screen. */
   function hubPill(text, onTap, ms){
     let b = document.getElementById('hubPill'); if (b) b.remove();

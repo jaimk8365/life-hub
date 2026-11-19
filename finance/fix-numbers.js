@@ -223,7 +223,9 @@ function trustBlock(){
   +'<details class="ck-ev"><summary>How these checks work</summary><p class="fx-small">Each account\'s balance in the app is worked out from every payment recorded in it. It is compared with the balance your bank reports through the bank feed. If the two are the same, every payment is there exactly once. A bank statement is the strongest check because it comes straight from the bank, not through the feed: once a month, type in the closing balance and the app compares it with its own figure for that day. Nothing here changes your records.</p></details>';
 }
 /* Statement check: type the closing balance from a bank statement; the app compares its own balance for that day. */
-function trustStatementOpen(acct){
+/* Check against a statement = the bank's CSV for the dates you pick (finance/csv-check.js). Typing a closing balance is still there as a fallback. */
+function trustStatementOpen(acct){if(typeof window.csvCheckOpen==='function'){window.csvCheckOpen(acct||null,'fix');return;}trustStatementTypedOpen(acct);}
+function trustStatementTypedOpen(acct){
  const accts=ACCTS.filter(a=>!a.hidden),pick=acct||(accts[0]&&accts[0].id),last=trustStatements(),eom=(()=>{const d=new Date();d.setDate(0);return d.toISOString().slice(0,10);})();
  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fh-link" onclick="fixOpen()">‹ Fix my numbers</button><h2>🧾 Check against a statement</h2>'
   +'<p>Open your bank statement (in the bank app or the PDF). Find the <b>closing balance</b> and the date it is for. Type them here. The app works out its own balance for that same day and tells you if they match.</p>'
@@ -251,11 +253,12 @@ async function trustStatementSave(){
 /* The bank CSV check (one payment at a time). It lives in the Finance page itself; the account chosen here is carried over. */
 function trustCsvOpen(id){
  const acct=id||(($('ts_acct')||{}).value)||((ACCTS.find(a=>!a.hidden)||{}).id);
+ if(typeof window.csvCheckOpen==='function'){window.csvCheckOpen(acct,'fix');return;}
  if(typeof window.openStatementCheck==='function'){window.openStatementCheck(acct);return;}
  toastMsg('Open the account in Accounts and tap "Check bank CSV".');
 }
 /* Async functions inside this block are not global on their own, so every one a button calls is handed to the page here. */
-window.trustStatementSave=trustStatementSave;window.trustCsvOpen=trustCsvOpen;window.fixSaveTxns=fixSaveTxns;window.fixSoftDelete=fixSoftDelete;
+window.trustStatementSave=trustStatementSave;window.trustCsvOpen=trustCsvOpen;window.trustStatementOpen=trustStatementOpen;window.trustStatementTypedOpen=trustStatementTypedOpen;window.fixSaveTxns=fixSaveTxns;window.fixSoftDelete=fixSoftDelete;
 
 /* Screen 1: the starting point. */
 function fixOpen(){
@@ -268,8 +271,7 @@ function fixOpen(){
   +(h.check?'<button class="fx-job" onclick="sortCheckOpen()"><b>✨ Check what I sorted</b><span>'+h.check+(h.check===1?' payment I was not sure about':' payments I was not sure about')+'</span></button>':'')
   +'<button class="fx-job" onclick="fixMiscOpen()"><b>1. Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
   +'<button class="fx-job" onclick="fixMatchOpen()"><b>2. Match to my bank</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
-  +'<button class="fx-job" onclick="trustStatementOpen()"><b>3. Check against a statement (once a month)</b><span>The strongest check: type a statement\'s closing balance and see if the app agrees</span></button>'
-  +'<button class="fx-job" onclick="trustCsvOpen()"><b>4. Check with a bank CSV</b><span>Upload the bank\'s CSV and every payment is matched, so you see exactly which ones are missing or doubled</span></button>'
+  +'<button class="fx-job" onclick="trustStatementOpen()"><b>3. Check against a statement (once a month)</b><span>Upload the bank\'s CSV, pick the dates: every payment is matched, so you see exactly which ones are missing or doubled</span></button>'
   +'<p class="fx-small">Nothing moves money. Every change can be undone.</p>';
  openSheet();
 }
@@ -285,7 +287,7 @@ function fixMiscOpen(range){
   +'<label class="fx-remember"><input type="checkbox" id="fx_rule_'+i+'" checked> Always put '+esc(g.name)+' here</label>'
   +'<button class="btn dark" onclick="fixMiscSave('+i+')">Save</button></div></details>';
  window._fixGroups=m.groups;
- $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixOpen()">‹ Fix my numbers</button><h2>Sort out Miscellaneous</h2>'
+ $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixOpen()">‹ Fix my numbers</button><h2>Sort out Miscellaneous</h2>'+(typeof catManagerOpen==='function'?'<button class="fx-back" onclick="catManagerOpen()">📂 Categories & sections · add or move one</button>':'')
   +'<p>The bank feed puts anything it does not recognise here. Tap a shop, tick the payments, and choose where they belong.</p>'
   +'<div class="fx-chips">'+chip('week','Last week')+chip('month','4 weeks')+chip('quarter','3 months')+'</div>'
   +'<p class="fx-sum"><b>'+FinFix.money(m.total)+'</b> in '+m.count+(m.count===1?' payment':' payments')+' · '+esc(r.label)+'</p>'
@@ -368,7 +370,7 @@ function fixMatchOpen(){
  const ev=typeof financeEvidence==='function'?financeEvidence():{accounts:[]},waiting=ev.accounts.filter(a=>!a.trusted);
  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixOpen()">‹ Fix my numbers</button><h2>Match to my bank</h2>'
   +'<p>Your bank balance is right. This checks whether the app adds up to the same number. Tap an account that is off to see why and fix it.</p>'
-  +'<p class="fx-small">Tip: tap 🏦 Bank feed first so the bank balances are from today.</p>'+rows
+  +'<p class="fx-small">Tip: tap 🏦 Bank feed first so the bank balances are from today.</p>'+(typeof window.csvCheckOpen==='function'?'<button class="btn dark" style="margin:6px 0 10px" onclick="csvCheckOpen(null,\'match\')">📄 Check an account with a bank CSV</button>':'')+rows
   +(waiting.length?'<div class="fx-note"><b>Spending money is held back until these are sorted:</b>'+waiting.map(a=>'<div>'+esc(a.name)+': '+esc(fixReason(a))+'</div>').join('')+'</div>':'<div class="fx-note ok">✅ Everyday, Bills and Loan Repay all check out. Spending money is shown.</div>');
  openSheet();
 }
@@ -388,7 +390,7 @@ function fixAcctOpen(id){
  const dups=FinFix.doubleUps(TXNS,id),lonely=FinFix.oneSided(TXNS,id,paired),fresh=TXNS.filter(t=>!t.deleted&&t.acct===id&&t.startFresh);
  const first=TXNS.filter(t=>!t.deleted&&t.acct===id).map(t=>t.date).sort()[0];
  const line=t=>'<div class="fx-row"><span>'+esc(fixDay(t.date))+'<small>'+esc(t.note||'')+(t.pocketsmithId!=null?' · from bank feed':' · added by hand or statement')+'</small></span><b>'+FinFix.money(t.amount)+'</b></div>';
- let html='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixMatchOpen()">‹ All accounts</button><h2>'+esc(a.name)+'</h2>';
+ let html='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixMatchOpen()">‹ All accounts</button><h2>'+esc(a.name)+'</h2>'+(typeof window.csvCheckOpen==='function'?'<button class="btn ghost" style="margin:4px 0 10px" onclick="csvCheckOpen(\''+esc(id)+'\',\'match\')">📄 Check '+esc(a.name)+' with a bank CSV</button>':'');
  if(g)html+='<div class="fx-compare"><div><small>Bank says</small><b>'+FinFix.money(g.bank)+'</b></div><div><small>App adds up to</small><b>'+FinFix.money(g.app)+'</b></div></div><p>'+esc(FinFix.gapWords(g))+'</p>';
  else html+='<p>'+esc(FinFix.gapWords(null))+'</p>';
  if(dups.length)html+='<h3>Possible double-ups ('+dups.length+')</h3><p class="fx-small">Same day and same amount, once from the bank feed and once added another way. Removing the extra copy can be undone.</p>'+dups.slice(0,30).map(p=>'<div class="fx-pair">'+line(p.keep)+line(p.extra)+'<button class="btn ghost" onclick="fixRemoveExtra(\''+esc(id)+'\',\''+esc(p.extra.id)+'\')">Remove the extra copy</button></div>').join('');

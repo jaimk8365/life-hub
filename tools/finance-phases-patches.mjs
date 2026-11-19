@@ -186,7 +186,11 @@ function prioPatch(s){
 /* Money plan: every dollar a job per account, and the next 14 days (finance/account-plan.js). */
 function planPatch(s){
   const pins='<script src="../finance/goal-pins.js?v=20261105"></script>';
-  return once(s,pins,pins+'\n<script src="../finance/account-plan.js?v=20261119"></script>','plan head');
+  s=once(s,pins,pins+'\n<script src="../finance/account-plan.js?v=20261119"></script>','plan head');
+  const plan='<script src="../finance/account-plan.js?v=20261119"></script>';
+  s=once(s,plan,plan+'\n<script src="../finance/cat-sections.js?v=20261119"></script>','sections head');
+  const secs='<script src="../finance/cat-sections.js?v=20261119"></script>';
+  return once(s,secs,secs+'\n<script src="../finance/csv-check.js?v=20261119"></script>','csv head');
 }
 export function patchPhasesFinance(source){
   let s=source;

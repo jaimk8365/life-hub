@@ -319,7 +319,7 @@ function finApAnswer(key){
 
 /* ================= Screens opened from More / Home ================= */
 function finAct(a){
-  const map={checkin:'coachOpen',reminders:'coachPrefsOpen',fixnumbers:'fixOpen',plan:'coachPlanOpen',actions:'coachActionsOpen',reviews:'coachReviewsOpen',reviewnow:'coachReviewNowOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap',comingup:'prioListOpen',pins:'goalPinsPicker'};
+  const map={checkin:'coachOpen',reminders:'coachPrefsOpen',fixnumbers:'fixOpen',plan:'coachPlanOpen',actions:'coachActionsOpen',reviews:'coachReviewsOpen',reviewnow:'coachReviewNowOpen',sync:'finSyncNow',manual:'openMoneyUpdate',autopilot:'finOpenAutopilot',moves:'finOpenMoves',files:'finOpenFiles',coach:'finOpenCoach',quests:'finOpenQuests',shop:'finOpenShop',swap:'finOpenSwap',comingup:'prioListOpen',pins:'goalPinsPicker',categories:'catManagerOpen',moneyplan:'acctPlanOpen'};
   if(finIsMatt())return;   // Matt's profile never reaches these screens
   const fn=map[a];if(fn&&typeof window[fn]==='function')window[fn]();
 }
