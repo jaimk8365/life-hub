@@ -197,7 +197,8 @@ const TRUST_ICON={good:'✅',warn:'⚠️',bad:'❌',note:'ℹ️'};
 const TRUST_FIX={sync:'Sync now',feed:'Bank feed settings',match:'Open',sortcheck:'Check them',misc:'Sort them',conflicts:'Review',statement:'Check a statement'};
 function trustFix(kind,acct){
  if(kind==='sync'){closeSheet();if(typeof finSyncNow==='function')finSyncNow().then(()=>{try{render();}catch(e){}});return;}
- if(kind==='feed'){try{(window.top||window).location.assign(new URL('app.html#bankfeed',location.href).href);}catch(e){location.assign('app.html#bankfeed');}return;}
+ // Inside Life Hub the bank feed settings open as a panel here. Only Finance opened on its own falls back to My Finance.
+ if(kind==='feed'){try{if(window.parent!==window&&typeof window.parent.openBankFeed==='function'){closeSheet();window.parent.openBankFeed();return;}}catch(e){}try{(window.top||window).location.assign(new URL('app.html#bankfeed',location.href).href);}catch(e){location.assign('app.html#bankfeed');}return;}
  if(kind==='match'){if(acct)fixAcctOpen(acct);else fixMatchOpen();return;}
  if(kind==='sortcheck'){if(typeof sortCheckOpen==='function')sortCheckOpen();return;}
  if(kind==='misc'){fixMiscOpen();return;}
@@ -259,7 +260,9 @@ window.trustStatementSave=trustStatementSave;window.trustCsvOpen=trustCsvOpen;wi
 /* Screen 1: the starting point. */
 function fixOpen(){
  /* Nothing here can be saved while another tab holds the lock, so say so before any sorting is done, not after. */
- try{const l=typeof finStorageLock==='function'?finStorageLock():null;if(l){toastMsg(l.title+'. Close the other tab and reload before sorting.');try{render();}catch(e){}return;}}catch(e){}
+ try{const l=typeof finStorageLock==='function'?finStorageLock():null;if(l){
+  if(l.tab&&typeof finLoadLatest==='function'){$('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔄 Load the latest first</h2><p>Finance was changed in another window on this device, so saving is paused here to keep the newer numbers safe.</p><p>Tap below, then open Fix my numbers again.</p><button class="btn dark" onclick="closeSheet();finLoadLatest()">Load latest</button>';openSheet();return;}
+  toastMsg(l.title+'. Saving is paused until it is sorted.');try{render();}catch(e){}return;}}catch(e){}
  const h=fixHome()||{misc:0,miscTotal:0,off:0,check:0};
  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🧰 Fix my numbers</h2>'+trustBlock()+'<div class="fh-mean-h" style="margin-top:14px">The jobs</div><p>These make every other number in the app right. Do them in order.</p>'
   +(h.check?'<button class="fx-job" onclick="sortCheckOpen()"><b>✨ Check what I sorted</b><span>'+h.check+(h.check===1?' payment I was not sure about':' payments I was not sure about')+'</span></button>':'')

@@ -60,6 +60,7 @@ body.fin-redesign .fab{bottom:calc(92px + var(--sab))}
 .fh-fill{position:absolute;left:0;right:0;bottom:0;background:var(--c);opacity:.85;transition:height .3s}
 .fh-jn{font:800 12px/1.2 'Nunito',sans-serif;text-align:center;overflow-wrap:anywhere}
 .fh-jb{font:700 14px 'Fredoka',sans-serif}
+.fh-jp{font-size:11px!important;padding:3px 8px!important;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .fh-row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:0 0 10px}
 .fh-rn{font:800 14px 'Nunito',sans-serif;min-width:0;overflow-wrap:anywhere}
 .fh-rv{font:700 13px 'Nunito',sans-serif;color:var(--ink-soft);text-align:right}

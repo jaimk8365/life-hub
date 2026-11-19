@@ -55,7 +55,7 @@ export function renderWeek(ctx) {
     const fam = G.familyItems(days);
     body = `${fam.length ? fam.map(f => `<span class="g-li">${f.kind === 'reminder' ? '🔔' : '📅'} ${esc(f.label)}${f.time ? ' ' + esc(f.time) : ''} · ${esc(f.title)}</span>`).join('') : '<p>Nothing school, sport or birthday related in your calendar this week.</p>'}<p class="hint">Got a school letter or note?</p><div class="g-btns"><button class="soft-button" data-action="letter-new">📸 Scan a letter</button></div><p class="hint">Or add what to prep below.</p>${prepForm(ctx, entry, days)}`;
   }
-  if (id === 'money') body = `<p>Check bills due this week and move money for the week.</p>${ctx.moneyCard || ''}<div class="g-btns"><a class="soft-button" href="../finance/app.html" target="_top">Open My Finance</a></div>`;
+  if (id === 'money') body = `<p>Check bills due this week and move money for the week.</p>${ctx.moneyCard || ''}<div class="g-btns"><a class="soft-button" href="../?tab=finance" target="_top" onclick="try{if(window.parent!==window&&window.parent.show){window.parent.show('finance');return false;}}catch(e){}">Open Finance</a></div>`;
   if (id === 'meals') body = `<p>Plan dinners and the shopping list.</p><div class="g-btns"><button class="soft-button" data-action="guide-open" data-section="kitchen">🍳 Open Kitchen</button></div><label class="g-check"><input type="checkbox" id="g-meals" ${entry.meals ? 'checked' : ''}> Dinners are sorted for this week</label>`;
   if (id === 'top3') {
     const open = openTasks(ctx.tasks).slice(0, 40), top = entry.top3 || [];
@@ -73,7 +73,7 @@ export function renderMonth(ctx) {
     const weeks = G.monthView({ ym: G.monthKey(ctx.today), events: ctx.events });
     body = `<p class="hint">Your calendar here reaches about 3 weeks ahead. ⭐ = school, sport, birthdays or appointments.</p>${weeks.map(w => `<div class="g-day"><b>${esc(w.label)}</b>${w.items.map(e => `<span class="g-li">${e.family ? '⭐ ' : ''}${esc(e.label)}${e.start ? ' ' + esc(e.start) : ''} · ${esc(e.title)}</span>`).join('')}</div>`).join('') || '<p>Nothing in your calendar for this month yet.</p>'}`;
   }
-  if (id === 'money') body = `<p>Do your Month-End Review: bills, sinking funds and what to change.</p>${ctx.moneyCard || ''}<div class="g-btns"><a class="soft-button" href="../finance/app.html" target="_top">Open My Finance</a></div>`;
+  if (id === 'money') body = `<p>Do your Month-End Review: bills, sinking funds and what to change.</p>${ctx.moneyCard || ''}<div class="g-btns"><a class="soft-button" href="../?tab=finance" target="_top" onclick="try{if(window.parent!==window&&window.parent.show){window.parent.show('finance');return false;}}catch(e){}">Open Finance</a></div>`;
   if (id === 'appts') body = `<p>Anything to book this month? Each one you tick becomes a small task.</p>${G.APPOINTMENTS.map(a => `<label class="g-check"><input type="checkbox" data-gappt="${esc(a)}" ${(entry.appts || []).includes(a) ? 'checked disabled' : ''}> ${esc(a)}${(entry.appts || []).includes(a) ? ' · added ✓' : ''}</label>`).join('')}<div class="g-row"><input type="text" id="g-apptx" maxlength="80" placeholder="Something else, e.g. Hearing test"></div>`;
   if (id === 'goals') body = `<p>3 small goals for this month. Keep them gentle.</p>${[0, 1, 2].map(i => `<div class="g-row"><input type="text" id="g-goal-${i}" maxlength="120" value="${esc((entry.goals || [])[i] || '')}" placeholder="Goal ${i + 1}"></div>`).join('')}`;
   if (id === 'summary') body = summary('month', entry, ctx, []);

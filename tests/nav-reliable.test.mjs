@@ -50,3 +50,18 @@ test('a menu tap during start-up is never undone by start-up', () => {
   assert.ok(guard < boot.indexOf('3 * 3600000'), 'checked before the "after a break" jump');
   assert.ok(boot.indexOf('navMeSet(true)') < guard, 'your folded menu still comes back');
 });
+
+// Nothing inside Life Hub may replace Life Hub with another page (the menu would vanish), and Finance must never be
+// opened a second time on the same device: two copies is what paused saving ("Finance is open in another tab").
+test('no button inside Life Hub leaves Life Hub or opens a second Finance', () => {
+  assert.ok(!/href="\.\.\/finance\/app\.html" target="_top"/.test(read('copilot/guides-ui.mjs')), 'Guides open Finance inside the hub');
+  assert.match(read('copilot/today-ui.mjs'), /today-board[\s\S]{0,200}p\.show\('board'\)/, 'the Family board opens as a section');
+  const fix = read('finance/fix-numbers.js');
+  assert.match(fix, /kind==='feed'\)\{try\{if\(window\.parent!==window&&typeof window\.parent\.openBankFeed==='function'\)/, 'bank feed settings open as a panel in the hub');
+  const hub = read('index.html');
+  assert.match(hub, /function openBankFeed\(\)/);
+  assert.match(hub, /addEventListener\('finance-storage-stale', financeStaleSeen\)/, 'a copy left behind catches up');
+  assert.match(hub, /async function financeLoadLatest\(\)/);
+  assert.match(read('finance/phase-glue.js'), /function finLoadLatest\(\)/);
+  assert.match(read('finance/home-redesign.js'), /finLoadLatest\(\);else location\.reload\(\)/, 'the saving-paused banner loads the latest instead of only reloading the page inside');
+});

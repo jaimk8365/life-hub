@@ -2,7 +2,7 @@
  * The synchronous read cache is hydrated before Finance boots. Saves are queued;
  * only a completed IDB transaction is reported as saved. Web Locks serialize tabs.
  */
-(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else{root.FinanceBulkStorage=api;if(!root.FinanceStore&&!root.FINANCE_RECOVERY_READ_ONLY){try{root.FinanceStore=root.parent!==root&&root.parent.FinanceStore||api.create({storage:root.localStorage,indexedDB:root.indexedDB,locks:root.navigator.locks,onState:state=>root.dispatchEvent(new CustomEvent('finance-storage-state',{detail:state})),onCommit:detail=>root.dispatchEvent(new CustomEvent('finance-storage-commit',{detail}))});}catch(error){root.FinanceStorageError=error;}}}})(typeof window==='object'?window:globalThis,()=>{
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else{root.FinanceBulkStorage=api;if(!root.FinanceStore&&!root.FINANCE_RECOVERY_READ_ONLY){try{root.FinanceStore=root.parent!==root&&root.parent.FinanceStore||api.create({storage:root.localStorage,indexedDB:root.indexedDB,locks:root.navigator.locks,onState:state=>root.dispatchEvent(new CustomEvent('finance-storage-state',{detail:state})),onCommit:detail=>root.dispatchEvent(new CustomEvent('finance-storage-commit',{detail})),channel:typeof root.BroadcastChannel==='function'?new root.BroadcastChannel('lifehub-finance-store-v2'):null,onStale:detail=>root.dispatchEvent(new CustomEvent('finance-storage-stale',{detail}))});}catch(error){root.FinanceStorageError=error;}}}})(typeof window==='object'?window:globalThis,()=>{
  const DB='lifehub-finance-store-v2',MARKER='lifehub_finance_storage_v2';
  const BULK=['fin_txns','fin_inbox','lifehub_record_versions_v1','lifehub_finance_sync_conflicts'];
  const isBulk=k=>BULK.includes(k);
@@ -15,10 +15,14 @@
   const db=await open(indexedDB,DB,false);if(!db)return {values:{},migration:null,journal:null};
   try{return await new Promise((resolve,reject)=>{const tx=db.transaction('state','readonly'),store=tx.objectStore('state'),out={};for(const key of ['current','migration-backup','journal']){const req=store.get(key);req.onsuccess=()=>{out[key]=req.result;};}tx.oncomplete=()=>resolve({values:out.current?.values||{},migration:out['migration-backup'],journal:out.journal});tx.onabort=tx.onerror=()=>reject(new Error('Finance recovery storage could not be read.'));});}finally{db.close();}
  }
- function create({storage,indexedDB,locks,onState=()=>{},onCommit=()=>{}}){
+ function create({storage,indexedDB,locks,onState=()=>{},onCommit=()=>{},channel=null,onStale=()=>{}}){
   const overlay=new Map();
-  let db,cache={},revision=0,pending=0,failure=null,tail=Promise.resolve();
-  const emit=()=>onState({pending,error:failure?.message||'',ready:!!db});
+  let db,cache={},revision=0,pending=0,failure=null,tail=Promise.resolve(),stale=false;
+  const emit=()=>onState({pending,error:failure?.message||'',ready:!!db,stale});
+  // Another window of Life Hub or My Finance on this device saved: say so at once, so this copy can reload
+  // before it ever tries to save over the newer data (it never saves over it either way: see commit()).
+  if(channel)try{channel.onmessage=event=>{const d=event&&event.data;if(d&&d.type==='commit'&&d.revision!==revision&&!stale){stale=true;emit();onStale({revision:d.revision});}};}catch(_){}
+  const announce=()=>{try{if(channel)channel.postMessage({type:'commit',revision});}catch(_){}};
   const lock=fn=>{if(!locks?.request)throw new Error('This browser cannot safely coordinate Finance storage. Use a current Safari or Chrome; existing data was kept.');return locks.request(DB,fn);};
   const ready=(async()=>{
    if(!indexedDB)throw new Error('Larger Finance storage is unavailable in this browser.');
@@ -65,7 +69,7 @@
     try{
      restoreSmall(storage,small);
      const next={revision:current.revision+1,values:bulk};
-     await write(db,{current:next,journal:undefined});revision=next.revision;
+     await write(db,{current:next,journal:undefined});revision=next.revision;announce();
     }catch(error){try{restoreSmall(storage,smallBefore);await write(db,{journal:undefined});}catch(_){/* Durable journal remains for restart recovery. */}throw error;}
    });
   }
@@ -79,7 +83,24 @@
    return task;
   }
   async function refresh(){await ready;await tail;if(failure)throw failure;return lock(async()=>{const current=await read(db,'current');if(await read(db,'journal'))throw new Error('Finance recovery is in progress.');cache={...current.values};revision=current.revision;});}
-  return {ready,getItem,keys,pendingValues:()=>Object.fromEntries(overlay),isBulk,commitRaw,save:records=>commitRaw(Object.fromEntries(Object.entries(records).map(([k,v])=>[k,JSON.stringify(v)]))),flush:async()=>{await ready;await tail;if(failure)throw failure;},refresh,state:()=>({pending,error:failure?.message||'',ready:!!db}),inspect:()=>inspect({storage,indexedDB})};
+  /* Catch up with the newest saved Finance (after another window saved). Only call this right before the Finance
+     page reloads: a page still showing the old numbers must never save on top of the newer ones.
+     It refuses while saves are waiting, unless discard is true (the "Reload" button, after Download recovery).
+     Only an "another tab" stop is cleared; any other save problem keeps showing. */
+  async function resync({discard=false}={}){
+   const started=await ready.then(()=>true,()=>false);await tail.catch(()=>{});
+   if(!started||!db||pending)return false;
+   if(overlay.size&&!discard)return false;
+   if(failure&&!/another tab|older Finance tab/i.test(failure.message))return false;
+   return lock(async()=>{
+    const current=await read(db,'current');if(!current||await read(db,'journal'))return false;
+    for(const key of BULK)if(storage.getItem(key)!==null)return false;
+    if(pending)return false; // a save arrived meanwhile: leave everything as it is
+    // The save queue still holds the old refusal; start it afresh or every later save would repeat it.
+    overlay.clear();cache={...current.values};revision=current.revision;stale=false;failure=null;tail=Promise.resolve();emit();return true;
+   });
+  }
+  return {ready,getItem,keys,pendingValues:()=>Object.fromEntries(overlay),isBulk,commitRaw,save:records=>commitRaw(Object.fromEntries(Object.entries(records).map(([k,v])=>[k,JSON.stringify(v)]))),flush:async()=>{await ready;await tail;if(failure)throw failure;},refresh,resync,state:()=>({pending,error:failure?.message||'',ready:!!db,stale}),inspect:()=>inspect({storage,indexedDB})};
  }
  return {create,inspect,BULK,DB,MARKER,isBulk};
 });

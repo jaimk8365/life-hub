@@ -183,6 +183,11 @@ function prioPatch(s){
   s=once(s,"<button class=\"btn ghost\" style=\"flex:1;padding:9px;color:var(--good)\" onclick=\"markSharedGoalComplete('${g.id}')\">✓ Complete</button></div></div>`;}","<button class=\"btn ghost\" style=\"flex:1;padding:9px;color:var(--good)\" onclick=\"markSharedGoalComplete('${g.id}')\">✓ Complete</button></div>${typeof gpPinBtn==='function'?gpPinBtn('shared:'+g.id):''}</div>`;}",'pin shared card');
   return s;
 }
+/* Money plan: every dollar a job per account, and the next 14 days (finance/account-plan.js). */
+function planPatch(s){
+  const pins='<script src="../finance/goal-pins.js?v=20261105"></script>';
+  return once(s,pins,pins+'\n<script src="../finance/account-plan.js?v=20261119"></script>','plan head');
+}
 export function patchPhasesFinance(source){
   let s=source;
   s=phase3(s);
@@ -206,5 +211,6 @@ export function patchPhasesFinance(source){
   s=catsPatch(s);
   s=autoSortPatch(s);
   s=prioPatch(s);
+  s=planPatch(s);
   return bump(s);
 }

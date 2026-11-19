@@ -85,7 +85,10 @@
  function card(key,title,body,cls){return '<section class="fh-card '+(cls||'')+'" aria-label="'+esc(title)+'"><div class="fh-h"><h2>'+esc(title)+'</h2>'+helpBtn(key)+'</div>'+body+'</section>';}
  function jars(list){
   if(!list.length)return '<p class="fh-note">No accounts yet.</p>';
-  return '<div class="fh-jars">'+list.map(j=>{const f=Math.round(clamp(j.fill,0,1)*100);return '<button type="button" class="fh-jar" onclick="openAcct(\''+esc(j.id)+'\')"><span class="fh-glass" style="--c:'+esc(j.color||'var(--sea)')+'"><span class="fh-fill" style="height:'+f+'%"></span></span><span class="fh-jn">'+esc(j.emoji||'')+' '+esc(j.name)+'</span><span class="fh-jb">'+aud(j.balance)+'</span></button>';}).join('')+'</div>';
+  // Each jar also says whether its money covers what is booked for the next 2 weeks (finance/account-plan.js).
+  let plan=null;try{plan=typeof acctPlanData==='function'?acctPlanData():null;}catch(e){}
+  const tag=id=>{const p=plan&&plan.plans.find(x=>x.id===id);if(!p)return '';return '<span class="fh-jp ap-chip '+(p.status==='short'?'ap-short">⚠️ '+aud(p.short)+(p.type==='save'&&p.unassigned<0?' missing':' short'):p.status==='tight'?'ap-tight">🙂 '+aud(p.free)+' free':'ap-ok">✅ '+aud(p.free)+' free')+'</span>';};
+  return '<div class="fh-jars">'+list.map(j=>{const f=Math.round(clamp(j.fill,0,1)*100);return '<button type="button" class="fh-jar" onclick="if(typeof acctPlanOpen===\'function\')acctPlanOpen(\''+esc(j.id)+'\');else openAcct(\''+esc(j.id)+'\')"><span class="fh-glass" style="--c:'+esc(j.color||'var(--sea)')+'"><span class="fh-fill" style="height:'+f+'%"></span></span><span class="fh-jn">'+esc(j.emoji||'')+' '+esc(j.name)+'</span><span class="fh-jb">'+aud(j.balance)+'</span>'+tag(j.id)+'</button>';}).join('')+'</div>';
  }
  function bars(list,empty,go,label){
   if(!list.length)return '<p class="fh-note">'+empty+'</p>';
@@ -104,7 +107,7 @@ function winsHtml(w){
 function lockHtml(l){
   if(!l)return '';
   return '<section class="fh-feed fh-feed-err fh-lock" aria-label="Saving is paused" role="alert"><div class="fh-feed-t"><span class="fh-feed-i" aria-hidden="true">🔒</span><div><div class="fh-feed-h">'+esc(l.title)+'</div><div class="fh-feed-s">'+esc(l.sub)+'</div></div></div>'
-   +'<div class="fh-feed-lock"><button type="button" class="fh-btn fh-feed-b" onclick="if(typeof exportFinanceRecovery===\'function\')exportFinanceRecovery()">Download recovery</button><button type="button" class="fh-btn fh-feed-b" onclick="location.reload()">Reload</button></div></section>';
+   +'<div class="fh-feed-lock"><button type="button" class="fh-btn fh-feed-b" onclick="if(typeof exportFinanceRecovery===\'function\')exportFinanceRecovery()">Download recovery</button><button type="button" class="fh-btn fh-feed-b" onclick="if(typeof finLoadLatest===\'function\')finLoadLatest();else location.reload()">'+(l.tab?'Load latest':'Reload')+'</button></div></section>';
  }
 function feedHtml(f){
   if(!f)return '';
@@ -154,7 +157,7 @@ function feedHtml(f){
   const saving=card('saving','Saving for',(((d.goals||[]).length||(d.funds||[]).length)?'<p class="fh-note">Each bar shows how much you have saved toward its target.</p>':'')+bars(d.goals||[],'No goals yet.','FinHome.tab(\'goals\')','Goals')+(typeof goalPinsHint==='function'?goalPinsHint():'')+((d.funds||[]).length?'<div class="fh-sub">Sinking funds (set aside for bills)</div>'+bars(d.funds||[],'','FinHome.tab(\'funds\')','Funds'):''));
   return '<div class="fh-home"><div class="fh-top"><div class="fh-date">'+esc(D.longDate(d.today))+'</div>'+(d.feed?'':'<div class="fh-sync"><i></i>'+esc(d.syncText||'')+'</div>')+(d.game?'<button type="button" class="fh-lv" onclick="FinHome.act(\'quests\')" aria-label="Level '+d.game.level+', '+d.game.streak+' day streak. Open daily wins"><b>Lv '+d.game.level+'</b><span class="fh-lvbar"><i style="width:'+d.game.pct+'%"></i></span><span>🔥 '+d.game.streak+'</span></button>':'')+'</div>'
    +lockHtml(d.lock)+winsHtml(d.wins)+feedHtml(d.feed)+fixCard(d.fix,d.trust)+planCard(d.plan)+actionsCard(d.actions)+coachCard(d.coach)+hero+al+(typeof goalPinsHomeHtml==='function'?goalPinsHomeHtml():'')
-   +card('accounts','Accounts',jars(d.jars||[])+'<p class="fh-note">Each jar shows how full the account is compared with its monthly budget.</p>')
+   +card('accounts','Accounts',jars(d.jars||[])+'<p class="fh-note">Tap a jar to see what its money is for and the next 2 weeks.</p>'+(typeof acctPlanOpen==='function'?'<button type="button" class="fh-btn" onclick="acctPlanOpen()">🧭 Money plan · every dollar a job</button>':''))
    +saving+files+shopCard(d.shop)+'</div>';
  }
 

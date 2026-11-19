@@ -62,3 +62,22 @@ test('sync rejects a concurrent edit instead of applying a stale pull',async()=>
  const env=fixture({fin_txns:'[]'}),store=create(env);await store.ready;await store.save({fin_txns:[{id:'edited'}]});
  await assert.rejects(store.commitRaw({fin_txns:'[{"id":"remote"}]'},{expected:{fin_txns:'[]'}}),/while syncing/);assert.equal((await inspect(env)).values.fin_txns,'[{"id":"edited"}]');
 });
+/* Two windows of Finance on one device: the one that falls behind hears about it, and can catch up without a page reload. */
+const channels=()=>{const all=[];return ()=>{const c={onmessage:null,postMessage(d){all.filter(x=>x!==c).forEach(x=>x.onmessage&&x.onmessage({data:d}));}};all.push(c);return c;};};
+test('another window saving marks this copy stale at once',async()=>{
+ const env=fixture({fin_txns:'[]'}),hub=channels();let heard=0;
+ const a=create({...env,channel:hub()}),b=create({...env,channel:hub(),onStale:()=>heard++});await a.ready;await b.ready;
+ await a.save({fin_txns:[{id:'newer'}]});assert.equal(heard,1);assert.equal(b.state().stale,true);assert.equal(a.state().stale,false,'the window that saved is not stale');
+});
+test('catching up after a refused save: later saves work again and nothing newer is overwritten',async()=>{
+ const env=fixture({fin_txns:'[]'}),a=create(env);await a.ready;const b=create(env);await b.ready;
+ await a.save({fin_txns:[{id:'newer'}]});await assert.rejects(b.save({fin_txns:[{id:'stale'}]}),/another tab/);
+ assert.equal(await b.resync(),false,'an unsaved change is not thrown away without asking');
+ assert.equal(await b.resync({discard:true}),true);assert.equal(b.state().error,'');assert.equal(b.getItem('fin_txns'),'[{"id":"newer"}]');
+ await b.save({fin_txns:[{id:'newer'},{id:'after'}]});assert.equal((await inspect(env)).values.fin_txns,'[{"id":"newer"},{"id":"after"}]');
+});
+test('catching up never clears a different save problem',async()=>{
+ const env=fixture({fin_txns:'[]',fin_accounts:'x'}),store=create(env);await store.ready;
+ env.storage.fail('fin_accounts');await assert.rejects(store.save({fin_accounts:'y'}),/quota/);env.storage.fail(null);
+ assert.equal(await store.resync({discard:true}),false);assert.match(store.state().error,/quota/);
+});

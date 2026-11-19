@@ -170,7 +170,10 @@ export function act(action, button, ctx, fx) {
     catch { fx.toast('Could not save that tick.'); }
     fx.render(); return true;
   }
-  if (action === 'today-board') { fx.openBoard(); return true; }
+  if (action === 'today-board') { // the Family board opens as a section, so the menu stays (it used to replace Life Hub)
+    try { const p = globalThis.parent; if (p && p !== globalThis && typeof p.show === 'function') { p.show('board'); return true; } } catch {}
+    fx.openBoard(); return true;
+  }
   if (action === 'tg-paste-clip') {
     const box = doc.getElementById('tg-paste');
     const read = globalThis.navigator?.clipboard?.readText;

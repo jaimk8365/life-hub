@@ -123,7 +123,7 @@
     .crumb{left:var(--rail-w)}
     nav{
       top:0;bottom:0;left:0;right:auto;width:var(--rail-w);height:auto;
-      flex-direction:column;justify-content:flex-start;gap:6px;
+      flex-direction:column;justify-content:flex-start;gap:2px; /* small gaps: a tap between two buttons still lands on one */
       padding:calc(20px + var(--sat)) 14px 20px;border-top:0;border-right:1px solid var(--line);overflow-y:auto;
     }
     nav::before{
@@ -137,7 +137,7 @@
     nav .foot{font-size:11px;color:var(--ink-faint);padding:0 10px;line-height:1.5}
     nav .nav-label{display:block;padding:8px 10px 2px;color:var(--ink-faint);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
     nav .nav-label:not(:first-of-type){margin-top:7px}
-    nav button, nav .finance-link{padding:9px 12px}
+    nav button, nav .finance-link{padding:11px 12px}
   }
   @media (max-width:759px){
     nav{display:none}
@@ -193,6 +193,23 @@
   .morepanel .oldnote{font-size:12px;color:var(--ink-faint);margin:2px 10px 8px;line-height:1.45}
   .morepanel .life-foot{display:flex;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
   .morepanel .life-foot button{justify-content:center;font-size:14px}
+  /* Bank feed settings, inside Life Hub (finance/bank-feed-ui.js) */
+  .bf-panel{position:fixed;inset:0;z-index:70;background:rgba(43,39,34,.35);display:flex;align-items:flex-end;justify-content:center}
+  .bf-panel[hidden]{display:none}
+  .bf-card{position:relative;background:var(--card);border-radius:22px 22px 0 0;width:min(520px,100%);max-height:88vh;overflow:auto;padding:22px 18px calc(22px + var(--sab));box-shadow:0 -10px 40px rgba(43,39,34,.2)}
+  @media (min-width:760px){ .bf-panel{align-items:center} .bf-card{border-radius:22px} }
+  .bf-card h2{font-family:'Fraunces',serif;font-size:20px;margin:0 0 10px}
+  .bf-card h3{font-size:15px;margin:16px 0 4px}
+  .bf-card p{font-size:14px;line-height:1.5;margin:0 0 10px}
+  .bf-card label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin:8px 0 4px}
+  .bf-card input,.bf-card select{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:inherit;font-size:15px;background:var(--paper-2,#fff)}
+  .bf-card button{border:0;border-radius:12px;padding:12px 14px;min-height:46px;font:inherit;font-weight:800;font-size:14px;background:var(--line-soft);color:var(--ink);cursor:pointer}
+  .bf-card .bf-primary{background:var(--ink);color:#fff;margin-top:10px}
+  .bf-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.bf-row button{flex:1}
+  .bf-map{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:8px 0}
+  .bf-hint{font-size:12.5px!important;color:var(--ink-faint)}
+  .bf-x{position:absolute;top:12px;right:12px;width:40px;min-height:40px!important;padding:0!important;border-radius:50%!important}
+  .hub-pill{position:fixed;z-index:80;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));border:0;border-radius:999px;padding:12px 18px;min-height:46px;font:800 14px inherit;font-family:inherit;background:var(--ink);color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:92vw;cursor:pointer}
 </style>
 <link rel="stylesheet" href="./theme-jaimi.css" />
 </head>
@@ -492,6 +509,43 @@
       });
     } catch(e){}
   }
+  /* Bank feed settings open here, inside Life Hub. They used to open the separate My Finance page, and two copies of
+     Finance on one device is what paused saving ("Finance is open in another tab"). */
+  let bankFeedUiLoaded = null;
+  function openBankFeed(){
+    loadFinanceFeed();
+    if (!bankFeedUiLoaded) bankFeedUiLoaded = new Promise(done => { const s = document.createElement('script'); s.src = './finance/bank-feed-ui.js'; s.onload = done; s.onerror = done; document.body.appendChild(s); });
+    bankFeedUiLoaded.then(() => { try { window.BankFeedUI.open(); } catch(e){} });
+  }
+  /* A small message pill at the bottom of the screen. */
+  function hubPill(text, onTap, ms){
+    let b = document.getElementById('hubPill'); if (b) b.remove();
+    b = document.createElement('button'); b.id = 'hubPill'; b.type = 'button'; b.className = 'hub-pill'; b.textContent = text;
+    b.onclick = () => { b.remove(); if (onTap) onTap(); };
+    document.body.appendChild(b); if (ms) setTimeout(() => b.remove(), ms);
+  }
+  /* Finance was saved in another window on this device (another Life Hub tab, or My Finance).
+     Hidden Finance catches up by itself. Finance on screen asks first, so nothing you are typing is lost.
+     The store only catches up right before Finance reloads, so an old screen can never save over newer numbers. */
+  async function financeCatchUp(discard){
+    try {
+      if (!window.FinanceStore || !window.FinanceStore.resync) return false;
+      const ok = await window.FinanceStore.resync({ discard: !!discard }); if (!ok) return false;
+      const f = document.getElementById('f-finance'); if (f && f.src) f.contentWindow.location.reload();
+      const p = document.getElementById('hubPill'); if (p && p.dataset.kind === 'stale') p.remove();
+      return true;
+    } catch(e){ return false; }
+  }
+  /* "Load latest" from inside Finance (its saving-paused banner and Fix my numbers). Falls back to reloading Life Hub. */
+  async function financeLoadLatest(){ if (!(await financeCatchUp(true))) location.reload(); }
+  function financeStaleSeen(){
+    const f = document.getElementById('f-finance');
+    if (!f || !f.src || document.hidden || !f.classList.contains('active')) { financeCatchUp(false); return; }
+    hubPill('🔄 Finance changed in your other window · tap to show the latest', () => financeCatchUp(false));
+    const p = document.getElementById('hubPill'); if (p) p.dataset.kind = 'stale';
+  }
+  try { window.addEventListener('finance-storage-stale', financeStaleSeen); } catch(e){}
+  try { document.addEventListener('visibilitychange', () => { try { if (window.FinanceStore && window.FinanceStore.state().stale && (document.hidden || !document.getElementById('f-finance').classList.contains('active'))) financeCatchUp(false); } catch(e){} }); } catch(e){}
   let parkFocus = null;
   let parkSelection = 'later';
   let inboxTimer = 0;
@@ -532,6 +586,7 @@
     if (!Object.prototype.hasOwnProperty.call(SRC, which)) which = 'hub';
     homeCareOn = false;
     if (which === 'finance') loadFinanceFeed();
+    else try { if (window.FinanceStore && window.FinanceStore.state().stale) financeCatchUp(false); } catch(e){} // leaving Finance: catch up quietly
     if (which !== 'copilot') navRecord({ sec:which }); else if (!navSilent) navRecord({ cp:copilotRoute });
     for (const k of Object.keys(SRC)){
       const f = document.getElementById('f-'+k), b = document.getElementById(BUTTONS[k]||'b-'+k);

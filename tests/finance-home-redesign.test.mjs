@@ -67,7 +67,7 @@ test('Home explains the safe-to-spend number in plain words, with the right tone
   const base={today:'2026-10-18',account:'Everyday',alert:{count:0},jars:[],goals:[],funds:[]};
   const ok=H.homeHtml({...base,safe:{trusted:true,safe:340,free:900}});assert.ok(ok.includes('fh-t-good')&&ok.includes('This is what is free to spend this week'));
   const bad=H.homeHtml({...base,safe:{trusted:true,safe:-20,free:900}});assert.ok(bad.includes('fh-t-act')&&bad.includes('Hold off on extras'));
-  assert.ok(ok.includes('Each jar shows how full the account is'));
+  assert.ok(ok.includes('Tap a jar to see what its money is for'));
  }finally{delete globalThis.FinMeaning;}
 });
 test('Home shows the money check-in button: start, carry on, or done',()=>{

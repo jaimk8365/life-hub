@@ -667,7 +667,13 @@ function finStorageLock(){
   try{const fs=window.FinanceStore&&window.FinanceStore.state&&window.FinanceStore.state(),msg=String((fs&&fs.error)||'');
    if(!msg)return null;
    const tab=/another tab|older Finance tab/i.test(msg);
-   return{title:tab?'Finance is open in another tab':'A save needs recovery',sub:tab?'Saving is paused so nothing gets overwritten. Close the other Finance tab, tap Download recovery, then Reload. Changes made here since then are not saved yet.':msg};}catch(e){return null;}
+   return{tab,title:tab?'Finance changed in another window':'A save needs recovery',sub:tab?'Saving is paused here so the newer numbers are not overwritten. Tap Load latest. Anything you changed here in the last minute may need doing again.':msg};}catch(e){return null;}
+}
+/* Load the newest saved Finance. Inside Life Hub the hub does it in place (no other tab to close);
+   Finance on its own (My Finance) reloads the whole page, which starts a fresh store. */
+function finLoadLatest(){
+  try{if(window.parent!==window&&typeof window.parent.financeLoadLatest==='function'){window.parent.financeLoadLatest();return;}}catch(e){}
+  try{window.top.location.reload();}catch(e){location.reload();}
 }
 function finFeedData(){
   let token=false,last=null;
