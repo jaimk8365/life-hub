@@ -4,6 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 20/11 1:45pm: CSV check results sorted into plain groups (PUSHED 20/11)
+- Why: her first real check showed 25 "in the app, not in the bank". Checked against her Transactions.csv: the ones visible (ZipMoney 7/10, 2 x Gympie ARC 8/10, Amazon 10/10, Anthropic 13/10) are all in the bank once, so the app holds them twice (one copy matched, the other was left over).
+- finance/csv-check.js: pure explain(result, txns) labels every leftover: double (twin in the app matched the bank), none (not in the bank), date (same amount 4-10 days apart), zero ($0 card check), other (in the app under another account), add (really missing). Screen: "What to do" summary, then one card per group with a plain sentence and one button. Double-ups are ticked and show "Already in the app: <date>"; "not in the bank" ones are unticked; date / other / $0 are info only. Add and Remove act on their own group. Removed double-ups get deletedReason "Double-up (bank CSV has it once)".
+- Proof: new test (710 passed). Preview with made-up data: 2 doubles, 1 missing, 1 not in bank, 1 $0 shown in the right groups; "Remove the ticked double-ups" removed only the 2 extra copies. sw lifehub-v104.
+
 ### 20/11 1:20pm: bank CSV dates like "20 Nov 26" (PUSHED 20/11)
 - Her bank CSV (Transactions.csv: Date, Amount, Account Number, Transaction Type, Transaction Details, Balance, Category, Merchant Name, Processed On) writes dates as "20 Nov 26". finance/statement-review.js date() only took 4-digit years, so the check said "CSV row 2 has an invalid date". Now takes 2-digit years (20yy) and full month names; csv-check.js header-less detector matches.
 - Proof: her file parses, 117 rows, 2026-10-01 to 2026-11-20, balance column found. New test; 709 passed. sw lifehub-v103.

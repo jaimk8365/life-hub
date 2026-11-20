@@ -108,3 +108,27 @@ test('bank CSV dates like "20 Nov 26" (2-digit year) and "1 November 2026" are r
   assert.equal(p.min, '2026-10-01');
   assert.equal(p.max, '2026-11-20');
 });
+
+test('CSV check explains each leftover: double-ups, $0 card checks, other account, different date, really missing', () => {
+  const C = require('../finance/csv-check.js');
+  const rows = [
+    { date: '2026-10-08', amount: -22.9, note: 'ARC' }, { date: '2026-10-08', amount: -22.9, note: 'ARC' },
+    { date: '2026-10-07', amount: -100, note: 'Zip' }, { date: '2026-11-20', amount: 0, note: 'Visa Provisioning' },
+    { date: '2026-10-26', amount: -125, note: 'Starlink' }, { date: '2026-10-20', amount: -50, note: 'Late post' },
+    { date: '2026-11-09', amount: -29, note: 'Aldi Mobile' }];
+  const txns = [
+    { id: 1, acct: 'b', date: '2026-10-08', amount: -22.9 }, { id: 2, acct: 'b', date: '2026-10-08', amount: -22.9 },
+    { id: 3, acct: 'b', date: '2026-10-08', amount: -22.9 }, { id: 4, acct: 'b', date: '2026-10-08', amount: -22.9 },
+    { id: 5, acct: 'b', date: '2026-10-07', amount: -100 }, { id: 6, acct: 'b', date: '2026-10-07', amount: -100 },
+    { id: 7, acct: 'b', date: '2026-10-12', amount: -50 }, { id: 8, acct: 'b', date: '2026-10-15', amount: -7 },
+    { id: 9, acct: 'e', date: '2026-10-26', amount: -125 }];
+  const r = C.run({ rows, txns, acct: 'b', from: '2026-10-01', to: '2026-11-20' });
+  const ex = C.explain(r, txns);
+  assert.equal(ex.double.length, 3, 'two extra swims and one extra Zip');
+  assert.ok(ex.double.every(x => x.twin && x.twin.id !== x.t.id));
+  assert.deepEqual(ex.none.map(x => x.t.id), [8]);
+  assert.deepEqual(ex.date.map(x => x.t.id), [7]);
+  assert.deepEqual(ex.zero.map(x => x.r.note), ['Visa Provisioning']);
+  assert.deepEqual(ex.other.map(x => x.txn.acct), ['e']);
+  assert.deepEqual(ex.add.map(x => x.r.note), ['Aldi Mobile']);
+});
