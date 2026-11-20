@@ -160,7 +160,7 @@
  function readCsv(text){
   try{return StatementReview.parse(text);}catch(err){
    const first=String(text).replace(/^\uFEFF/,'').split(/\r?\n/).find(l=>l.trim())||'',cols=first.split(',').map(c=>c.replace(/^"|"$/g,'').trim());
-   const isDate=v=>/^\d{1,2}[\/ -](\d{1,2}|[a-z]{3})[\/ -]\d{4}$|^\d{4}-\d{2}-\d{2}$/i.test(v),isAmt=v=>/^[+-]?\$?[\d,]+(\.\d{1,2})?$/.test(v);
+   const isDate=v=>/^\d{1,2}[\/ -](\d{1,2}|[a-z]{3,9})[\/ -](\d{4}|\d{2})$|^\d{4}-\d{2}-\d{2}$/i.test(v),isAmt=v=>/^[+-]?\$?[\d,]+(\.\d{1,2})?$/.test(v);
    if(cols.length>=3&&isDate(cols[0])&&isAmt(cols[1])){const head=['Date','Amount','Description','Balance'].slice(0,Math.min(4,cols.length)).concat(cols.slice(4).map((_,i)=>'Extra '+(i+1)));return StatementReview.parse(head.join(',')+'\n'+text.replace(/^\uFEFF/,''));}
    throw err;
   }

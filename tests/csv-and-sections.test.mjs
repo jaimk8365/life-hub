@@ -101,3 +101,10 @@ test('CSV check waits for Process: no results and no typed-statement option once
   const fileFn = g.slice(g.indexOf('async function file('), g.indexOf('function process('));
   assert.ok(!/compute\(\)/.test(fileFn), 'choosing a file does not check straight away');
 });
+
+test('bank CSV dates like "20 Nov 26" (2-digit year) and "1 November 2026" are read', () => {
+  const p = SR.parse('Date,Amount,Transaction Details,Balance\n20 Nov 26,-10.00,Coffee,90.00\n01 Oct 26,100.00,Pay,100.00\n1 November 2026,-5,Snack,95');
+  assert.deepEqual(p.rows.map(r => r.date), ['2026-11-20', '2026-10-01', '2026-11-01']);
+  assert.equal(p.min, '2026-10-01');
+  assert.equal(p.max, '2026-11-20');
+});

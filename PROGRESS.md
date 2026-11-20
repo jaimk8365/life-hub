@@ -4,6 +4,10 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 20/11 1:20pm: bank CSV dates like "20 Nov 26" (PUSHED 20/11)
+- Her bank CSV (Transactions.csv: Date, Amount, Account Number, Transaction Type, Transaction Details, Balance, Category, Merchant Name, Processed On) writes dates as "20 Nov 26". finance/statement-review.js date() only took 4-digit years, so the check said "CSV row 2 has an invalid date". Now takes 2-digit years (20yy) and full month names; csv-check.js header-less detector matches.
+- Proof: her file parses, 117 rows, 2026-10-01 to 2026-11-20, balance column found. New test; 709 passed. sw lifehub-v103.
+
 ### 20/11 afternoon: recipes from Apple Notes added to Kitchen (PUSHED 20/11, b234a65)
 - Read the recipe folders in Apple Notes (🍔 RECIPES, 📔 Recipes, 🥐 Breakfast, 🍰 Slices, 🥖 Bread, 🥨 Snacks, 💪🏼 High Protein Snacks). 80 recipes added to the Kitchen seed in src/kitchen.html (ids note-…), between KIT_SEED_START/END. They merge into the library once per device, like earlier seed recipes; nothing she has is overwritten.
 - Photo-only notes were typed up from the photos (cake-mix cookies, granola bars, pasta bake, stir-fry, French martini, Tuscan chicken, apple crumble, pancakes). "6 Nights of Meals" split into 6 recipes; the bread note into 2. The note of 10 saved links became 10 link-only cards.
