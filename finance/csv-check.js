@@ -22,6 +22,10 @@
  function run({rows=[],txns=[],acct,from,to,openBal=0}){
   if(!acct)throw Error('Choose an account.');
   if(!from||!to||from>to)throw Error('Choose the dates to check (from must be on or before to).');
+  // Only the dates the CSV actually covers: a payment the file cannot show is not "missing from the bank".
+  const asked={from,to},span=rows.map(r=>r.date).filter(Boolean).sort();let clipped=false;
+  if(span.length){if(from<span[0]){from=span[0];clipped=true;}if(to>span[span.length-1]){to=span[span.length-1];clipped=true;}}
+  if(from>to)throw Error('Your CSV covers '+span[0]+' to '+span[span.length-1]+'. Pick dates inside those.');
   const bank=rows.filter(r=>r.date>=from&&r.date<=to).map((r,i)=>({...r,i}));
   const live=t=>t&&!t.deleted&&t.acct===acct&&Number.isFinite(+t.amount)&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'');
   const app=txns.filter(t=>live(t)&&t.date>=from&&t.date<=to);
@@ -39,7 +43,7 @@
   matched.forEach(m=>{if(m.row.date<=cut&&m.txn.date>cut)appClose+=+m.txn.amount;else if(m.row.date>cut&&m.txn.date<=cut)appClose-=+m.txn.amount;});
   appClose=r2(appClose);
   const ok=!onlyBank.some(r=>cents(r.amount))&&!onlyApp.length&&(!close||cents(close.balance)===cents(appClose));
-  return {acct,from,to,bankCount:bank.length,appCount:app.length,matched,onlyBank,onlyApp,
+  return {acct,from,to,asked,clipped,bankCount:bank.length,appCount:app.length,matched,onlyBank,onlyApp,
    missingTotal:sum(onlyBank,r=>+r.amount),extraTotal:sum(onlyApp,t=>+t.amount),bankIn,bankOut,appIn,appOut,
    bankClose:close,appClose,closeDiff:close?r2(close.balance-appClose):null,ok};
  }
@@ -156,6 +160,7 @@
     :'<div class="tr-card tr-bad"><div class="tr-h">'+(r.onlyBank.some(x=>Math.round(+x.amount*100))||r.onlyApp.length?'⚠️ Not matching yet · see What to do below':'⚠️ The payments match, the balance does not')+'</div><p>'+r.matched.length+' of '+r.bankCount+' bank payments matched, '+e(day(r.from))+' – '+e(day(r.to))+'.</p>'
      +(r.bankClose?'<p>Bank balance on '+e(day(r.bankClose.date))+': <b>'+money(r.bankClose.balance)+'</b> · App: <b>'+money(r.appClose)+'</b>'+(r.closeDiff?' · off by '+money(Math.abs(r.closeDiff)):'')+(r.bankClose.unsure?' (several payments that day; check the order)':'')+'</p>':'<p class="fx-small">This CSV has no balance column, so only the payments are compared.</p>')
      +((!r.onlyBank.length&&!r.onlyApp.length&&r.closeDiff)?'<p class="fx-small">Every payment in these dates matches, so the difference is from before '+e(day(r.from))+'. Pick an earlier From date, or use Start fresh in Match to my bank.</p>':'')+'</div>';
+   if(r.clipped)h+='<p class="fx-small" style="margin:10px 0">📅 Your CSV covers <b>'+e(day(r.from))+' to '+e(day(r.to))+'</b>, so only those dates were checked. Payments outside them are not counted as missing.</p>';
    h+='<p class="fx-small" style="margin:10px 0">💰 Money in: bank '+money(r.bankIn)+' · app '+money(r.appIn)+'<br>🛒 Money out: bank '+money(-r.bankOut)+' · app '+money(-r.appOut)+'</p>';
    h+=groupsHtml(r);
   }
@@ -205,6 +210,14 @@
     fixed right here: remove, add, move to the right account, use the bank's date, or change date/amount/description.
     Nothing is saved until "✅ Done: update the app". */
  const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-r{padding:10px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.cc-top small{display:block}.cc-act{display:flex;gap:8px;margin-top:8px;align-items:center}.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;font:inherit;font-size:.92em}.cc-ed{border:0;background:none;color:#3A73A8;font:inherit;font-weight:700;padding:6px;cursor:pointer;white-space:nowrap}.cc-edit{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#FBF4E6}.cc-edit[hidden]{display:none}.cc-edit label{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92em}.cc-edit input{width:62%;padding:7px 8px;border-radius:8px;border:1px solid #E2D6C0;font:inherit}.cc-r.cc-on{background:linear-gradient(90deg,rgba(127,183,155,.12),transparent)}.cc-info{opacity:.8}.cc-done{position:sticky;bottom:0;background:#FEF6E8;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
+ const catOpts=cur=>{let list=[];try{list=CATS;}catch(_){}return list.map(c=>'<option value="'+e(c.id)+'"'+(c.id===cur?' selected':'')+'>'+e(((c.e||'')+' '+c.n).trim())+'</option>').join('');};
+ /* What a bank line most likely is: a loan line by the bank's wording, otherwise Miscellaneous. */
+ function suggestCat(x,acct){const a=acctById(acct);if(a&&a.type==='loan'&&typeof FinCats!=='undefined'&&FinCats.loanKind){const k=FinCats.loanKind({note:x.note,amount:x.amount,sourceType:x.type});if(k)return k==='transfer'?'transfer':'loan_'+acct+'_'+k;}return 'other';}
+ /* In a loan account every row can be marked as what it is. */
+ function loanOpts(t,acct){
+  const a=acctById(acct);if(!a||a.type!=='loan'||!t)return [];
+  return [['cat:loan_'+acct+'_repay','💸 Mark as loan repayment'],['cat:transfer','↔️ Mark as redraw / drawdown (to another account)'],['cat:loan_'+acct+'_interest','📈 Mark as interest charged'],['cat:loan_'+acct+'_fees','🧾 Mark as fees']].filter(o=>o[0].slice(4)!==t.cat);
+ }
  function groupsHtml(r){
   const ex=FinCsvCheck.explain(r,TXNS),acc=id=>acctById(id)||{id,name:id},here=acc(r.acct),others=ACCTS.filter(a=>!a.hidden&&a.id!==r.acct);
   const tot=l=>money(l.reduce((s,x)=>s+(+(x.t||x.r).amount),0));
@@ -214,7 +227,7 @@
    return '<div class="cc-r" data-k="'+k+'"><div class="cc-top"><span>'+e(day(date))+'<small>'+e(note||'')+'</small>'+(sub?'<span class="cc-sub">'+sub+'</span>':'')+'</span><b>'+money(amt)+'</b></div>'
     +'<div class="cc-act"><select class="cc-sel" aria-label="What to do" onchange="csvCheckCount()">'+opts.map(o=>'<option value="'+e(o[0])+'"'+(o[0]===def?' selected':'')+'>'+e(o[1])+'</option>').join('')+'</select>'
     +'<button type="button" class="cc-ed" onclick="csvCheckEdit('+k+')">✏️ Edit</button></div>'
-    +'<div class="cc-edit" id="cc_ed_'+k+'" hidden><label>Date<input type="date" data-f="date" value="'+e(src.date)+'" oninput="csvCheckCount()"></label><label>Amount<input type="number" step="0.01" inputmode="decimal" data-f="amount" value="'+e(String(+src.amount))+'" oninput="csvCheckCount()"></label><label>Description<input data-f="note" value="'+e(src.note||'')+'" oninput="csvCheckCount()"></label></div></div>';
+    +'<div class="cc-edit" id="cc_ed_'+k+'" hidden><label>Date<input type="date" data-f="date" value="'+e(src.date)+'" oninput="csvCheckCount()"></label><label>Amount<input type="number" step="0.01" inputmode="decimal" data-f="amount" value="'+e(String(+src.amount))+'" oninput="csvCheckCount()"></label><label>Description<input data-f="note" value="'+e(src.note||'')+'" oninput="csvCheckCount()"></label><label>Category<select data-f="cat" aria-label="Category" onchange="csvCheckCount()">'+catOpts(src.cat||(ref.row?suggestCat(ref.row,r.acct):'other'))+'</select></label></div></div>';
   };
   const info=(date,note,amt,sub)=>'<div class="cc-r"><div class="cc-top"><span>'+e(day(date))+'<small>'+e(note||'')+'</small>'+(sub?'<span class="cc-sub">'+sub+'</span>':'')+'</span><b>'+money(amt)+'</b></div></div>';
   const grp=(key,title,why,body)=>'<div class="cc-g" data-cc-group="'+key+'"><h3>'+title+'</h3><p class="fx-small">'+why+'</p>'+body+'</div>';
@@ -232,16 +245,16 @@
   if(ex.transfer.length)h+=grp('transfer','🔁 Bank transfers ('+ex.transfer.length+')','The bank shows these as a <b>transfer</b>. The app has them as something else, or the other way round.',
    ex.transfer.slice(0,80).map(x=>{const amt=+x.row.amount,io=amt>0?'in':'out',opts=x.flip
      ?[['trflip','🔁 Make it '+money(amt)+' transfer '+io+' (as the bank shows)'],['keep','Leave it'],['del','🗑 Remove']].concat(others.map(a=>['move:'+a.id,'🔀 Move to '+a.name]))
-     :[['bankdate','🔁 Paid by transfer · keep the category, use the bank date'],['trmatch','🔁 It was a transfer between my accounts'],['keep','Leave it']];
+     :[['bankdate','🔁 Paid by transfer · keep the category, use the bank date'],['trmatch','🔁 It was a transfer between my accounts'],['keep','Leave it']].concat(loanOpts(x.t,r.acct));
     return row({txn:x.t,row:x.row,g:'transfer',flip:x.flip},opts,x.flip?'trflip':'bankdate',x.t.date,x.t.note,x.t.amount,'Bank: <b>'+money(amt)+'</b> on '+e(day(x.row.date))+' · '+e(String(x.row.note||'').slice(0,50))+(x.flip?' · <b>the other way round</b> from the app':''));}).join(''));
   if(ex.add.length)h+=grp('add','➕ Missing from the app ('+ex.add.length+' · '+tot(ex.add)+')','In the bank, not in the app.',
    ex.add.slice(0,80).map(x=>row({row:x.r,g:'add'},[['add','➕ Add to the app'],['keep','Leave it out']],'add',x.r.date,x.r.note,x.r.amount,'')).join(''));
   if(ex.other.length)h+=grp('other','🔀 In the wrong account ('+ex.other.length+')','The bank has these in <b>'+e(here.name)+'</b>, but the app has them under another account.',
    ex.other.slice(0,80).map(x=>row({txn:x.txn,g:'other'},[['here','🔀 Move it to '+here.name],['keep','Leave it in '+acc(x.txn.acct).name]],'here',x.r.date,x.r.note,x.r.amount,'In the app under <b>'+e(acc(x.txn.acct).name)+'</b> on '+e(day(x.txn.date)))).join(''));
   if(ex.date.length)h+=grp('date','📅 Same payment, different date ('+ex.date.length+')','The app and the bank have this payment on different days.',
-   ex.date.slice(0,80).map(x=>row({txn:x.t,row:x.row,g:'date'},[['bankdate','📅 Use the bank date ('+day(x.row.date)+')'],['keep','Leave it']],'bankdate',x.t.date,x.t.note,x.t.amount,'Bank date: '+e(day(x.row.date)))).join(''));
+   ex.date.slice(0,80).map(x=>row({txn:x.t,row:x.row,g:'date'},[['bankdate','📅 Use the bank date ('+day(x.row.date)+')'],['keep','Leave it']].concat(loanOpts(x.t,r.acct)),'bankdate',x.t.date,x.t.note,x.t.amount,'Bank date: '+e(day(x.row.date)))).join(''));
   if(ex.none.length)h+=grp('none','❓ In the app, not in the bank ('+ex.none.length+' · '+tot(ex.none)+')','Typed by hand, still pending, or in the wrong account? Pick what is right for each one.',
-   ex.none.slice(0,80).map(x=>row({txn:x.t,g:'none'},[['keep','Leave it for now'],['del','🗑 Remove (it never came out of '+here.name+')']].concat(others.map(a=>['move:'+a.id,'🔀 Move to '+a.name])),'keep',x.t.date,x.t.note,x.t.amount,x.t.pocketsmithId!=null?'From the bank feed':'Added by hand or from a statement')).join(''));
+   ex.none.slice(0,80).map(x=>row({txn:x.t,g:'none'},[['keep','Leave it for now']].concat(loanOpts(x.t,r.acct),[['del','🗑 Remove (it never came out of '+here.name+')']],others.map(a=>['move:'+a.id,'🔀 Move to '+a.name])),'keep',x.t.date,x.t.note,x.t.amount,x.t.pocketsmithId!=null?'From the bank feed':'Added by hand or from a statement')).join(''));
   if(ex.zero.length)h+=grp('zero','⏭ $0 card checks ('+ex.zero.length+')','The bank checking your card. No money moved, so nothing to do.',
    '<div class="cc-info">'+ex.zero.slice(0,20).map(x=>info(x.r.date,x.r.note,0,'')).join('')+'</div>');
   if(st.refs.length)h+='<div class="cc-done"><button class="btn dark" id="cc_apply" onclick="csvCheckApply()" style="display:block;width:100%;padding:14px;font-size:1.05em">✅ Done: update the app</button><p class="fx-small" style="margin:6px 0 0;text-align:center">Nothing is saved until you tap Done.</p></div>';
@@ -273,7 +286,7 @@
   document.querySelectorAll('.cc-r[data-k]').forEach(el=>{
    const ref=(st.refs||[])[+el.dataset.k];if(!ref)return;const v=(el.querySelector('.cc-sel')||{}).value||'keep',src=ref.txn||ref.row,ed={};
    el.querySelectorAll('.cc-edit [data-f]').forEach(i=>{const f=i.dataset.f,val=f==='amount'?Math.round(+i.value*100)/100:String(i.value).trim();
-    if(f==='amount'?(i.value!==''&&Number.isFinite(val)&&Math.round(val*100)!==Math.round(+src.amount*100)):(f==='date'?/^\d{4}-\d{2}-\d{2}$/.test(val)&&val!==src.date:val!==String(src.note||'')))ed[f]=val;});
+    if(f==='amount'?(i.value!==''&&Number.isFinite(val)&&Math.round(val*100)!==Math.round(+src.amount*100)):(f==='date'?/^\d{4}-\d{2}-\d{2}$/.test(val)&&val!==src.date:f==='cat'?val!==String(src.cat||(ref.row&&!ref.txn?'__none':'other'))&&!!val:val!==String(src.note||'')))ed[f]=val;});
    el.classList.toggle('cc-on',v!=='keep'||Object.keys(ed).length>0);
    out.push({ref,v,ed});
   });
@@ -281,7 +294,7 @@
  }
  function sums(p){
   const c={add:0,del:0,move:0,fix:0};
-  p.forEach(x=>{if(x.v==='add')c.add++;else if(x.v==='del')c.del++;else if(x.v==='here'||x.v.startsWith('move:'))c.move++;else if(x.v==='bankdate'||x.v==='trflip'||x.v==='trmatch'||(x.ref.txn&&Object.keys(x.ed).length))c.fix++;
+  p.forEach(x=>{if(x.v==='add')c.add++;else if(x.v==='del')c.del++;else if(x.v==='here'||x.v.startsWith('move:'))c.move++;else if(x.v==='bankdate'||x.v==='trflip'||x.v==='trmatch'||x.v.startsWith('cat:')||(x.ref.txn&&Object.keys(x.ed).length))c.fix++;
    if(x.v!=='del'&&x.v!=='bankdate'&&x.ref.txn&&Object.keys(x.ed).length&&(x.v==='here'||x.v.startsWith('move:')))c.fix++;});
   return c;
  }
@@ -299,12 +312,13 @@
   if(c.fix)lines.push('• Fix the date or details on '+c.fix);
   if(!confirm('Update the app?\n\n'+lines.join('\n')+'\n\nRemoved ones can be brought back from the account.'))return;
   const now=new Date().toISOString(),before=TXNS.map(t=>({...t})),made=[];
-  const fixT=(t,ed)=>{if(ed.date!=null){t.date=ed.date;t.dateOverride=true;}if(ed.amount!=null){t.amount=ed.amount;t.amountOverride=true;}if(ed.note!=null){t.note=ed.note;t.noteOverride=true;}if(Object.keys(ed).length){t.editedAt=now;t.editedVia='csv-check';}};
+  const fixT=(t,ed)=>{if(ed.cat!=null){t.cat=ed.cat;t.categoryOverride=true;}if(ed.date!=null){t.date=ed.date;t.dateOverride=true;}if(ed.amount!=null){t.amount=ed.amount;t.amountOverride=true;}if(ed.note!=null){t.note=ed.note;t.noteOverride=true;}if(Object.keys(ed).length){t.editedAt=now;t.editedVia='csv-check';}};
   p.forEach(({ref,v,ed})=>{
-   if(v==='add'){const x=ref.row;made.push({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:ed.date||x.date,amount:ed.amount!=null?ed.amount:+x.amount,note:ed.note||x.note||'From bank CSV',cat:+(ed.amount!=null?ed.amount:x.amount)>0?'income':'other',src:'csv-check',needsReview:true});return;}
+   if(v==='add'){const x=ref.row;made.push({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:ed.date||x.date,amount:ed.amount!=null?ed.amount:+x.amount,note:ed.note||x.note||'From bank CSV',cat:ed.cat||(()=>{const sc=suggestCat(x,r.acct);return sc!=='other'?sc:+(ed.amount!=null?ed.amount:x.amount)>0?'income':'other';})(),categoryOverride:!!ed.cat,src:'csv-check',needsReview:true});return;}
    const t=ref.txn;if(!t)return;
    if(v==='del'){Object.assign(t,{deleted:true,deletedAt:now,deletedReason:ref.g==='double'?'Double-up (bank CSV has it once)':'Not in the bank CSV'});return;}
    if(v==='here'||v.startsWith('move:')){const to=v==='here'?r.acct:v.slice(5);t.movedFrom=t.acct;t.acct=to;t.acctOverride=true;t.movedAt=now;}
+   if(v.startsWith('cat:')){t.cat=v.slice(4);t.categoryOverride=true;t.sortedAt=now;}
    if(v==='bankdate'&&ref.row){t.date=ref.row.date;t.dateOverride=true;}
    if((v==='trflip'||v==='trmatch')&&ref.row){if(v==='trflip'){t.userNote=('Was in the app as '+money(+t.amount)+(t.note?' · '+t.note:'')).slice(0,200);t.amount=+ref.row.amount;t.amountOverride=true;t.note=ref.row.note||t.note;t.noteOverride=true;}t.date=ref.row.date;t.dateOverride=true;t.cat='transfer';t.categoryOverride=true;t.catOnce=true;}
    fixT(t,ed);

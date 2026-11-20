@@ -159,7 +159,8 @@ test('CSV check shows the live Fix my numbers alert after Done, with what is lef
 test('CSV check recognises bank transfers, even the other way round from the app (the $55 Pilates case)', () => {
   const C = require('../finance/csv-check.js');
   const rows = [{ date: '2026-10-19', amount: 55, note: 'ONLINE B2915038377 Linked Acc Trns KYTE J', type: 'TRANSFER CREDIT' },
-    { date: '2026-10-22', amount: -80, note: 'Transfer to Liiv Well Pilates', type: 'TRANSFER DEBIT' }];
+    { date: '2026-10-22', amount: -80, note: 'Transfer to Liiv Well Pilates', type: 'TRANSFER DEBIT' },
+    { date: '2026-10-01', amount: 0, note: 'start of the statement' }, { date: '2026-10-31', amount: 0, note: 'end of the statement' }];
   const txns = [{ id: 'p', acct: 'a', date: '2026-10-19', amount: -55, note: 'Pilates' }, { id: 'q', acct: 'a', date: '2026-10-15', amount: -80, note: 'Pilates term' }];
   const r = C.run({ rows, txns, acct: 'a', from: '2026-10-01', to: '2026-10-31' });
   const ex = C.explain(r, txns);
@@ -202,4 +203,20 @@ test('each loan gets repayment, interest charged and fees categories in a Loans 
   assert.deepEqual(out, ['loan_house_repay', 'loan_house_interest', 'loan_land_fees', 'transfer', 'loan_car_repay', 'other', 'bnpl', 'other']);
   const moves = M.detectMoves([{ id: 1, acct: 'everyday', date: '2026-11-03', amount: -1200, cat: 'transfer' }, { id: 2, acct: 'house', date: '2026-11-03', amount: 1200, cat: 'loan_house_repay' }], A);
   assert.equal(moves.length, 1, 'a repayment still pairs with the other side of the transfer');
+});
+
+test('CSV check only compares the dates the CSV covers, and loan rows can be marked as repayment / redraw / interest / fees', () => {
+  const C = require('../finance/csv-check.js');
+  const rows = [{ date: '2026-10-07', amount: 294, note: 'LOAN REPAYMENT KYTE M' }, { date: '2026-11-18', amount: -60.1, note: 'INTEREST CHARGED' }];
+  const txns = [{ id: 'old', acct: 'car', date: '2025-07-09', amount: 294, note: 'LOAN REPAYMENT KYTE M' },
+    { id: 'a', acct: 'car', date: '2026-10-07', amount: 294 }, { id: 'b', acct: 'car', date: '2026-11-18', amount: -60.1 }];
+  const r = C.run({ rows, txns, acct: 'car', from: '2024-10-01', to: '2026-11-20' });
+  assert.equal(r.clipped, true);
+  assert.equal(r.from, '2026-10-07'); assert.equal(r.to, '2026-11-18');
+  assert.equal(r.onlyApp.length, 0, 'July 2025 is outside the CSV, so it is not "not in the bank"');
+  assert.equal(r.ok, true);
+  assert.throws(() => C.run({ rows, txns, acct: 'car', from: '2024-01-01', to: '2024-02-01' }), /Your CSV covers/);
+  const g = read('finance/csv-check.js');
+  for (const s of ['💸 Mark as loan repayment', '↔️ Mark as redraw / drawdown', '📈 Mark as interest charged', '🧾 Mark as fees', 'data-f="cat"', 'so only those dates were checked'])
+    assert.ok(g.includes(s), s);
 });
