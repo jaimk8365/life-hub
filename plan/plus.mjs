@@ -327,3 +327,52 @@ window.render();
 try { const want = sessionStorage.getItem('plan_goto'); if (want) window.ppGoto(want); } catch { /* fine */ }
 try { if (sessionStorage.getItem('plan_goto_lists')) P.openHomeCare(); } catch { /* fine */ }
 try { const r = sessionStorage.getItem('plan_goto_routines'); if (r) { P.listsOff(); R.open(r === '1' ? null : r); } } catch { /* fine */ }
+
+/* ---------- Year and Month: what is on a date, in a small pop-up, without leaving the screen ----------
+   Computer: hover a day. iPad/phone: touch and hold a day (a normal tap still opens the month). */
+(() => {
+  const tEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const st = document.createElement('style');
+  st.textContent = '#pp-tip{position:fixed;z-index:99999;max-width:270px;background:var(--card,#fff);color:var(--ink,#1F3442);border:1px solid var(--line,#E7DFD0);border-radius:14px;box-shadow:0 12px 30px rgba(20,30,40,.2);padding:10px 12px;font:600 13px/1.35 inherit;font-family:inherit;pointer-events:none}#pp-tip b{display:block;font-size:14px;margin-bottom:4px}#pp-tip div{padding:2px 0;overflow-wrap:anywhere}#pp-tip small{opacity:.7}.ygrid i.ev,.ygrid i.mo,.monthday:not(.out){cursor:help}';
+  document.head.appendChild(st);
+  const to12 = hm => { const [h, m] = String(hm).split(':').map(Number); return (h % 12 || 12) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? 'am' : 'pm'); };
+  /* the date a cell stands for */
+  function isoOf(el) {
+    const y = el.closest('.ymon');
+    if (y && el.matches('.ygrid i')) { const n = parseInt(el.textContent, 10); if (!n) return null; const m = [...document.querySelectorAll('.ymon')].indexOf(y) + 1; return yearCursor + '-' + String(m).padStart(2, '0') + '-' + String(n).padStart(2, '0'); }
+    const c = el.closest('.monthday:not(.out)'); if (!c) return null;
+    const k = [...document.querySelectorAll('.monthday:not(.out)')].indexOf(c) + 1; return k ? monthCursor + '-' + String(k).padStart(2, '0') : null;
+  }
+  function lines(iso) {
+    const out = [];
+    try { const f = feedFor(iso); f.allday.forEach(e => out.push('📅 ' + tEsc(e.title))); f.timed.forEach(e => out.push('📅 <small>' + tEsc(to12(e.start)) + '</small> ' + tEsc(e.title))); (f.reminders || []).forEach(r => out.push('🔔 ' + tEsc(r.title || r.text || 'Reminder'))); } catch { /* no feed */ }
+    try { load(K_MONEY_DATES, []).filter(x => x.date === iso).forEach(x => out.push('💵 ' + tEsc(x.title))); } catch { /* none */ }
+    try { blocksFor(iso).filter(b => !b.repeat || b.repeat.type === 'once').forEach(b => out.push(tEsc(b.icon || '✅') + ' ' + (b.start ? '<small>' + tEsc(to12(b.start)) + '</small> ' : '') + tEsc(b.title))); } catch { /* none */ }
+    return out;
+  }
+  let tip = null, holdTimer = 0, swallow = 0;
+  const hide = () => { if (tip) tip.style.display = 'none'; }; // hidden, not removed: shown again on the next hover
+  function show(el) {
+    const iso = isoOf(el); if (!iso) return hide();
+    const l = lines(iso); if (!l.length) return hide();
+    const nice = new Date(iso + 'T12:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+    if (!tip) { tip = document.createElement('div'); tip.id = 'pp-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+    tip.style.display = '';
+    tip.innerHTML = '<b>' + tEsc(nice) + '</b>' + l.slice(0, 8).map(x => '<div>' + x + '</div>').join('') + (l.length > 8 ? '<div><small>+ ' + (l.length - 8) + ' more</small></div>' : '');
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    let left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8), top = r.bottom + 8;
+    if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 8);
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  const cellOf = t => t && t.closest ? (t.closest('.ygrid i') || t.closest('.monthday:not(.out)')) : null;
+  document.addEventListener('pointerover', e => { if (e.pointerType === 'touch') return; const c = cellOf(e.target); if (c) show(c); else hide(); });
+  document.addEventListener('pointerleave', hide);
+  document.addEventListener('scroll', hide, true);
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return; const c = cellOf(e.target); hide(); clearTimeout(holdTimer); if (!c) return;
+    holdTimer = setTimeout(() => { show(c); if (tip) swallow = Date.now(); }, 450);
+  });
+  ['pointerup', 'pointercancel', 'pointermove'].forEach(n => document.addEventListener(n, e => { if (e.pointerType === 'touch' && (n !== 'pointermove' || Math.abs(e.movementX) + Math.abs(e.movementY) > 6)) clearTimeout(holdTimer); }));
+  // after a touch-and-hold the lifted finger must not also open the month; the next tap anywhere closes the pop-up
+  document.addEventListener('click', e => { if (swallow && Date.now() - swallow < 1500) { e.preventDefault(); e.stopPropagation(); swallow = 0; return; } if (tip && !cellOf(e.target)) hide(); }, true);
+})();

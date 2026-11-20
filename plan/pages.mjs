@@ -52,6 +52,7 @@ export const CSS = `
 .pg-ch.late small{color:var(--bad,#C75B45)}.pg-ch.d .t{opacity:.5;text-decoration:line-through}
 .pg-tick{all:unset;cursor:pointer;width:36px;height:36px;min-height:36px!important;box-sizing:border-box;border-radius:50%;border:2.5px solid var(--joy-turquoise,#7FB79B);display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;margin:0 auto}
 .pg-ch.d .pg-tick{background:var(--joy-turquoise,#7FB79B)}.pg-tick:focus-visible,.pg-now:focus-visible,.pg-edit:focus-visible{outline:3px solid var(--coral,#E8927C);outline-offset:2px}
+.pg-btns{display:flex;gap:4px}.pg-today{background:#FFF0D6!important}
 .pg-now{all:unset;cursor:pointer;font-size:19px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--joy-yellow-soft,#FFF3C4)}
 .pg-edit{all:unset;cursor:pointer;display:block;min-width:0}
 .pg-lh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 10px}.pg-lh h2{font:600 22px 'Fraunces',serif;margin:0}
@@ -88,7 +89,7 @@ function stickersHtml(iso, list, row) {
 function choreRow(c, canTick, withNow) {
   return `<div class="pg-ch${c.done ? ' d' : ''}${c.late ? ' late' : ''}">${canTick ? `<button type="button" class="pg-tick" data-pg-tick="${esc(c.id)}" aria-pressed="${c.done}" aria-label="${c.done ? 'Undo' : 'Done'}: ${esc(c.name)}">${c.done ? '✓' : ''}</button>` : '<span></span>'}
     <span aria-hidden="true">${esc(c.icon)}</span><button type="button" class="pg-edit" data-pg-edit="${esc(c.id)}" aria-label="Change ${esc(c.name)}"><span class="t">${c.must ? '★ ' : ''}${esc(c.name)}</span><small>${esc(c.freq)}${c.words && !c.done ? ' · ' + esc(c.words) : ''}</small></button>
-    ${withNow && !c.done ? `<button type="button" class="pg-now" data-pg-now="${esc(c.id)}" aria-label="Do ${esc(c.name)} now" title="Do it now">🎯</button>` : '<span></span>'}</div>`;
+    ${withNow && !c.done ? `<span class="pg-btns">${!c.due || c.due > todayISO() ? `<button type="button" class="pg-now pg-today" data-pg-today="${esc(c.id)}" aria-label="Do ${esc(c.name)} today" title="Do it today">☀️</button>` : ''}<button type="button" class="pg-now" data-pg-now="${esc(c.id)}" aria-label="Do ${esc(c.name)} now" title="Do it now">🎯</button></span>` : '<span></span>'}</div>`;
 }
 
 /* ---------- week: the spread ---------- */
@@ -199,7 +200,7 @@ function taskSheet(id) {
   const due = H.nextDue(t, today), hist = H.history(arr(K_LOG), id), sched = H.scheduledFor(BLOCKS, id, today), done = t.last === today;
   document.getElementById('sheet').innerHTML = `<button class="close" onclick="closeSheet()" aria-label="Close">✕</button><div class="pg-tk"><h2>${esc(l.e)} ${esc(t.name)}</h2>
     <div class="sub">${esc(l.n)} · ${esc(v ? v.freq : '')}${due && !done ? ' · ' + esc(H.dueWords(due, today)) : ''}</div>
-    <div class="pg-acts"><button type="button" class="go" data-pg-sheet-tick="${esc(id)}" aria-pressed="${done}">${done ? '↩︎ Undo' : '✓ Done today'}</button>${done ? '' : `<button type="button" data-pg-now="${esc(id)}">🎯 Do now</button>`}<button type="button" data-pg-change="${esc(id)}">✏️ Change</button></div>
+    <div class="pg-acts"><button type="button" class="go" data-pg-sheet-tick="${esc(id)}" aria-pressed="${done}">${done ? '↩︎ Undo' : '✓ Done today'}</button>${done ? '' : (due && due <= today ? '' : `<button type="button" data-pg-today="${esc(id)}">☀️ Do today</button>`) + `<button type="button" data-pg-now="${esc(id)}">🎯 Do now</button>`}<button type="button" data-pg-change="${esc(id)}">✏️ Change</button></div>${adminChip(t)}
     <div class="pg-part"><h3>🗓️ Put it on the Planner</h3>${sched.map(b => `<button type="button" class="pp-rtchip" data-pg-goday="${esc(b.date)}" style="margin:0 0 6px">🗓️ ${esc(niceDay(b.date))} · ${esc(C.to12(b.start))}</button>`).join('')}
       <form class="pg-sched" data-pg-sched="${esc(id)}"><input type="date" name="date" min="${today}" value="${due && due > today ? esc(due) : today}" aria-label="Date"><input type="time" name="start" value="09:00" aria-label="Time" style="flex:0 1 110px"><button type="submit" class="pg-btn">＋ Planner</button></form></div>
     <div class="pg-part"><h3>📝 Notes</h3><textarea data-pg-desc="${esc(id)}" placeholder="How you do it, what you need, what to watch for" aria-label="Notes">${esc(t.desc || '')}</textarea></div>
@@ -207,18 +208,24 @@ function taskSheet(id) {
     <div class="pg-part"><h3>📖 History · ${hist.length ? 'done ' + hist.length + (hist.length === 1 ? ' time' : ' times') : 'not done yet'}</h3>${hist.length ? `<div class="pg-hist">${hist.slice(0, 10).map(d => `<span>✓ ${esc(niceDay(d))}</span>`).join('')}</div>` : (t.last ? `<div class="pg-row">Last done ${esc(niceDay(t.last))}</div>` : '')}</div></div>`;
   openSheet();
 }
+/* Life Admin items you can link a task to (e.g. Pest control), and the chip that opens the item. */
+function adminItems() { try { return (JSON.parse(localStorage.getItem('la_items') || '[]') || []).filter(i => i && i.id && i.name && !(i.freq === 'oneoff' && i.done)).sort((a, b) => a.name.localeCompare(b.name)); } catch { return []; } }
+function adminChip(t) { if (!t || !t.admin) return ''; const a = adminItems().find(x => x.id === t.admin); return a ? `<button type="button" class="pp-rtchip" data-pg-go="admin" data-id="${esc(a.id)}" style="margin:8px 0 0">📂 ${esc(a.name)} · Life Admin ›</button>` : ''; }
 function editSheet(id) {
   const t = id ? arr(K_TASKS).find(x => x.id === id) : null, lists = allLists(), cur = t ? H.listOf(t) : (lists.some(l => l.id === st.filter) ? st.filter : 'clean');
   const opt = (v, label, sel) => `<option value="${esc(v)}" ${sel ? 'selected' : ''}>${esc(label)}</option>`;
+  // an older task with "every N days" shows as Custom; the number is shown in the unit it was saved in
+  const freq = t ? (t.every && t.cat !== 'custom' ? 'custom' : t.cat) : 'weekly', unit = (t && t.everyUnit) || 'days', mult = (H.UNITS.find(u => u.id === unit) || H.UNITS[0]).mult, unitVal = t && t.every ? (t.every % mult === 0 ? t.every / mult : t.every) : '';
   document.getElementById('sheet').innerHTML = `<button class="close" onclick="closeSheet()" aria-label="Close">✕</button><h2>${t ? '✏️ Task' : '＋ New task'}</h2>
     <form class="pg-form" data-pg-form="${t ? esc(t.id) : ''}" autocomplete="off">
       <div class="field"><label for="pgf-name">Task</label><input id="pgf-name" name="name" value="${t ? esc(t.name) : ''}" placeholder="e.g. Wash towels"></div>
       <div class="field"><label for="pgf-list">List</label><select id="pgf-list" name="list">${lists.map(l => opt(l.id, l.e + ' ' + l.n, l.id === cur)).join('')}</select></div>
-      <div class="field"><label for="pgf-cat">How often</label><select id="pgf-cat" name="cat">${H.FREQS.map(f => opt(f.id, f.n, f.id === (t ? t.cat : 'weekly'))).join('')}</select></div>
+      <div class="field"><label for="pgf-cat">How often</label><select id="pgf-cat" name="cat" onchange="this.form.querySelector('.pg-custom').hidden=this.value!=='custom'">${H.FREQS.map(f => opt(f.id, f.n, f.id === freq)).join('')}</select></div>
+      <div class="field pg-custom" ${freq === 'custom' ? '' : 'hidden'}><label for="pgf-every">Every</label><div style="display:flex;gap:8px"><input id="pgf-every" name="every" type="number" min="1" max="365" inputmode="numeric" value="${esc(unitVal)}" placeholder="e.g. 3" style="flex:1"><select name="unit" aria-label="Days, weeks or months" style="flex:1">${H.UNITS.map(u => opt(u.id, u.n, u.id === unit)).join('')}</select></div></div>
       <div class="field"><label for="pgf-day">On a set day</label><select id="pgf-day" name="day">${opt('', 'Any day', !(t && t.day))}${['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(d => opt(d, H.WD_NAMES[d], t && t.day === d)).join('')}</select></div>
       <details class="pp-opts"><summary>More options</summary>
-        <div class="field"><label for="pgf-due">Next time (pick a date)</label><input id="pgf-due" name="dueOn" type="date" value="${t && t.dueOn ? esc(t.dueOn) : ''}"></div>
-        <div class="field"><label for="pgf-every">Or every how many days</label><input id="pgf-every" name="every" type="number" min="1" max="730" inputmode="numeric" value="${t && t.every ? esc(t.every) : ''}" placeholder="e.g. 10"></div>
+        <div class="field"><label for="pgf-due">Next time (pick a date, or leave empty)</label><input id="pgf-due" name="dueOn" type="date" value="${t && t.dueOn ? esc(t.dueOn) : ''}"></div>
+        <div class="field"><label for="pgf-admin">📂 Link to Life Admin</label><select id="pgf-admin" name="admin">${opt('', 'Not linked', !(t && t.admin))}${adminItems().map(a => opt(a.id, a.name, t && t.admin === a.id)).join('')}</select></div>
         <label class="chk"><input type="checkbox" name="must" ${t && t.pri ? 'checked' : ''}> ★ Must</label></details>
       <div style="display:flex;gap:8px;margin-top:18px"><button class="btn dark" type="submit" style="flex:2">Save</button>${t ? `<button type="button" class="btn ghost" style="flex:1" data-pg-del="${esc(t.id)}">Remove</button>` : ''}</div>
     </form>`;
@@ -226,13 +233,14 @@ function editSheet(id) {
 }
 
 export function onClick(e) {
-  const t = e.target.closest?.('[data-pg-tab],[data-pg-tick],[data-pg-now],[data-pg-edit],[data-pg-new],[data-pg-newlist],[data-pg-filter],[data-pg-del],[data-pg-tray],[data-pg-stick],[data-pg-unstick],[data-pg-plant],[data-pg-plants],[data-pg-change],[data-pg-group],[data-pg-addpic],[data-pg-unpic],[data-pg-pic],[data-pg-sheet-tick],[data-pg-goday],[data-pg-go]'); if (!t) return false;
+  const t = e.target.closest?.('[data-pg-tab],[data-pg-tick],[data-pg-today],[data-pg-now],[data-pg-edit],[data-pg-new],[data-pg-newlist],[data-pg-filter],[data-pg-del],[data-pg-tray],[data-pg-stick],[data-pg-unstick],[data-pg-plant],[data-pg-plants],[data-pg-change],[data-pg-group],[data-pg-addpic],[data-pg-unpic],[data-pg-pic],[data-pg-sheet-tick],[data-pg-goday],[data-pg-go]'); if (!t) return false;
   const d = t.dataset;
   if ('pgTab' in d) { st.lists = true; st.tray = null; render(); window.scrollTo(0, 0); }
   else if (d.pgPlant) { save(K_PLANTS, PL.careToggle(load(K_PLANTS, { plants: [] }), d.pgPlant, d.kind, todayISO(), uid())); render(); }
   else if ('pgPlants' in d) { try { parent.show('plants'); } catch { /* opened outside Life Hub */ } }
   else if (d.pgGo) { try { if (d.pgGo === 'admin' && d.id) parent.goAdminItem(d.id); else parent.show(d.pgGo); } catch { /* opened outside Life Hub */ } }
   else if (d.pgTick) tick(d.pgTick);
+  else if (d.pgToday) { save(K_TASKS, H.sendToday(arr(K_TASKS), d.pgToday, todayISO())); say('☀️ On today\'s list'); if (st.task === d.pgToday && document.querySelector('.pg-tk')) taskSheet(d.pgToday); else render(); }
   else if (d.pgNow) { try { closeSheet(); } catch { /* no sheet open */ } doNow(d.pgNow); }
   else if (d.pgEdit) taskSheet(d.pgEdit);
   else if (d.pgChange) editSheet(d.pgChange);
@@ -258,7 +266,7 @@ export function onSubmit(e) {
     catch (err) { say(err.message); }
     return true; }
   if (!f.matches?.('[data-pg-form]')) return false; e.preventDefault();
-  try { save(K_TASKS, H.saveTask(arr(K_TASKS), { id: f.dataset.pgForm || null, name: f.name.value, list: f.list.value, cat: f.cat.value, day: f.day.value, every: f.every.value, dueOn: f.dueOn.value, must: f.must.checked }, 'ht' + uid())); closeSheet(); render(); }
+  try { save(K_TASKS, H.saveTask(arr(K_TASKS), { id: f.dataset.pgForm || null, name: f.name.value, list: f.list.value, cat: f.cat.value, day: f.day.value, every: f.cat.value === 'custom' ? f.every.value : '', unit: f.unit ? f.unit.value : 'days', admin: f.admin ? f.admin.value : '', dueOn: f.dueOn.value, must: f.must.checked }, 'ht' + uid())); closeSheet(); render(); }
   catch (err) { say(err.message); }
   return true;
 }

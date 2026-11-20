@@ -7,8 +7,10 @@ import { addDays, weekdayOf, mondayOf, dayItems, dayLoad, doneKey, to12 } from '
 export const FREQS = [
   { id: 'daily', n: 'Every day', days: 1 }, { id: 'weekly', n: 'Weekly', days: 7 }, { id: 'fortnight', n: 'Fortnightly', days: 14 },
   { id: 'monthly', n: 'Monthly', days: 30 }, { id: 'quarterly', n: 'Every 3 months', days: 90 }, { id: 'halfyear', n: 'Every 6 months', days: 180 },
-  { id: 'yearly', n: 'Yearly', days: 365 }, { id: 'seasonal', n: 'Each season', days: null }, { id: 'once', n: 'Just once', days: null },
+  { id: 'yearly', n: 'Yearly', days: 365 }, { id: 'seasonal', n: 'Each season', days: null }, { id: 'custom', n: 'Custom: every …', days: null },
+  { id: 'once', n: 'Just once', days: null }, { id: 'someday', n: 'No date · someday', days: null },
 ];
+export const UNITS = [{ id: 'days', n: 'days', mult: 1 }, { id: 'weeks', n: 'weeks', mult: 7 }, { id: 'months', n: 'months', mult: 30 }];
 const freqOf = id => FREQS.find(f => f.id === id) || FREQS[1];
 export const WD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 export const WD_NAMES = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -46,6 +48,7 @@ const nextWeekday = (day, after) => { let d = addDays(after, 1); while (WD[weekd
 const stepOf = t => { const days = Number(t.every) > 0 ? Number(t.every) : (freqOf(t.cat).days || 7); return t.day ? Math.max(days, 7) : days; };
 export function nextDue(t, today) {
   if (t.dueOn) return t.dueOn;
+  if (t.cat === 'someday') return null; // no date until you send it to a day
   if (t.cat === 'once') return t.last ? null : today;
   if (t.cat === 'seasonal') return t.last ? seasonStartAfter(t.season || 'spring', t.last) : (seasonNow(today) === t.season ? today : seasonStartAfter(t.season || 'spring', today));
   if (t.day) {
@@ -73,7 +76,8 @@ export function occursOn(t, iso, today) {
   if (due <= today && t.last !== today) return gap > 0 && gap % step === 0; // it is waiting today; once done it comes round from today
   return gap >= 0 && gap % step === 0;
 }
-const freqWords = t => t.cat === 'once' ? 'once' : (Number(t.every) > 0 ? 'every ' + t.every + ' days' : freqOf(t.cat).n.toLowerCase()) + (t.day ? ' · ' + WD_NAMES[t.day] : '');
+const everyWords = t => { const n = Number(t.every), u = UNITS.find(x => x.id === t.everyUnit); if (u && u.mult > 1 && n % u.mult === 0) { const k = n / u.mult; return 'every ' + (k === 1 ? u.n.replace(/s$/, '') : k + ' ' + u.n); } return n === 1 ? 'every day' : 'every ' + n + ' days'; };
+const freqWords = t => t.cat === 'once' ? 'once' : t.cat === 'someday' ? 'no date' : (Number(t.every) > 0 ? everyWords(t) : freqOf(t.cat).n.toLowerCase()) + (t.day ? ' · ' + WD_NAMES[t.day] : '');
 const view = (t, today, lists) => { const due = nextDue(t, today), l = lists.find(x => x.id === listOf(t)) || lists[lists.length - 1]; return { id: t.id, name: t.name, list: l.id, icon: l.e, cat: t.cat, freq: freqWords(t), must: !!t.pri, due, words: t.last === today ? 'done' : dueWords(due, today), late: !!due && due < today && t.last !== today ? diff(due, today) : 0, done: t.last === today, desc: t.desc || '' }; };
 /** The tasks for one day, most pressing first. */
 export function choresOn(tasks, iso, today, custom) {
@@ -93,27 +97,32 @@ export function listsView(tasks, today, custom) {
 export function complete(tasks, log, id, today, logId) {
   const t = (tasks || []).find(x => x.id === id); if (!t) return { tasks, log };
   const entry = { id: logId, tid: t.id, name: t.name, cat: t.cat, date: today, prevLast: t.last || null, prevDueOn: t.dueOn || null };
-  const next = tasks.map(x => { if (x.id !== id) return x; const y = { ...x, last: today }; delete y.dueOn; if (x.cat === 'once') y.deleted = true; return y; });
+  const next = tasks.map(x => { if (x.id !== id) return x; const y = { ...x, last: today }; delete y.dueOn; if (x.cat === 'once' || x.cat === 'someday') y.deleted = true; return y; });
   return { tasks: next, log: [entry, ...(log || [])].slice(0, 600) };
 }
 export function undo(tasks, log, id, today) {
   const entry = (log || []).find(e => e.tid === id && e.date === today); if (!entry) return { tasks, log };
-  const next = (tasks || []).map(x => { if (x.id !== id || x.last !== today) return x; const y = { ...x, last: entry.prevLast || null }; if (entry.prevDueOn) y.dueOn = entry.prevDueOn; if (x.cat === 'once') y.deleted = false; return y; });
+  const next = (tasks || []).map(x => { if (x.id !== id || x.last !== today) return x; const y = { ...x, last: entry.prevLast || null }; if (entry.prevDueOn) y.dueOn = entry.prevDueOn; if (x.cat === 'once' || x.cat === 'someday') y.deleted = false; return y; });
   return { tasks: next, log: log.filter(e => e !== entry) };
 }
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 /** Add a task, or change one. Only the fields the form owns are touched; everything else on the task is kept. */
 export function saveTask(tasks, form, newId) {
   const name = String(form.name || '').trim().slice(0, 80); if (!name) throw new Error('Name the task.');
-  const cat = FREQS.some(f => f.id === form.cat) ? form.cat : 'weekly', every = Math.floor(Number(form.every));
-  const fields = { name, list: String(form.list || 'other'), cat, day: WD.includes(form.day) ? form.day : null, every: every > 0 && every <= 730 ? every : null, pri: form.must ? 1 : 0 };
+  const cat = FREQS.some(f => f.id === form.cat) ? form.cat : 'weekly', unit = UNITS.find(u => u.id === form.unit) || UNITS[0], every = Math.floor(Number(form.every)) * unit.mult;
+  if (cat === 'custom' && !(every > 0)) throw new Error('How often? Type a number, e.g. every 3 weeks.');
+  const fields = { name, list: String(form.list || 'other'), cat, day: WD.includes(form.day) ? form.day : null, every: every > 0 && every <= 1095 ? every : null, pri: form.must ? 1 : 0 };
+  const extra = { everyUnit: cat === 'custom' ? unit.id : null, admin: String(form.admin || '') || null };
   const dueOn = ISO.test(String(form.dueOn || '')) ? form.dueOn : null;
   const exists = form.id && (tasks || []).some(t => t.id === form.id);
-  if (exists) return tasks.map(t => { if (t.id !== form.id) return t; const y = { ...t, ...fields }; if (dueOn) y.dueOn = dueOn; else delete y.dueOn; if (!y.day) delete y.day; if (!y.every) delete y.every; return y; });
-  const made = { id: newId, ...fields, desc: '', last: null, deleted: false }; if (dueOn) made.dueOn = dueOn; if (!made.day) delete made.day; if (!made.every) delete made.every;
+  const tidy = y => { for (const k of ['day', 'every', 'everyUnit', 'admin']) if (!y[k]) delete y[k]; return y; };
+  if (exists) return tasks.map(t => { if (t.id !== form.id) return t; const y = { ...t, ...fields, ...extra }; if (dueOn) y.dueOn = dueOn; else delete y.dueOn; return tidy(y); });
+  const made = tidy({ id: newId, ...fields, ...extra, desc: '', last: null, deleted: false }); if (dueOn) made.dueOn = dueOn;
   if (cat === 'seasonal') made.season = 'spring';
   return [...(tasks || []), made];
 }
+/** ☀️ Do today: it joins today's list, without a time. Once done it goes back to its usual rhythm. */
+export const sendToday = (tasks, id, today) => (tasks || []).map(t => t.id === id ? { ...t, dueOn: today } : t);
 export const removeTask = (tasks, id) => (tasks || []).map(t => t.id === id ? { ...t, deleted: true } : t);
 
 /* ---------- stickers and notes: your own touches on a day or a week ---------- */
@@ -150,7 +159,7 @@ export function tickedFromBlocks(blocks, done, tasks, today) {
 export { mondayOf };
 
 /* ---------- Home care: the same tasks grouped by how often, and what each task remembers ---------- */
-const FREQ_ICON = { daily: '☀️', weekly: '🗓️', fortnight: '🌓', monthly: '🌙', quarterly: '🍂', halfyear: '⛰️', yearly: '🎆', seasonal: '🌸', once: '1️⃣' };
+const FREQ_ICON = { custom: '🔧', someday: '💭', daily: '☀️', weekly: '🗓️', fortnight: '🌓', monthly: '🌙', quarterly: '🍂', halfyear: '⛰️', yearly: '🎆', seasonal: '🌸', once: '1️⃣' };
 export function freqView(tasks, today, custom) {
   const lists = [...LISTS, ...(custom || [])], all = (tasks || []).filter(t => t && !t.deleted).map(t => ({ ...view(t, today, lists), cat: FREQS.some(f => f.id === t.cat) ? t.cat : 'weekly' }));
   return FREQS.map(f => { const items = all.filter(v => v.cat === f.id).sort((a, b) => String(a.due || '9').localeCompare(String(b.due || '9')) || a.name.localeCompare(b.name)); return { id: f.id, n: f.n, e: FREQ_ICON[f.id], items, due: items.filter(v => !v.done && v.due && v.due <= today).length }; }).filter(g => g.items.length);

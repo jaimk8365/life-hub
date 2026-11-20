@@ -220,3 +220,32 @@ test('CSV check only compares the dates the CSV covers, and loan rows can be mar
   for (const s of ['💸 Mark as loan repayment', '↔️ Mark as redraw / drawdown', '📈 Mark as interest charged', '🧾 Mark as fees', 'data-f="cat"', 'so only those dates were checked'])
     assert.ok(g.includes(s), s);
 });
+
+test('all accounts at once: wrong account, extra copy in another account, transfer missing on both sides', () => {
+  const C = require('../finance/csv-check.js');
+  const ev = [{ date: '2026-11-02', amount: -5, note: 'Coffee' }, { date: '2026-11-03', amount: -500, note: 'Transfer to Bills', type: 'TRANSFER DEBIT' }, { date: '2026-11-01', amount: 0, note: 's' }, { date: '2026-11-10', amount: 0, note: 'e' }];
+  const bi = [{ date: '2026-11-04', amount: -93.7, note: 'TELSTRA' }, { date: '2026-11-03', amount: 500, note: 'Transfer from Everyday', type: 'TRANSFER CREDIT' }, { date: '2026-11-05', amount: -20, note: 'KMART' }, { date: '2026-11-01', amount: 0, note: 's' }, { date: '2026-11-10', amount: 0, note: 'e' }];
+  const T = [{ id: 'c', acct: 'ev', date: '2026-11-02', amount: -5 }, { id: 'tel', acct: 'ev', date: '2026-11-04', amount: -93.7 }, { id: 'k1', acct: 'bi', date: '2026-11-05', amount: -20 }, { id: 'k2', acct: 'ev', date: '2026-11-05', amount: -20 },
+    { id: 'gone', acct: 'ev', date: '2026-11-06', amount: -12 }];
+  const run = (acct, rows) => ({ acct, res: C.run({ rows, txns: T, acct, from: '2026-11-01', to: '2026-11-10' }) });
+  const [E, B] = C.explainAll([run('ev', ev), run('bi', bi)], T);
+  assert.deepEqual(E.ex.dupelse.map(a => a.t.id), ['k2'], 'Bills already has the Kmart payment');
+  assert.deepEqual(B.ex.other.map(b => b.txn.id), ['tel'], 'Telstra belongs in Bills');
+  assert.deepEqual(E.ex.none.map(a => a.t.id), ['gone'], 'only the one in no bank file needs you; Telstra is not listed twice');
+  assert.equal(E.ex.add[0].pair.acct, 'bi'); assert.equal(B.ex.add[0].pair.acct, 'ev');
+});
+
+test('a bank file finds its account by number; a new export joins the saved one without leaving a hole', () => {
+  const C = require('../finance/csv-check.js');
+  const A = [{ id: 'everyday', num: '2015' }, { id: 'car', num: '1984' }, { id: 'x', num: '' }];
+  assert.equal(C.matchAccount({ accountNumber: '274760352015' }, A), 'everyday');
+  assert.equal(C.matchAccount({ accountNumber: '' }, A), null);
+  assert.equal(C.matchAccount({ accountNumber: '0000' }, [{ id: 'a', num: '0000' }, { id: 'b', num: '0000' }]), null, 'two accounts with the same number: ask');
+  const saved = { name: 'a.csv', rows: [{ date: '2026-10-01', amount: -1, note: 'x' }, { date: '2026-10-05', amount: -2, note: 'y' }], min: '2026-10-01', max: '2026-10-05' };
+  const joined = C.mergeFile(saved, { rows: [{ date: '2026-10-05', amount: -2, note: 'y' }, { date: '2026-10-08', amount: -3, note: 'z' }], min: '2026-10-05', max: '2026-10-08' }, 'b.csv', 'now');
+  assert.equal(joined.rows.length, 3); assert.equal(joined.min, '2026-10-01'); assert.equal(joined.max, '2026-10-08');
+  const far = C.mergeFile(saved, { rows: [{ date: '2026-12-20', amount: -4, note: 'w' }], min: '2026-12-20', max: '2026-12-20' }, 'c.csv', 'now');
+  assert.equal(far.rows.length, 1, 'a file far from the saved one replaces it, so there is no hole in the dates');
+  const g = read('finance/csv-check.js');
+  for (const s of ['📚 Check all my accounts', "K_BANK_FILES='fin_bank_files_v1'", 'Ready to fix', 'Needs you', 'csvMultiOpen:multiOpen']) assert.ok(g.includes(s), s);
+});

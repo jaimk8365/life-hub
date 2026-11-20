@@ -372,7 +372,7 @@ function fixMatchOpen(){
  const ev=typeof financeEvidence==='function'?financeEvidence():{accounts:[]},waiting=ev.accounts.filter(a=>!a.trusted);
  $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="fixOpen()">‹ Fix my numbers</button><h2>Match to my bank</h2>'
   +'<p>Your bank balance is right. This checks whether the app adds up to the same number. Tap an account that is off to see why and fix it.</p>'
-  +'<p class="fx-small">Tip: tap 🏦 Bank feed first so the bank balances are from today.</p>'+(typeof window.csvCheckOpen==='function'?'<button class="btn dark" style="margin:6px 0 10px" onclick="csvCheckOpen(null,\'match\')">📄 Check an account with a bank CSV</button>':'')+rows
+  +'<p class="fx-small">Tip: tap 🏦 Bank feed first so the bank balances are from today.</p>'+(typeof window.csvMultiOpen==='function'?'<button class="btn dark" style="margin:6px 0 6px;display:block;width:100%" onclick="csvMultiOpen(\'match\')">📚 Check all my accounts with bank CSVs</button>':'')+(typeof window.csvCheckOpen==='function'?'<button class="btn ghost" style="margin:0 0 10px;display:block;width:100%" onclick="csvCheckOpen(null,\'match\')">📄 Check one account</button>':'')+rows
   +(waiting.length?'<div class="fx-note"><b>Spending money is held back until these are sorted:</b>'+waiting.map(a=>'<div>'+esc(a.name)+': '+esc(fixReason(a))+'</div>').join('')+'</div>':'<div class="fx-note ok">✅ Everyday, Bills and Loan Repay all check out. Spending money is shown.</div>');
  openSheet();
 }

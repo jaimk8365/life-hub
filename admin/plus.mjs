@@ -37,6 +37,10 @@ const CSS = `
 .lp-acts button,.lp-mini{border:1px solid var(--line);background:var(--card);border-radius:12px;min-height:42px;padding:0 13px;font:700 13px inherit;font-family:inherit;color:var(--ink);cursor:pointer}
 .lp-acts button.on{background:#FCF3EF;border-color:var(--coral)}.lp-acts .lp-done{background:#EAF3EE;border-color:var(--mint,#BFDCCB);color:var(--good,#3F7D5C)}
 .lp-sec{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.lp-chip{display:inline-flex;align-items:center;gap:6px;background:#EEF5FB;border:1px solid #CFE0EE;border-radius:999px;padding:4px 6px 4px 12px;font-size:13px;font-weight:700;margin:0 6px 8px 0}
+.lp-payrow{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:11px 12px;margin:6px 0;font:600 14px inherit;font-family:inherit;color:var(--ink);cursor:pointer}.lp-payrow small{display:block;font-weight:600;color:var(--ink-soft);font-size:12.5px;overflow-wrap:anywhere}.lp-payrow b{white-space:nowrap}
+.lp-pick{background:#FFF6E3;border:1.5px solid #E8D7B5;border-radius:16px;padding:12px;margin:10px 0}.lp-pick p{margin:0 0 8px}.lp-payonce,.lp-payalways{display:block;width:100%;border-radius:14px;min-height:48px;margin-top:8px;font:800 15px inherit;font-family:inherit;cursor:pointer;border:0;text-align:center;padding:10px}.lp-payonce{background:var(--card);border:1.5px solid var(--line);color:var(--ink)}.lp-payalways{background:#2F6FA3;color:#fff}.lp-payalways small{display:block;font-weight:600;opacity:.85;font-size:12.5px}
+.lp-del{width:100%;border:1.5px solid #E7B7AC;background:#FCF1EE;color:var(--bad,#C75B45);border-radius:14px;min-height:48px;font:800 15px inherit;font-family:inherit;cursor:pointer}
 .lp-sec h3{font:800 11.5px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 8px}
 .lp-note{width:100%;min-height:90px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font:500 15px/1.45 inherit;font-family:inherit;background:var(--card);color:var(--ink);resize:vertical;outline:none}
 .lp-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line-soft,#EEE9DF)}
@@ -112,6 +116,8 @@ function draw() {
 
 /* ---------- one item, opened ---------- */
 let openId = null, noteTimer = 0;
+/* Planner Home tasks linked to this item (the task's "Link to Life Admin"). */
+const homeTasksFor = id => { try { return (JSON.parse(localStorage.getItem('home_tasks') || '[]') || []).filter(t => t && !t.deleted && t.admin === id); } catch { return []; } };
 async function detail(id) {
   const i = item(id); if (!i) return; openId = id;
   const a = areaOf(i.cat), today = todayISO(), dated = A.isDated(i), live = A.isLive(i), have = new Set(await fileKeys());
@@ -126,14 +132,83 @@ async function detail(id) {
     <div class="lp-sec"><h3>🧩 Details</h3>${A.fieldsFor(i).map((f, n) => `<div class="lp-f"><label for="lpf${n}">${esc(f.label)}</label><input id="lpf${n}" data-lp-field="${esc(f.label)}" value="${esc(f.value)}" autocomplete="off">${f.own ? `<button type="button" class="lp-x" data-lp-unfield="${esc(f.label)}" aria-label="Remove ${esc(f.label)}">✕</button>` : '<span></span>'}</div>`).join('')}
       <button type="button" class="lp-mini" data-lp-newfield>＋ Add a detail</button></div>
     <div class="lp-sec"><h3>📝 Notes</h3><textarea class="lp-note" data-lp-note="${esc(id)}" placeholder="Policy number, who to call, what you decided…" aria-label="Notes">${esc(i.body || '')}</textarea></div>
+    ${paySection(i, today)}
     <div class="lp-sec"><h3>🔗 Links</h3>${(i.links || []).map(l => { const k = A.linkKind(l.url); return `<div class="lp-row"><span aria-hidden="true">${k.icon}</span><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.title)}<small>${esc(k.name)}</small></a><button type="button" class="lp-x" data-lp-unlink="${esc(l.id)}" aria-label="Remove link ${esc(l.title)}">✕</button></div>`; }).join('')}
       <form class="lp-form" data-lp-link autocomplete="off"><input name="title" placeholder="Name  e.g. Bali budget" aria-label="Link name"><input name="url" placeholder="Paste link" aria-label="Link address" inputmode="url"><button type="submit" aria-label="Add link">＋</button></form></div>
     <div class="lp-sec"><h3>📎 Files</h3>${(i.files || []).map(f => `<div class="lp-row"><span aria-hidden="true">${A.fileIcon(f)}</span>${have.has(f.id) ? `<button type="button" class="lp-open" data-lp-file="${esc(f.id)}">${esc(f.name)}<small>${A.sizeWords(f.size)}</small></button>` : `<div style="opacity:.6"><b style="font-size:14.5px;overflow-wrap:anywhere">${esc(f.name)}</b><small>💻 saved on another device</small></div>`}<button type="button" class="lp-x" data-lp-unfile="${esc(f.id)}" aria-label="Remove file ${esc(f.name)}">✕</button></div>`).join('')}
       <div class="lp-form"><label class="lp-file">＋ File or photo<input type="file" multiple data-lp-addfile></label></div>
       <div class="lp-hint">Files stay on this device. For something you need everywhere, save a link.</div></div>
-    <div class="lp-sec"><h3>🗓️ Planner</h3>${blocks.map(b => `<div class="lp-row" style="${b.past ? 'opacity:.55' : ''}"><span aria-hidden="true">🗓️</span><button type="button" class="lp-open" data-lp-plan="${esc(b.date)}">${fmt(b.date)}<small>${esc(b.start)}</small></button><span></span></div>`).join('')}
-      <form class="lp-form" data-lp-book><input type="date" name="date" value="${dated && i.nextDue >= today ? esc(i.nextDue) : today}" aria-label="Date"><input type="time" name="start" value="09:00" aria-label="Time" style="flex:0 1 120px"><button type="submit">＋ Planner</button></form></div>`;
+    <div class="lp-sec"><h3>🗓️ Planner</h3>${homeTasksFor(id).map(t => `<div class="lp-row"><span aria-hidden="true">🧹</span><div><b style="font-size:14.5px">${esc(t.name)}</b><small style="display:block">Task in the Planner's Home lists</small></div><span></span></div>`).join('')}${blocks.map(b => `<div class="lp-row" style="${b.past ? 'opacity:.55' : ''}"><span aria-hidden="true">🗓️</span><button type="button" class="lp-open" data-lp-plan="${esc(b.date)}">${fmt(b.date)}<small>${esc(b.start)}</small></button><span></span></div>`).join('')}
+      <form class="lp-form" data-lp-book><input type="date" name="date" value="${dated && i.nextDue >= today ? esc(i.nextDue) : today}" aria-label="Date"><input type="time" name="start" value="09:00" aria-label="Time" style="flex:0 1 120px"><button type="submit">＋ Planner</button></form></div>
+    <div class="lp-sec"><button type="button" class="lp-del" data-lp-delete="${esc(id)}">🗑 Delete this item</button></div>`;
   openSheet();
+  if ((i.payRules || []).length) payAutoAll(id);
+}
+/* ---------- 💳 Payments: link Finance payments to an item (read-only from Finance) ---------- */
+async function finData() {
+  let fs = null; try { fs = parent !== window && parent.FinanceStore; } catch { fs = null; }
+  if (!fs) throw new Error('Open Life Admin inside Life Hub to see your Finance payments.');
+  await fs.ready;
+  const get = async k => { try { const v = await fs.getItem(k); return v == null ? null : (typeof v === 'string' ? JSON.parse(v) : v); } catch { return null; } };
+  const txns = ((await get('fin_txns')) || []).filter(t => t && !t.deleted && t.date), accts = (await get('fin_accounts')) || [];
+  return { txns, acctName: id => ((accts.find(a => a.id === id) || {}).name || id || '') };
+}
+const payAmt = n => (+n > 0 ? '+' + AUD(+n) : AUD(-n)); // money out shows as a plain amount, money in with a +
+const putItem = next => { const k = ITEMS.findIndex(x => x.id === next.id); if (k >= 0) ITEMS[k] = next; keep(); return next; };
+function paySection(i, today) {
+  const py = A.paidYear(i, today), list = i.payments || [];
+  return `<div class="lp-sec"><h3>💳 Payments</h3>`
+    + (i.payRules || []).map(k => `<span class="lp-chip">🔁 Always linking “${esc(k)}”<button type="button" class="lp-x" data-lp-unrule="${esc(k)}" aria-label="Stop linking ${esc(k)} automatically">✕</button></span>`).join('')
+    + list.slice(0, 12).map(p => `<div class="lp-row"><span aria-hidden="true">💳</span><div><b style="font-size:14.5px">${payAmt(p.amount)}</b> · ${fmt(p.date)}<small style="display:block">${esc(p.note)}${p.acctName ? ' · ' + esc(p.acctName) : ''}${p.via === 'rule' ? ' · linked automatically' : ''}</small></div><button type="button" class="lp-x" data-lp-unpay="${esc(p.id)}" aria-label="Unlink this payment">✕</button></div>`).join('')
+    + (list.length > 12 ? `<div class="lp-hint">+ ${list.length - 12} older payments</div>` : '')
+    + (py.count ? `<div class="lp-hint">Paid ${AUD(py.total)} in the last 12 months · ${py.count} payment${py.count === 1 ? '' : 's'}</div>` : (list.length ? '' : '<div class="lp-hint">No payments linked yet.</div>'))
+    + `<button type="button" class="lp-mini" data-lp-paylink>＋ Link a payment</button></div>`;
+}
+const pay = { id: null, q: '', pending: null, data: null };
+async function payPicker(id) {
+  const i = item(id); if (!i) return; pay.id = id; pay.q = ''; pay.pending = null;
+  document.getElementById('sheet').innerHTML = `<button class="close" onclick="closeSheet()" aria-label="Close">✕</button><p style="padding:30px 4px">⏳ Getting your payments…</p>`;
+  try { pay.data = await finData(); } catch (err) { toast(err.message); detail(id); return; }
+  payRender();
+}
+function payRow(t, today) {
+  const dd = A.isDirectDebit(t);
+  return `<button type="button" class="lp-payrow" data-lp-paypick="${esc(String(t.id))}"><span>${fmt(t.date)}<small>${esc(t.note || '')}${pay.data.acctName(t.acct) ? ' · ' + esc(pay.data.acctName(t.acct)) : ''}${dd ? ' · <b>direct debit</b>' : ''}</small></span><b>${payAmt(t.amount)}</b></button>`;
+}
+function payList() {
+  const i = item(pay.id), today = todayISO(), linked = new Set((i.payments || []).map(p => p.id)), q = pay.q.trim().toLowerCase();
+  const all = pay.data.txns.filter(t => !linked.has(String(t.id)) && (!q || [t.note, t.date, String(Math.abs(+t.amount).toFixed(2)), pay.data.acctName(t.acct)].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => b.date.localeCompare(a.date) || (+a.amount - +b.amount));
+  const sug = q ? [] : A.paySuggest(i, pay.data.txns, today);
+  return (sug.length ? `<div class="lp-h">✨ Looks like this one</div>` + sug.map(t => payRow(t, today)).join('') : '')
+    + `<div class="lp-h">${q ? 'Matching payments' : 'All payments, newest first'}</div>` + (all.length ? all.slice(0, 80).map(t => payRow(t, today)).join('') + (all.length > 80 ? `<div class="lp-hint">Showing 80 of ${all.length}. Search to find older ones.</div>` : '') : '<div class="lp-hint">No payments match.</div>');
+}
+function payRender() {
+  const i = item(pay.id); if (!i) return;
+  const t = pay.pending && pay.data.txns.find(x => String(x.id) === pay.pending), key = t ? A.payKey(t.note) : '';
+  document.getElementById('sheet').innerHTML = `<button class="close" onclick="closeSheet()" aria-label="Close">✕</button>
+    <button type="button" class="lp-back" data-lp-open="${esc(i.id)}">‹ ${esc(i.name)}</button><h2 style="margin:6px 0">💳 Link a payment</h2>
+    ${t ? `<div class="lp-pick"><p><b>${payAmt(t.amount)}</b> · ${fmt(t.date)}<small style="display:block">${esc(t.note || '')}</small></p>
+      <button type="button" class="lp-payonce" data-lp-payonce>💳 Just this payment</button>
+      ${key ? `<button type="button" class="lp-payalways" data-lp-payalways>🔁 Always link “${esc(key)}” payments<small>Past and future ones, e.g. a direct debit</small></button>` : ''}
+      <button type="button" class="lp-back" data-lp-paycancel>Cancel</button></div>` : ''}
+    <input class="lp-q lp-payq" type="search" placeholder="🔍 Search payments: name, amount or date" value="${esc(pay.q)}" aria-label="Search payments" autocomplete="off">
+    <div id="lp-paylist">${payList()}</div>`;
+  if (t) document.getElementById('sheet').scrollTop = 0;
+}
+function payChoose(always) {
+  const i = item(pay.id), t = pay.data && pay.data.txns.find(x => String(x.id) === pay.pending); if (!i || !t) return;
+  const at = new Date().toISOString(); let next = A.payLink(i, t, pay.data.acctName(t.acct), at), more = 0;
+  if (always) { next = A.payRuleAdd(next, A.payKey(t.note)); const r = A.payAuto(next, pay.data.txns, pay.data.acctName, at); next = r.item; more = r.added; }
+  putItem(next); pay.pending = null; draw(); detail(i.id);
+  toast(always ? `🔁 Linked${more ? ' + ' + more + ' more' : ''}. New ones will link themselves` : '💳 Payment linked');
+}
+async function payAutoAll(only) {
+  const list = ITEMS.filter(i => (i.payRules || []).length && (!only || i.id === only)); if (!list.length) return;
+  let data; try { data = await finData(); } catch { return; }
+  let any = false; const at = new Date().toISOString();
+  for (const i of list) { const r = A.payAuto(item(i.id), data.txns, data.acctName, at); if (r.added) { putItem(r.item); any = true; } }
+  if (any) { draw(); if (openId && list.some(i => i.id === openId) && document.querySelector('[data-lp-paylink]')) detail(openId); }
 }
 function putOnPlanner(i, date, start) {
   const block = A.plannerBlock(i, { date, start, id: uid(), icon: areaOf(i.cat).e });
@@ -147,8 +222,16 @@ function putOnPlanner(i, date, start) {
 
 /* ---------- taps ---------- */
 function onClick(e) {
-  const t = e.target.closest('[data-lp-done],[data-lp-pin],[data-lp-unlink],[data-lp-unfile],[data-lp-file],[data-lp-plan],[data-lp-area],[data-lp-alldue],[data-lp-costs],[data-lp-remind],[data-lp-unfield],[data-lp-newfield],[data-lp-new],[data-lp-newarea],[data-lp-open]'); if (!t) return;
+  const t = e.target.closest('[data-lp-paylink],[data-lp-paypick],[data-lp-payonce],[data-lp-payalways],[data-lp-paycancel],[data-lp-unpay],[data-lp-unrule],[data-lp-delete],[data-lp-done],[data-lp-pin],[data-lp-unlink],[data-lp-unfile],[data-lp-file],[data-lp-plan],[data-lp-area],[data-lp-alldue],[data-lp-costs],[data-lp-remind],[data-lp-unfield],[data-lp-newfield],[data-lp-new],[data-lp-newarea],[data-lp-open]'); if (!t) return;
   const d = t.dataset, cur = item(openId);
+  if ('lpPaylink' in d && cur) { payPicker(cur.id); return; }
+  if ('lpPaypick' in d) { pay.pending = d.lpPaypick; payRender(); return; }
+  if ('lpPayonce' in d) { payChoose(false); return; }
+  if ('lpPayalways' in d) { payChoose(true); return; }
+  if ('lpPaycancel' in d) { pay.pending = null; payRender(); return; }
+  if ('lpUnpay' in d && cur) { putItem(A.payUnlink(cur, d.lpUnpay)); draw(); detail(cur.id); toast('Unlinked'); return; }
+  if ('lpUnrule' in d && cur) { putItem(A.payRuleRemove(cur, d.lpUnrule)); detail(cur.id); toast('Stopped linking those automatically'); return; }
+  if ('lpDelete' in d) { const i = item(d.lpDelete); if (!i || !confirm('Delete "' + i.name + '"? It is removed from Life Admin.')) return; const files = (i.files || []).map(f => f.id); ITEMS = ITEMS.filter(x => x.id !== i.id); keep(); files.forEach(f => fileDel(f).catch(() => {})); openId = null; closeSheet(); draw(); toast('🗑 Deleted'); return; }
   if ('lpDone' in d) { e.stopPropagation(); markDone(d.lpDone); if (openId) closeSheet(); toast('✓ Done'); return; }
   if ('lpPin' in d) { const i = item(d.lpPin); if (i) { i.pin = !i.pin; keep(); draw(); detail(i.id); } return; }
   if ('lpUnlink' in d && cur) { cur.links = A.linkRemove(cur.links, d.lpUnlink); keep(); draw(); detail(cur.id); return; }
@@ -182,6 +265,7 @@ async function onChange(e) {
 }
 function onInput(e) {
   const t = e.target;
+  if (t.matches('.lp-payq')) { pay.q = t.value; const box = document.getElementById('lp-paylist'); if (box && pay.data) box.innerHTML = payList(); return; }
   if (t.matches('.lp-q')) { state.q = t.value; document.getElementById('lp-body').innerHTML = body(); return; }
   if (t.matches('[data-lp-field]')) { const i = item(openId); if (!i) return; try { i.fields = A.fieldSet(i.fields, t.dataset.lpField, t.value); } catch { return; } clearTimeout(noteTimer); noteTimer = setTimeout(keep, 500); return; }
   if (t.matches('[data-lp-note]')) { const i = item(t.dataset.lpNote); if (!i) return; i.body = t.value.slice(0, 20000); clearTimeout(noteTimer); noteTimer = setTimeout(keep, 500); }
@@ -207,6 +291,7 @@ function start() {
   document.addEventListener('click', onClick); document.addEventListener('submit', onSubmit); document.addEventListener('change', onChange); document.addEventListener('input', onInput);
   document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.lp-item')) { e.preventDefault(); detail(e.target.dataset.lpOpen); } });
   draw();
+  setTimeout(() => payAutoAll().catch(() => {}), 2500); // new payments from an "always" payee link themselves
   try { const want = sessionStorage.getItem('la_open'); if (want) window.lpOpen(want); } catch { /* fine */ }
 }
 start();

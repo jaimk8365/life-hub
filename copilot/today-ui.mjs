@@ -87,6 +87,36 @@ export function fold(html) {
 }
 export const tierWord = tier => Day.TIER_WORDS[tier] || 'Should';
 
+/* Weekends: routines set to repeat "every day" that are really weekday things (school, work, lunches…) are offered,
+   in one tap, as "Weekdays only". That changes the Planner block itself, so Today, Now and the Planner all agree. */
+const K_WD_KEEP = 'cp_weekday_keep_v1';
+export const WEEKDAY_WORDS = /\b(school|drop[- ]?offs?|pick[- ]?ups?|lunch ?box(es)?|lunches|uniforms?|school bags?|bags packed|homework|reader|get(ting)? (the )?kids ready|kids ready|before school|after school|bus|work|bpm|office|e-?mails?|time ?block(ing)?|invoices?|claims|commute|meetings?|stand-?up|clients?|ndis)\b/i;
+export const isWeekend = iso => { const d = new Date(iso + 'T12:00:00Z').getUTCDay(); return d === 0 || d === 6; };
+export function weekdayOnly(blocks, iso, keep = []) {
+  if (!isWeekend(iso)) return [];
+  const kept = new Set(keep || []);
+  return (blocks || []).filter(b => b && b.id && !kept.has(b.id) && b.repeat && b.repeat.type === 'daily' && (b.cat === 'work' || WEEKDAY_WORDS.test(String(b.title || ''))));
+}
+function plannerBlocks(ctx) { const p = ctx.planner || { blocks: readLS('plan_blocks', []) }; return Array.isArray(p.blocks) ? p.blocks : []; }
+export function weekendCard(ctx) {
+  const list = weekdayOnly(plannerBlocks(ctx), ctx.today, readLS(K_WD_KEEP, [])), esc = ctx.esc;
+  if (!list.length) return '';
+  return `<div class="card tg-weekend"><p class="eyebrow">🏖️ IT'S THE WEEKEND</p><h3>These look like weekday routines</h3>
+    <p class="hint">They are set to repeat every day, so they show today too.</p>
+    ${list.map(b => `<div class="tg-row"><span>${esc(b.icon || '•')} ${esc(b.title)}</span><button class="soft-button" data-action="wk-not" data-id="${esc(b.id)}" aria-label="Keep ${esc(b.title)} every day">Keep every day</button></div>`).join('')}
+    <button class="primary" data-action="wk-weekdays" style="margin-top:10px">📅 Make ${list.length === 1 ? 'it' : 'these ' + list.length} weekdays only</button></div>`;
+}
+/* Change the Planner blocks: inside Life Hub through the open Planner (so its copy stays the true one), otherwise storage. */
+function setRepeat(ids, type) {
+  try {
+    const w = globalThis.parent && globalThis.parent !== globalThis && globalThis.parent.document.getElementById('f-plan')?.contentWindow;
+    if (w && w.document.getElementById('root') && typeof w.eval === 'function') { w.eval('(ids,t)=>{BLOCKS.forEach(b=>{if(ids.includes(b.id))b.repeat={...(b.repeat||{}),type:t};});save(K_BLOCKS,BLOCKS);render();}')(ids, type); return true; }
+  } catch { /* the Planner is not open: change storage below */ }
+  const list = readLS('plan_blocks', null); if (!Array.isArray(list)) return false;
+  list.forEach(b => { if (b && ids.includes(b.id)) b.repeat = { ...(b.repeat || {}), type }; });
+  globalThis.localStorage.setItem('plan_blocks', JSON.stringify(list)); return true;
+}
+
 export function glance(ctx) {
   publishAhead(ctx.events, ctx.today);
   const { esc } = ctx, tomorrow = addDays(ctx.today, 1);
@@ -100,6 +130,7 @@ export function glance(ctx) {
     ${strip}
     ${ctx.nowTask ? `<div class="card tg-now"><p class="eyebrow">YOUR TASK</p><h2>${esc(ctx.nowTask.title)}</h2><button class="soft-button" data-route="now">Open it ›</button></div>` : (strip ? '' : '<div class="card tg-now"><p class="eyebrow">DO THIS NOW</p><p>Nothing urgent. Pick one thing below, or rest.</p></div>')}
     ${todo.length ? `<div class="card"><h3>📌 Sent to today</h3>${todo.map(t => `<div class="tg-row"><span>${esc(t.title)}</span></div>`).join('')}</div>` : ''}
+    ${weekendCard(ctx)}
     <div class="card tg-myday"><div class="icon-row"><h3>🗓️ My day</h3><button class="soft-button" data-action="today-open" data-section="plan">Planner ›</button></div>${allDay.map(row).join('')}${items.length ? Day.timelineHtml(items, { esc, nowMin: now, tickable: true }) : (allDay.length ? '' : '<p class="hint">Nothing planned today.</p>')}</div>
     ${habitsCard(ctx)}
     <div class="tg-grid">
@@ -196,6 +227,13 @@ function hubGo(where) {
 export function act(action, button, ctx, fx) {
   const doc = globalThis.document, ls = globalThis.localStorage;
   if (action === 'today-open') { fx.openSection(button.dataset.section); return true; }
+  if (action === 'wk-not') { try { const keep = readLS(K_WD_KEEP, []); keep.push(button.dataset.id); ls.setItem(K_WD_KEEP, JSON.stringify([...new Set(keep)])); } catch {} fx.render(); return true; }
+  if (action === 'wk-weekdays') {
+    const ids = weekdayOnly(plannerBlocks(ctx), ctx.today, readLS(K_WD_KEEP, [])).map(b => b.id);
+    if (ids.length && setRepeat(ids, 'weekdays')) { if (ctx.planner && Array.isArray(ctx.planner.blocks)) ctx.planner.blocks.forEach(b => { if (ids.includes(b.id)) b.repeat = { ...(b.repeat || {}), type: 'weekdays' }; }); fx.toast('📅 Weekdays only now ✓ Enjoy your weekend'); }
+    else fx.toast('Open My Planner once, then try again.');
+    fx.render(); return true;
+  }
   if (action === 'hub-go') { hubGo(button.dataset.hub || 'cp:today'); return true; }
   if (action === 'rt-tick') { try { ls.setItem(K_STEPS, JSON.stringify(Stacks.stepToggle(readLS(K_STEPS, {}), ctx.today, button.dataset.id, +button.dataset.i))); } catch { fx.toast('Could not save that tick.'); } fx.render(); return true; }
   if (action === 'rt-edit') { openRoutines(button.dataset.id); return true; }

@@ -170,3 +170,55 @@ export function costYear(items, today) {
 }
 /** Everything worth searching on an item, as one string. */
 export const haystack = i => [i.name, i.note, i.body, ...Object.entries(i.fields || {}).map(([k, v]) => k + ' ' + v), ...(i.links || []).map(l => l.title + ' ' + l.url), ...(i.files || []).map(f => f.name)].join(' ');
+
+/* ---------- Payments: Finance payments linked to an item, as its payment record ----------
+   A link is a copy (date, amount, description, account) kept on the item, so the record stays even if Finance
+   changes. "Always" adds a payee rule: every payment from that payee (past and future) links itself. Finance is
+   never changed from here. */
+const PAY_NOISE = /\b(v\d{3,}|pos|eftpos|visa|debit|credit|purchase|direct|dd|payment|bpay|osko|online|transfer|to|from|card|ref|aud|pty|ltd|au|nsw|qld|vic)\b/g;
+/** A payee key from a bank description: "Direct Debit 123456 TELSTRA LTD" → "telstra". */
+export function payKey(note) {
+  const words = String(note || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\b\w*\d\w*\b/g, ' ').replace(PAY_NOISE, ' ').split(/\s+/).filter(w => w.length > 1);
+  return words.slice(0, 2).join(' ');
+}
+/** Same payee: the same key, or one is the other plus extra words ("kmart" and "kmart typed"). */
+export const payKeyMatch = (rule, key) => !!rule && !!key && (rule === key || key.startsWith(rule + ' ') || rule.startsWith(key + ' '));
+export const isDirectDebit = t => /direct debit|\bdd\b|debit order|bpay|recurring/i.test(String((t && (t.note || '')) + ' ' + ((t && t.sourceType) || '')));
+const payRec = (t, acctName, via, at) => ({ id: String(t.id), date: t.date, amount: Math.round((+t.amount || 0) * 100) / 100, note: String(t.note || '').slice(0, 120), acct: t.acct || '', acctName: acctName || '', via, at: at || null });
+export function payLink(item, t, acctName, at) {
+  const list = (item.payments || []).filter(p => p.id !== String(t.id));
+  return { ...item, payments: [payRec(t, acctName, 'you', at), ...list].sort((a, b) => b.date.localeCompare(a.date)), payIgnore: (item.payIgnore || []).filter(x => x !== String(t.id)) };
+}
+export function payUnlink(item, id) {
+  const p = (item.payments || []).find(x => x.id === id);
+  return { ...item, payments: (item.payments || []).filter(x => x.id !== id), payIgnore: p && p.via === 'rule' ? [...new Set([...(item.payIgnore || []), id])] : (item.payIgnore || []) };
+}
+export function payRuleAdd(item, key) { return key ? { ...item, payRules: [...new Set([...(item.payRules || []), key])] } : item; }
+export const payRuleRemove = (item, key) => ({ ...item, payRules: (item.payRules || []).filter(k => k !== key) });
+/** Payments that a rule says belong to this item and are not linked yet (or unlinked by hand). */
+export function payAuto(item, txns, acctName, at) {
+  const rules = new Set(item.payRules || []); if (!rules.size) return { item, added: 0 };
+  const have = new Set((item.payments || []).map(p => p.id)), skip = new Set(item.payIgnore || []);
+  const add = (txns || []).filter(t => t && !t.deleted && +t.amount < 0 && !have.has(String(t.id)) && !skip.has(String(t.id)) && [...rules].some(r => payKeyMatch(r, payKey(t.note))));
+  if (!add.length) return { item, added: 0 };
+  return { item: { ...item, payments: [...(item.payments || []), ...add.map(t => payRec(t, acctName(t.acct), 'rule', at))].sort((a, b) => b.date.localeCompare(a.date)) }, added: add.length };
+}
+/** Likely payments for an item: same amount, payee words from the name or details, near the due date, direct debits. */
+export function paySuggest(item, txns, today) {
+  const words = [item.name, ...Object.values(item.fields || {})].join(' ').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 4 && !/^(payment|bill|bills|insurance|fees?|kids|club|school|annual|yearly|monthly)$/.test(w));
+  const linked = new Set((item.payments || []).map(p => p.id)), amt = item.amount != null ? Math.abs(+item.amount) : null;
+  return (txns || []).filter(t => t && !t.deleted && +t.amount < 0 && !linked.has(String(t.id))).map(t => {
+    const note = String(t.note || '').toLowerCase(); let score = 0;
+    if (amt && Math.abs(Math.abs(+t.amount) - amt) <= 1) score += 3;
+    if (words.some(w => note.includes(w))) score += 3;
+    if (isDirectDebit(t)) score += 1;
+    if (item.nextDue && Math.abs(daysAway(t.date, item.nextDue)) <= 45) score += 1;
+    return { t, score };
+  }).filter(x => x.score >= 3).sort((a, b) => b.score - a.score || b.t.date.localeCompare(a.t.date)).slice(0, 12).map(x => x.t);
+}
+/** Paid in the last 12 months. */
+export function paidYear(item, today) {
+  const from = new Date(Date.parse(today + 'T00:00:00Z') - 365 * 864e5).toISOString().slice(0, 10);
+  const list = (item.payments || []).filter(p => p.date >= from && p.date <= today);
+  return { count: list.length, total: Math.round(list.reduce((s, p) => s - p.amount, 0) * 100) / 100 };
+}
