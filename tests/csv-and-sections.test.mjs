@@ -132,3 +132,14 @@ test('CSV check explains each leftover: double-ups, $0 card checks, other accoun
   assert.deepEqual(ex.other.map(x => x.txn.acct), ['e']);
   assert.deepEqual(ex.add.map(x => x.r.note), ['Aldi Mobile']);
 });
+
+test('CSV check: a $0 card check does not stop an account matching; one Done button applies everything', () => {
+  const C = require('../finance/csv-check.js');
+  const r = C.run({ rows: [{ date: '2026-11-20', amount: 0, note: 'Visa Provisioning' }, { date: '2026-11-19', amount: -5, note: 'x' }],
+    txns: [{ id: 1, acct: 'b', date: '2026-11-19', amount: -5 }], acct: 'b', from: '2026-11-01', to: '2026-11-20' });
+  assert.equal(r.ok, true);
+  const g = read('finance/csv-check.js');
+  assert.match(g, /csvCheckApply:apply/);
+  assert.match(g, /✅ Done: update the app/);
+  assert.ok(!/csvCheckRemove\(\\'double\\'\)/.test(g), 'no separate per-group buttons');
+});

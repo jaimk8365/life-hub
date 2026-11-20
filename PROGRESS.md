@@ -4,6 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 20/11 1:55pm: CSV check "✅ Done: update the app" button (PUSHED 20/11)
+- finance/csv-check.js: the per-group Add/Remove buttons are gone. One sticky button at the bottom, "✅ Done: update the app (add N · remove M)", whose count follows the ticks ("Nothing ticked" when empty). One confirm lists what will happen, then every ticked add and remove is saved in ONE saveAtomic (rolls back if the save fails), Finance re-renders, the same CSV is checked again and a "✓ App updated · Added N · removed M" card shows at the top.
+- A $0 card check (Visa Provisioning) no longer stops an account showing ✅ matches.
+- Proof: preview with made-up data, button read "add 1 · remove 2", went to "remove 3" with an extra tick and back; pressing it added 1, removed only the 2 double-ups, the unticked one stayed. Tests 711 passed. sw lifehub-v105.
+
 ### 20/11 1:45pm: CSV check results sorted into plain groups (PUSHED 20/11)
 - Why: her first real check showed 25 "in the app, not in the bank". Checked against her Transactions.csv: the ones visible (ZipMoney 7/10, 2 x Gympie ARC 8/10, Amazon 10/10, Anthropic 13/10) are all in the bank once, so the app holds them twice (one copy matched, the other was left over).
 - finance/csv-check.js: pure explain(result, txns) labels every leftover: double (twin in the app matched the bank), none (not in the bank), date (same amount 4-10 days apart), zero ($0 card check), other (in the app under another account), add (really missing). Screen: "What to do" summary, then one card per group with a plain sentence and one button. Double-ups are ticked and show "Already in the app: <date>"; "not in the bank" ones are unticked; date / other / $0 are info only. Add and Remove act on their own group. Removed double-ups get deletedReason "Double-up (bank CSV has it once)".
