@@ -4,6 +4,12 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 20/11 4:10pm: loan categories, repayment / interest / fees per loan (PUSHED 20/11)
+- finance/categories.js: loanCats(ACCTS) gives every type:'loan' account three categories, named from the account: "<Loan> · repayment" (loan_<id>_repay), "· interest charged" (loan_<id>_interest), "· fees" (loan_<id>_fees). sync() adds them (ACCTS read in try/catch: not yet defined on first load). New section "🏦 Loans (repayments, interest & fees)" after Fixed; the old Loan category moves there too.
+- loanSort(): lines in a loan account still in Miscellaneous / transfer / income and not chosen by hand are sorted by the bank's wording (her CSVs: LOAN INSTALMENT / LOAN REPAYMENT / Linked Acc Trns → repayment; INTEREST CHARGED → interest; ANNUAL PACKAGE FEE → fees; LOAN REDRAW → transfer; $0 rate notices left alone). Runs in finApplyCatRules (on open, after each sync) and after the CSV check adds payments.
+- money-moves.js detectMoves and fix-numbers oneSided treat loan_*_repay like a transfer, so the Everyday side of a repayment still finds its partner (no new "transfer has no matching side" warnings).
+- Proof: tests 717 passed (new: names, section, her bank wording, override kept, transfer pairing). Preview: interest and instalment lines sorted to House loan · interest charged / · repayment; picker shows the Loans section. sw lifehub-v109.
+
 ### 20/11 2:50pm: once/always categories, bold picker headings, transfers in the CSV check (PUSHED 20/11)
 - Once or always: new finance/cat-memory.js (script tag via planPatch, v=20261120). Changing a category asks "🧠 Always for <shop>" (saves a shop rule, sorts waiting ones) or "1️⃣ Just this once" (t.catOnce, never teaches) or Cancel. Wraps saveEdit (Edit a payment) and replaces the OK/Cancel confirm in Check what I sorted (sortChange/sortChangeGroup in auto-sort.js). FinSort.learn skips catOnce rows. Edit a payment on a bank-feed row now also sets acct/date/amountOverride so the sync keeps it.
 - Picker: native drop-downs grey out section names and cannot be styled, so grouped category selects (cat-sections.js, data-cg="1") open the app's own picker: search box, sticky section headings 800 16px dark on a tinted band, current one ticked; choosing sets the select's value and fires change, so all screens work unchanged. Chip-grid headings (.cg-h) and Categories & sections headings (.cs-sec) are now 15–16px, bold, dark.

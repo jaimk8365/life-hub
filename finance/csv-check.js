@@ -312,6 +312,7 @@
   made.forEach(t=>TXNS.push(t));
   try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
   const done=[];if(c.add)done.push('Added '+c.add);if(c.del)done.push('removed '+c.del);if(c.move)done.push('moved '+c.move);if(c.fix)done.push('fixed '+c.fix);
+  if(made.length&&typeof finApplyCatRules==='function'){try{await finApplyCatRules();}catch(_){}} // new ones get sorted (shop rules, loan lines) straight away
   st.applied=done.join(' · ');compute();try{render();}catch(_){}paint();
   const t1=trustNow(),n0=trustCount(st.trustBefore),n1=trustCount(t1);
   toastMsg('App updated ✓ '+st.applied+(n0!=null&&n1!=null&&n0!==n1?' · Fix my numbers: '+n0+' → '+n1:''));

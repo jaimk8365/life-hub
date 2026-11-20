@@ -18,13 +18,38 @@
  ];
  const OTHER='other';
  const fundId=f=>'fund_'+f.id;
+ /* Every loan account gets its own three: repayment, interest charged, fees. Names follow the account name. */
+ const LOAN_KINDS=[['repay','repayment','💸'],['interest','interest charged','📈'],['fees','fees','🧾']];
+ const loanId=(acct,k)=>'loan_'+acct+'_'+k;
+ function loanCats(accts){return (accts||[]).filter(a=>a&&a.id!=null&&a.type==='loan'&&!a.deleted).flatMap(a=>LOAN_KINDS.map(([k,n,e])=>({id:loanId(a.id,k),n:(a.name||a.id)+' · '+n,e:k==='repay'?(a.emoji||e):e,loan:a.id,loanKind:k})));}
+ /* Sort lines in a loan account by what the bank calls them. Only ones still in Miscellaneous / transfer / income
+    that you have not chosen yourself. A redraw is money moving out to another account, so it is a transfer. */
+ function loanKind(t){
+  const s=' '+String((t&&t.note)||'')+' '+String((t&&t.sourceType)||'')+' ',amt=+((t&&t.amount)||0);
+  if(!amt)return null;
+  if(/redraw/i.test(s))return amt<0?'transfer':null;
+  if(/interest (charged|debit)|\bdebit interest\b|^ *interest *$/i.test(s)&&amt<0)return 'interest';
+  if(/\bfees?\b|package fee|account fee|service fee|establishment|dishonour|late payment/i.test(s)&&amt<0)return 'fees';
+  if(amt>0&&/loan (instalment|installment|repayment|payment)|repayment|instalment|linked acc|transfer|\btrns?\b|osko|payid|bpay|from a\/c/i.test(s))return 'repay';
+  return null;
+ }
+ function loanSort(txns,accts,at){
+  const loans=new Set((accts||[]).filter(a=>a&&a.type==='loan').map(a=>String(a.id)));let changed=0;
+  const out=(txns||[]).map(t=>{
+   if(!t||t.deleted||!loans.has(String(t.acct))||t.categoryOverride||t.catOnce||!['other','transfer','income',''].includes(String(t.cat||'')))return t;
+   const k=loanKind(t);if(!k)return t;const cat=k==='transfer'?'transfer':loanId(t.acct,k);if(cat===t.cat)return t;
+   changed++;return {...t,cat,autoSort:{level:'sure',cat,why:k==='transfer'?'Loan redraw: money moved to another account':'Loan account: '+(k==='repay'?'repayment':k==='interest'?'interest charged':'fees'),at:at||null,checked:true}};
+  });
+  return {txns:out,changed};
+ }
  function fundCats(funds){return (funds||[]).filter(f=>f&&f.id!=null&&f.name&&!f.archived).map(f=>({id:fundId(f),n:f.name+' (fund)',e:f.emoji||'🎯',fund:f.id}));}
  /* Rebuild the list in place: built-ins, then new built-ins, then funds, then your own, then Miscellaneous last. */
  function sync(cats,custom,funds){
-  const base=cats.filter(c=>c.id!==OTHER&&!c.fund&&!String(c.id).startsWith('custom_')&&!EXTRA.some(x=>x.id===c.id));
+  const base=cats.filter(c=>c.id!==OTHER&&!c.fund&&!c.loan&&!String(c.id).startsWith('custom_')&&!EXTRA.some(x=>x.id===c.id));
+  let accts=[];try{accts=typeof ACCTS!=='undefined'?ACCTS:[];}catch(_){} // ACCTS may not exist yet on first load
   const other=cats.find(c=>c.id===OTHER)||{id:OTHER,n:'Miscellaneous / one-offs',e:'•'};
   const ids=new Set(base.map(c=>c.id)),out=base.slice();
-  EXTRA.concat(fundCats(funds),custom||[]).forEach(c=>{if(!ids.has(c.id)){ids.add(c.id);out.push(c);}});
+  EXTRA.concat(loanCats(accts),fundCats(funds),custom||[]).forEach(c=>{if(!ids.has(c.id)){ids.add(c.id);out.push(c);}});
   out.push(other);
   cats.length=0;out.forEach(c=>cats.push(c));return cats;
  }
@@ -43,19 +68,20 @@
  const GROUPS=[
   {id:'essentials',n:'Everyday essentials',e:'🛒'},
   {id:'fixed',n:'Fixed expenses',e:'📄'},
+  {id:'loans',n:'Loans (repayments, interest & fees)',e:'🏦'},
   {id:'lifestyle',n:'Lifestyle',e:'✨'},
   {id:'allocated',n:'Allocated money (funds & savings)',e:'🐖'},
   {id:'transfers',n:'Internal transfers & income',e:'🔄'},
   {id:'other',n:'Other',e:'🧾'}
  ];
  const DEFAULT_GROUP={groceries:'essentials',fuel:'essentials',medical:'essentials',pets:'essentials',kids:'essentials',home:'essentials',car:'essentials',
-  insurance:'fixed',subs:'fixed',rego:'fixed',rates:'fixed',loan:'fixed',union:'fixed',internet:'fixed',phone:'fixed',bnpl:'fixed',
+  insurance:'fixed',subs:'fixed',rego:'fixed',rates:'fixed',loan:'loans',union:'fixed',internet:'fixed',phone:'fixed',bnpl:'fixed',
   eating:'lifestyle',personal:'lifestyle',fitness:'lifestyle',shopping:'lifestyle',clothing:'lifestyle',travel:'lifestyle',
   savings:'allocated',income:'transfers',transfer:'transfers',refund:'transfers',cash:'transfers',work:'other',other:'other'};
  const GROUP_IDS=new Set(GROUPS.map(g=>g.id));
  function groupOf(c,overrides){
   if(!c)return 'other';const o=overrides&&overrides[c.id];if(o&&GROUP_IDS.has(o))return o;
-  if(c.g&&GROUP_IDS.has(c.g))return c.g;if(c.fund!=null||String(c.id).startsWith('fund_'))return 'allocated';
+  if(c.g&&GROUP_IDS.has(c.g))return c.g;if(c.fund!=null||String(c.id).startsWith('fund_'))return 'allocated';if(c.loan!=null||String(c.id).startsWith('loan_'))return 'loans';
   return DEFAULT_GROUP[c.id]||'other';
  }
  function grouped(cats,overrides){return GROUPS.map(g=>({...g,cats:(cats||[]).filter(c=>groupOf(c,overrides)===g.id)})).filter(g=>g.cats.length);}
@@ -78,6 +104,6 @@
   const nextRules=rules==null?rules:JSON.parse(JSON.stringify(rules).split('"'+from+'"').join('"'+to+'"'));
   return {funds:nextFunds,txns:nextTx,budget:nextBudget,catBudget:nextCatBudget,rules:nextRules,moved,removed:{...drop,mergedInto:keepId}};
  }
- const api={EXTRA,EMOJI,fundCats,sync,makeCustom,setNote,GROUPS,DEFAULT_GROUP,groupOf,grouped,optionsHtml,fundDupes,mergeFunds};
+ const api={EXTRA,EMOJI,fundCats,loanCats,loanKind,loanSort,sync,makeCustom,setNote,GROUPS,DEFAULT_GROUP,groupOf,grouped,optionsHtml,fundDupes,mergeFunds};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FinCats=api;
 })(typeof window!=='undefined'?window:globalThis);

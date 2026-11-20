@@ -59,7 +59,7 @@
  /* Transfers in or out of this account with no matching record in another account. */
  function oneSided(txns,acctId,pairedIds){
   const paired=new Set((pairedIds||[]).map(String));
-  return (txns||[]).filter(t=>live(t)&&t.acct===acctId&&t.src!=='balance-adjustment'&&(t.cat==='transfer'||/transfer/i.test(t.note||''))&&!paired.has(String(t.id))).sort((a,b)=>b.date.localeCompare(a.date));
+  return (txns||[]).filter(t=>live(t)&&t.acct===acctId&&t.src!=='balance-adjustment'&&(t.cat==='transfer'||/^loan_.+_repay$/.test(String(t.cat||''))||/transfer/i.test(t.note||''))&&!paired.has(String(t.id))).sort((a,b)=>b.date.localeCompare(a.date));
  }
  /* One clearly labelled line that makes the app match the bank on the bank's date. Counts as a transfer, so it is never spending or income. */
  function startFreshRow(acct,g,id,at){
@@ -163,8 +163,10 @@ async function finApplyCatRules(){
  if(r.changed){TXNS.length=0;r.txns.forEach(t=>TXNS.push(t));}
  /* Then sort the rest by itself (auto-sort.js): sure ones quietly, probably ones go to "Check what I sorted". */
  let s={changed:0};if(typeof FinSort!=='undefined'){s=FinSort.run(TXNS,fixRules(),CATS.map(c=>c.id),fixNow());if(s.changed){TXNS.length=0;s.txns.forEach(t=>TXNS.push(t));}}
- if(r.changed||s.changed){try{await fixSaveTxns();}catch(e){}}
- return r.changed+s.changed;
+ /* Loan accounts: repayments, interest and fees go to that loan's own categories (finance/categories.js). */
+ let l={changed:0};if(typeof FinCats!=='undefined'&&FinCats.loanSort&&typeof ACCTS!=='undefined'){l=FinCats.loanSort(TXNS,ACCTS,fixNow());if(l.changed){TXNS.length=0;l.txns.forEach(t=>TXNS.push(t));}}
+ if(r.changed||s.changed||l.changed){try{await fixSaveTxns();}catch(e){}}
+ return r.changed+s.changed+l.changed;
 }
 window.finApplyCatRules=finApplyCatRules;
 

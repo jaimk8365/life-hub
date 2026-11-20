@@ -14,7 +14,8 @@
   const gap=gapDays==null?2:gapDays,ids=new Set((accts||[]).map(a=>a.id)),outs=[],ins=[];
   for(const t of (txns||[]).filter(live)){
    if(!ids.has(t.acct))continue;
-   if(!(t.cat==='transfer'||/transfer/i.test(t.note||'')))continue;
+   // a loan repayment (loan_<acct>_repay, finance/categories.js) is money moving into a loan: one side of a transfer
+   if(!(t.cat==='transfer'||/^loan_.+_repay$/.test(String(t.cat||''))||/transfer/i.test(t.note||'')))continue;
    (t.amount<0?outs:ins).push(t);
   }
   const used=new Set(),moves=[];

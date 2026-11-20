@@ -185,3 +185,21 @@ test('category change asks "Always for this shop" or "Just this once"; one-offs 
   for (const s of ['function openPicker(', '.cgp-h{', 'font:800 16px', "dispatchEvent(new Event('change',{bubbles:true}))"]) assert.ok(c.includes(s), s);
   assert.match(read('src/finance.html'), /finance\/cat-memory\.js\?v=20261120/);
 });
+
+test('each loan gets repayment, interest charged and fees categories in a Loans section; loan lines sort themselves', () => {
+  const C = require('../finance/categories.js'), M = require('../finance/money-moves.js');
+  const A = [{ id: 'house', name: 'House Loan', type: 'loan', emoji: '🏠' }, { id: 'land', name: 'Land Loan', type: 'loan' }, { id: 'car', name: 'Car Loan', type: 'loan' }, { id: 'everyday', name: 'Everyday' }];
+  const lc = C.loanCats(A);
+  assert.equal(lc.length, 9);
+  assert.deepEqual(lc.filter(c => c.loan === 'house').map(c => c.n), ['House Loan · repayment', 'House Loan · interest charged', 'House Loan · fees']);
+  assert.ok(lc.every(c => C.groupOf(c) === 'loans'));
+  assert.ok(C.GROUPS.some(g => g.id === 'loans'));
+  const t = (note, amount, acct, extra) => ({ id: note, note, amount, acct, cat: 'other', date: '2026-11-03', ...extra });
+  const rows = [t('LOAN INSTALMENT M AND J KYTE FROM A/C 27-476-1', 1200, 'house'), t('INTEREST CHARGED', -1650, 'house'), t('ANNUAL PACKAGE FEE', -395, 'land'),
+    t('LOAN REDRAW TO 1 2', -500, 'car'), t('ONLINE C1 Linked Acc Trns KYTE M', 300, 'car'), t('PLEASE NOTE YOUR CURRENT DEBIT INTEREST RATE IS 6.1', 0, 'car'),
+    t('INTEREST CHARGED', -10, 'house', { categoryOverride: true, cat: 'bnpl' }), t('Coles', -20, 'everyday')];
+  const out = C.loanSort(rows, A, 'now').txns.map(x => x.cat);
+  assert.deepEqual(out, ['loan_house_repay', 'loan_house_interest', 'loan_land_fees', 'transfer', 'loan_car_repay', 'other', 'bnpl', 'other']);
+  const moves = M.detectMoves([{ id: 1, acct: 'everyday', date: '2026-11-03', amount: -1200, cat: 'transfer' }, { id: 2, acct: 'house', date: '2026-11-03', amount: 1200, cat: 'loan_house_repay' }], A);
+  assert.equal(moves.length, 1, 'a repayment still pairs with the other side of the transfer');
+});
