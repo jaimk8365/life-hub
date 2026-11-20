@@ -146,6 +146,7 @@
    +'<div id="cc_msg" class="fx-small" role="status"></div>'+(()=>{const w=where(st.acct);return w&&w.from&&(w.from!==st.from||w.to!==st.to)?'<p class="fx-small">📅 Suggested for this account: <b>'+e(day(w.from))+' to today</b> <button class="fh-link" onclick="csvCheckUseSuggested()">Use these dates</button></p>':'';})();
   h+='<div id="cc_result"></div>';
   if(st.applied&&r&&st.processed)h+='<div class="tr-card tr-good"><div class="tr-h">✓ App updated</div><p>'+e(st.applied)+'. Checked again with the same CSV below.</p></div>';
+  if(r&&st.processed)h+=trustBox(r.acct);
   if(r&&st.processed){
    const acct=acctById(r.acct)||{name:r.acct};
    h+=r.ok?'<div class="tr-card tr-good"><div class="tr-h">✅ '+e(acct.name)+' matches the bank</div><p>'+r.matched.length+' payments from '+e(day(r.from))+' to '+e(day(r.to))+' are in both.'+(r.bankClose?' Closing balance '+money(r.bankClose.balance)+' in both.':'')+'</p></div>'
@@ -195,7 +196,7 @@
  /* Process: nothing is compared until you tap it, so you can check the dates first. */
  function process(){
   if(!st.parsed)return;const b=$('cc_process');if(b){b.disabled=true;b.textContent='⏳ Checking…';}
-  setTimeout(()=>{st.err='';st.applied='';st.processed=true;compute();paint();const t=$('cc_result');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'start'});},30);
+  setTimeout(()=>{st.err='';st.applied='';st.processed=true;st.trustBefore=trustNow();compute();paint();const t=$('cc_result');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'start'});},30);
  }
  /* The leftovers in plain groups. Every row has a choice (with a sensible default) and ✏️ Edit, so anything can be
     fixed right here: remove, add, move to the right account, use the bank's date, or change date/amount/description.
@@ -236,6 +237,25 @@
    '<div class="cc-info">'+ex.zero.slice(0,20).map(x=>info(x.r.date,x.r.note,0,'')).join('')+'</div>');
   if(st.refs.length)h+='<div class="cc-done"><button class="btn dark" id="cc_apply" onclick="csvCheckApply()" style="display:block;width:100%;padding:14px;font-size:1.05em">✅ Done: update the app</button><p class="fx-small" style="margin:6px 0 0;text-align:center">Nothing is saved until you tap Done.</p></div>';
   return h;
+ }
+ /* The "Fix my numbers" alert, live: the same count Home shows, worked out again from the data as it is now. */
+ const FIXL={sync:'Sync now',feed:'Bank feed settings',match:'Open Match to my bank',sortcheck:'Check them',misc:'Sort them',conflicts:'Review',statement:'Check a statement'};
+ const trustCount=t=>t?(t.bad||t.warn||0):null;
+ function trustNow(){try{return typeof trustData==='function'?trustData():null;}catch(_){return null;}}
+ function trustBox(acct){
+  const t=trustNow();if(!t)return '';
+  const ICON={good:'✅',warn:'⚠️',bad:'❌',note:'ℹ️'},row=(t.accounts||[]).find(a=>a.id===acct),name=e((acctById(acct)||{name:acct}).name);
+  // the number in the headline: things that need fixing (red), or if none, things worth a look (amber)
+  const tone=t.bad?'bad':'warn',mine=row?row.checks.filter(c=>c.tone==='bad'||c.tone==='warn'):[];
+  const rest=(t.all||[]).filter(c=>c.tone===tone).length+(t.accounts||[]).filter(a=>a.id!==acct).reduce((n,a)=>n+a.checks.filter(c=>c.tone===tone).length,0);
+  const b0=st.trustBefore,was=b0&&trustCount(b0)!==trustCount(t)?' <span class="fx-small">(was '+trustCount(b0)+' '+(b0.bad?'to fix':'to look at')+')</span>':'';
+  let h='<div class="cc-g" id="cc_trust"><h3>🧰 Fix my numbers</h3><p><b>'+(ICON[t.tone]||'')+' '+e(t.headline)+'</b>'+was+'</p>';
+  h+=mine.length?'<p class="fx-small" style="margin-top:6px">Still on the list for <b>'+name+'</b>:</p>'+mine.map(c=>'<div class="cc-r"><span>'+(ICON[c.tone]||'')+' '+e(c.text)+'</span>'+(c.fix&&typeof trustFix==='function'&&FIXL[c.fix]?'<div><button type="button" class="cc-ed" style="padding-left:0" onclick="trustFix(\''+e(c.fix)+'\',\''+e(acct)+'\')">'+FIXL[c.fix]+' ›</button></div>':'')+'</div>').join('')
+   :'<p class="fx-small" style="margin-top:6px">✅ Nothing left on the list for <b>'+name+'</b>.</p>';
+  const r=st.result,clean=r&&!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100));
+  if(clean&&mine.some(c=>c.key==='match'&&c.tone==='bad'))h+='<p class="fx-small" style="margin-top:8px">💡 Every payment from '+e(day(r.from))+' to '+e(day(r.to))+' matches, so the balance difference is from <b>before '+e(day(r.from))+'</b>. Check an earlier CSV, or use Start fresh in Match to my bank.</p>';
+  if(rest)h+='<p class="fx-small" style="margin-top:8px">Plus '+rest+' thing'+(rest===1?'':'s')+' in other accounts or sorting. The CSV check cannot fix those.</p>';
+  return h+'<button class="btn ghost" style="margin-top:8px" onclick="fixOpen()">Open Fix my numbers</button></div>';
  }
  function edit(k){const p=$('cc_ed_'+k);if(p){p.hidden=!p.hidden;if(!p.hidden){const i=p.querySelector('input');if(i)i.focus();}}}
  /* What each row will do: its choice plus any edited details. */
@@ -282,8 +302,9 @@
   made.forEach(t=>TXNS.push(t));
   try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
   const done=[];if(c.add)done.push('Added '+c.add);if(c.del)done.push('removed '+c.del);if(c.move)done.push('moved '+c.move);if(c.fix)done.push('fixed '+c.fix);
-  st.applied=done.join(' · ');compute();paint();try{render();}catch(_){}
-  toastMsg('App updated ✓ '+st.applied);
+  st.applied=done.join(' · ');compute();try{render();}catch(_){}paint();
+  const t1=trustNow(),n0=trustCount(st.trustBefore),n1=trustCount(t1);
+  toastMsg('App updated ✓ '+st.applied+(n0!=null&&n1!=null&&n0!==n1?' · Fix my numbers: '+n0+' → '+n1:''));
   const sh=$('sheet');if(sh)sh.scrollTop=0;
  }
  Object.assign(window,{csvCheckApply:apply,csvCheckCount:count,csvCheckEdit:edit});

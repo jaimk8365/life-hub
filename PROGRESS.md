@@ -4,6 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 20/11 2:35pm: CSV check shows the live "Fix my numbers" alert (PUSHED 20/11)
+- Jaimi: fixing things in the CSV check did not seem to change "12 things need fixing". The alert (FinFix.trustReport via trustData/trustHome) is recalculated on every render, but it counts kinds of problem per account (balance vs bank, statement, recorded twice, unsorted, feed age), not payments. Removing double-ups shrinks a balance gap but the line stays red until the gap is $0.
+- finance/csv-check.js: after Process and after Done, a "🧰 Fix my numbers" box shows the same live headline as Home, "(was N)" when it changed, every red/amber line still on the list for this account with its own fix button (trustFix: Open Match to my bank, Check a statement, Sync now…), how many are elsewhere ("the CSV check cannot fix those"), and an "Open Fix my numbers" button. If every payment in the dates matches but the balance is off, it says the difference is from before the From date. Toast after Done adds "Fix my numbers: 12 → 9" when the count changes. render() now runs before the screen repaints.
+- Proof: preview with made-up data: box showed balance gap $3,260 → $1,630 after removing a double-up, buttons present. Tests 714 passed. sw lifehub-v107.
+
 ### 20/11 2:15pm: fix anything right in the CSV check (PUSHED 20/11)
 - finance/csv-check.js: every result row has a choice with a sensible default, plus ✏️ Edit (date, amount, description). Double-up: Remove extra copy (default) / Leave. Missing: Add (default) / Leave out; Edit changes what gets added. Wrong account (new group, was info only): Move it here (default) / Leave. Different date: Use the bank date (default) / Leave. Not in the bank: Leave for now (default) / Remove / Move to <each other account>. Rows with a change are tinted. Nothing is saved until "✅ Done: update the app (add · remove · move · fix)": one confirm, one saveAtomic (rolls back on failure), then it checks again.
 - Moves set acctOverride (+ movedFrom, movedAt); dates dateOverride; amounts amountOverride; descriptions noteOverride.

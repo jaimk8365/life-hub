@@ -149,3 +149,9 @@ test('CSV check: every result row can be fixed here (choice + Edit), saved only 
   for (const s of ['🗑 Remove this extra copy', '➕ Add to the app', "🔀 Move it to '", '📅 Use the bank date', "'🔀 Move to '", '✏️ Edit', 'csvCheckEdit:edit', 'acctOverride=true', 'dateOverride=true', 'Nothing is saved until you tap Done'])
     assert.ok(g.includes(s), s);
 });
+
+test('CSV check shows the live Fix my numbers alert after Done, with what is left and a fix button for each', () => {
+  const g = read('finance/csv-check.js');
+  for (const s of ['function trustBox(', 'Still on the list for', 'The CSV check cannot fix those', "Fix my numbers: '+n0+' → '+n1", 'trustFix(', 'the balance difference is from <b>before'])
+    assert.ok(g.includes(s), s);
+});
