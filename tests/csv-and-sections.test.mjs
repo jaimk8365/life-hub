@@ -155,3 +155,33 @@ test('CSV check shows the live Fix my numbers alert after Done, with what is lef
   for (const s of ['function trustBox(', 'Still on the list for', 'The CSV check cannot fix those', "Fix my numbers: '+n0+' → '+n1", 'trustFix(', 'the balance difference is from <b>before'])
     assert.ok(g.includes(s), s);
 });
+
+test('CSV check recognises bank transfers, even the other way round from the app (the $55 Pilates case)', () => {
+  const C = require('../finance/csv-check.js');
+  const rows = [{ date: '2026-10-19', amount: 55, note: 'ONLINE B2915038377 Linked Acc Trns KYTE J', type: 'TRANSFER CREDIT' },
+    { date: '2026-10-22', amount: -80, note: 'Transfer to Liiv Well Pilates', type: 'TRANSFER DEBIT' }];
+  const txns = [{ id: 'p', acct: 'a', date: '2026-10-19', amount: -55, note: 'Pilates' }, { id: 'q', acct: 'a', date: '2026-10-15', amount: -80, note: 'Pilates term' }];
+  const r = C.run({ rows, txns, acct: 'a', from: '2026-10-01', to: '2026-10-31' });
+  const ex = C.explain(r, txns);
+  assert.equal(ex.transfer.length, 2);
+  assert.equal(ex.transfer.find(x => x.t.id === 'p').flip, true);
+  assert.equal(ex.transfer.find(x => x.t.id === 'q').flip, false);
+  assert.equal(ex.add.length, 0, 'the bank rows are not listed as missing as well');
+  assert.ok(C.isTransfer({ type: 'TRANSFER CREDIT', note: '' }));
+  assert.ok(!C.isTransfer({ type: 'EFTPOS DEBIT', note: 'LIIV WELL PILATES' }));
+});
+
+test('category change asks "Always for this shop" or "Just this once"; one-offs never teach; picker has bold section headings', () => {
+  const S = require('../finance/auto-sort.js');
+  const mk = (id, cat, extra) => ({ id, acct: 'e', date: '2026-11-0' + id, amount: -10, note: 'COLES 1234 GYMPIE', cat, categoryOverride: true, ...extra });
+  const learned = S.learn([mk(1, 'groceries'), mk(2, 'groceries'), mk(3, 'gifts', { catOnce: true })]);
+  const k = [...learned.values()][0];
+  assert.equal(k.cat, 'groceries'); assert.equal(k.share, 1, 'the one-off does not count');
+  const m = read('finance/cat-memory.js');
+  for (const s of ['🧠 Always for ', '1️⃣ Just this once', 'window.saveEdit=wrapped', 'acctOverride=true', 't.catOnce=true']) assert.ok(m.includes(s), s);
+  const a = read('finance/auto-sort.js');
+  assert.ok(a.includes('await catAsk(') && !a.includes("confirm('Moved to '"), 'no more OK/Cancel box');
+  const c = read('finance/cat-sections.js');
+  for (const s of ['function openPicker(', '.cgp-h{', 'font:800 16px', "dispatchEvent(new Event('change',{bubbles:true}))"]) assert.ok(c.includes(s), s);
+  assert.match(read('src/finance.html'), /finance\/cat-memory\.js\?v=20261120/);
+});

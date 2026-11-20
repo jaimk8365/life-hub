@@ -190,7 +190,9 @@ function planPatch(s){
   const plan='<script src="../finance/account-plan.js?v=20261119"></script>';
   s=once(s,plan,plan+'\n<script src="../finance/cat-sections.js?v=20261119"></script>','sections head');
   const secs='<script src="../finance/cat-sections.js?v=20261119"></script>';
-  return once(s,secs,secs+'\n<script src="../finance/csv-check.js?v=20261119"></script>','csv head');
+  s=once(s,secs,secs+'\n<script src="../finance/csv-check.js?v=20261119"></script>','csv head');
+  const csvTag='<script src="../finance/csv-check.js?v=20261119"></script>';
+  return once(s,csvTag,csvTag+'\n<script src="../finance/cat-memory.js?v=20261120"></script>','memory head');
 }
 export function patchPhasesFinance(source){
   let s=source;

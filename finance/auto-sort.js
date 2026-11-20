@@ -42,7 +42,7 @@
  function learn(txns){
   const by=new Map();
   for(const t of txns||[]){
-   if(!live(t)||NEVER.has(t.cat)||+t.amount>=0)continue;
+   if(!live(t)||NEVER.has(t.cat)||+t.amount>=0||t.catOnce)continue; // a 'just this once' choice never teaches
    const mine=t.categoryOverride===true&&!t.ruleApplied||t.autoSort&&t.autoSort.checked;if(!mine)continue;
    const k=F.shopKey(t.note);if(!k)continue;
    if(!by.has(k))by.set(k,{});const c=by.get(k);c[t.cat]=(c[t.cat]||0)+1;
@@ -142,17 +142,22 @@ function sortRightAll(){const ids=FinSort.toCheck(TXNS).map(t=>t.id);if(ids.leng
 function sortRightGroup(i){const g=(window._sortGroups||[])[i];if(!g)return;sortSave(FinSort.confirm(TXNS,g.txns.map(t=>t.id),fixNow()),(g.txns.length===1?'Thanks ✓':'All '+g.txns.length+' confirmed ✓')+' I will remember');}
 async function sortChangeGroup(i,cat){
  const g=(window._sortGroups||[])[i];if(!g||!cat)return;
- const key=FinFix.shopKey(g.txns[0].note),always=cat!=='other'&&key&&confirm('Move '+(g.txns.length===1?'it':'all '+g.txns.length)+' to '+(catOf(cat)?.n||cat)+'.\n\nAlways put '+g.name+' here from now on?');
+ const key=FinFix.shopKey(g.txns[0].note);let choice=null;
+ if(cat!=='other'&&key){choice=typeof catAsk==='function'?await catAsk(g.name,cat,g.txns.length):(confirm('Always put '+g.name+' here from now on?')?'always':'once');if(!choice){sortCheckOpen();return;}}
+ const always=choice==='always';
  if(always){const rules=FinFix.addRule(fixRules(),key,cat,g.name,fixNow());try{await saveAtomic({[K_CAT_RULES]:rules});}catch(e){}}
  let next=TXNS;g.txns.forEach(t=>{next=FinSort.change(next,t.id,cat,fixNow());});
- sortSave(next,(cat==='other'?'Back in Miscellaneous':'Moved '+g.txns.length+' to '+(catOf(cat)?.n||cat)+' ✓')+(always?' · remembered':''));
+ if(choice){const ids=new Set(g.txns.map(t=>String(t.id)));next=next.map(t=>ids.has(String(t.id))?(choice==='once'?{...t,catOnce:true}:(({catOnce,...r})=>r)(t)):t);}
+ sortSave(next,(cat==='other'?'Back in Miscellaneous':'Moved '+g.txns.length+' to '+(catOf(cat)?.n||cat)+' ✓')+(always?' · remembered':choice==='once'?' · just this once':''));
 }
 async function sortChange(id,cat){
  if(!cat)return;const t=TXNS.find(x=>String(x.id)===String(id));if(!t)return;
  const name=FinFix.shopName(t.note),key=FinFix.shopKey(t.note);
- const always=cat!=='other'&&key&&confirm('Moved to '+(catOf(cat)?.n||cat)+'.\n\nAlways put '+name+' here from now on?');
+ let choice=null;if(cat!=='other'&&key){choice=typeof catAsk==='function'?await catAsk(name,cat,1):(confirm('Always put '+name+' here from now on?')?'always':'once');if(!choice){sortCheckOpen();return;}}
+ const always=choice==='always';
  if(always){const rules=FinFix.addRule(fixRules(),key,cat,name,fixNow());try{await saveAtomic({[K_CAT_RULES]:rules});}catch(e){}}
- sortSave(FinSort.change(TXNS,id,cat,fixNow()),cat==='other'?'Back in Miscellaneous':'Moved to '+(catOf(cat)?.n||cat)+' ✓'+(always?' · remembered':''));
+ let next=FinSort.change(TXNS,id,cat,fixNow());if(choice)next=next.map(x=>String(x.id)===String(id)?(choice==='once'?{...x,catOnce:true}:(({catOnce,...r})=>r)(x)):x);
+ sortSave(next,cat==='other'?'Back in Miscellaneous':'Moved to '+(catOf(cat)?.n||cat)+' ✓'+(always?' · remembered':choice==='once'?' · just this once':''));
 }
 Object.assign(window,{sortCheckOpen,sortRight,sortRightAll,sortChange,sortRightGroup,sortChangeGroup});
 }
