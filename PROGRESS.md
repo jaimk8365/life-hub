@@ -4,6 +4,13 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 20/11 2:15pm: fix anything right in the CSV check (PUSHED 20/11)
+- finance/csv-check.js: every result row has a choice with a sensible default, plus ✏️ Edit (date, amount, description). Double-up: Remove extra copy (default) / Leave. Missing: Add (default) / Leave out; Edit changes what gets added. Wrong account (new group, was info only): Move it here (default) / Leave. Different date: Use the bank date (default) / Leave. Not in the bank: Leave for now (default) / Remove / Move to <each other account>. Rows with a change are tinted. Nothing is saved until "✅ Done: update the app (add · remove · move · fix)": one confirm, one saveAtomic (rolls back on failure), then it checks again.
+- Moves set acctOverride (+ movedFrom, movedAt); dates dateOverride; amounts amountOverride; descriptions noteOverride.
+- finance/pocketsmith-import.js: a feed update now keeps acct/date/amount when the matching *Override flag is set (like it already kept categoryOverride/noteOverride), so the next sync does not undo a move or a date fix. Without the flag the feed still decides.
+- Fixed while testing: .cc-edit display:grid beat [hidden], so every edit box was open; added .cc-edit[hidden]{display:none}.
+- Proof: tests 713 passed (new: feed keeps overrides; csv-check strings). Preview with made-up data: double removed, missing added with an edited description, wrong-account payment moved here, a "not in the bank" one moved to Bills, date fixed to the bank's; re-check showed "✅ Everyday matches the bank". sw lifehub-v106.
+
 ### 20/11 1:55pm: CSV check "✅ Done: update the app" button (PUSHED 20/11)
 - finance/csv-check.js: the per-group Add/Remove buttons are gone. One sticky button at the bottom, "✅ Done: update the app (add N · remove M)", whose count follows the ticks ("Nothing ticked" when empty). One confirm lists what will happen, then every ticked add and remove is saved in ONE saveAtomic (rolls back if the save fails), Finance re-renders, the same CSV is checked again and a "✓ App updated · Added N · removed M" card shows at the top.
 - A $0 card check (Visa Provisioning) no longer stops an account showing ✅ matches.

@@ -197,81 +197,95 @@
   if(!st.parsed)return;const b=$('cc_process');if(b){b.disabled=true;b.textContent='⏳ Checking…';}
   setTimeout(()=>{st.err='';st.applied='';st.processed=true;compute();paint();const t=$('cc_result');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'start'});},30);
  }
- /* The leftovers in plain groups: what each one is, what to do, one button per group. */
- const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-info{opacity:.8}.cc-done{position:sticky;bottom:0;background:#FEF6E8;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
+ /* The leftovers in plain groups. Every row has a choice (with a sensible default) and ✏️ Edit, so anything can be
+    fixed right here: remove, add, move to the right account, use the bank's date, or change date/amount/description.
+    Nothing is saved until "✅ Done: update the app". */
+ const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-r{padding:10px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.cc-top small{display:block}.cc-act{display:flex;gap:8px;margin-top:8px;align-items:center}.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;font:inherit;font-size:.92em}.cc-ed{border:0;background:none;color:#3A73A8;font:inherit;font-weight:700;padding:6px;cursor:pointer;white-space:nowrap}.cc-edit{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#FBF4E6}.cc-edit[hidden]{display:none}.cc-edit label{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92em}.cc-edit input{width:62%;padding:7px 8px;border-radius:8px;border:1px solid #E2D6C0;font:inherit}.cc-r.cc-on{background:linear-gradient(90deg,rgba(127,183,155,.12),transparent)}.cc-info{opacity:.8}.cc-done{position:sticky;bottom:0;background:#FEF6E8;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
  function groupsHtml(r){
-  const ex=FinCsvCheck.explain(r,TXNS),nm=id=>e((acctById(id)||{name:id}).name),tot=l=>money(l.reduce((s,x)=>s+(+(x.t||x.r).amount),0));
-  const row=(attr,idx,ticked,date,note,amt,sub)=>'<label class="fx-row">'+(attr?'<input type="checkbox" onchange="csvCheckCount()"'+(ticked?' checked':'')+' '+attr+'="'+idx+'">':'')+'<span>'+e(day(date))+'<small>'+e(note||'')+'</small>'+(sub?'<span class="cc-sub">'+sub+'</span>':'')+'</span><b>'+money(amt)+'</b></label>';
-  const grp=(key,title,why,body,btn)=>'<div class="cc-g" data-cc-group="'+key+'"><h3>'+title+'</h3><p class="fx-small">'+why+'</p>'+body+(btn||'')+'</div>';
+  const ex=FinCsvCheck.explain(r,TXNS),acc=id=>acctById(id)||{id,name:id},here=acc(r.acct),others=ACCTS.filter(a=>!a.hidden&&a.id!==r.acct);
+  const tot=l=>money(l.reduce((s,x)=>s+(+(x.t||x.r).amount),0));
+  st.refs=[];
+  const row=(ref,opts,def,date,note,amt,sub)=>{
+   const k=st.refs.push(ref)-1,src=ref.txn||ref.row;
+   return '<div class="cc-r" data-k="'+k+'"><div class="cc-top"><span>'+e(day(date))+'<small>'+e(note||'')+'</small>'+(sub?'<span class="cc-sub">'+sub+'</span>':'')+'</span><b>'+money(amt)+'</b></div>'
+    +'<div class="cc-act"><select class="cc-sel" aria-label="What to do" onchange="csvCheckCount()">'+opts.map(o=>'<option value="'+e(o[0])+'"'+(o[0]===def?' selected':'')+'>'+e(o[1])+'</option>').join('')+'</select>'
+    +'<button type="button" class="cc-ed" onclick="csvCheckEdit('+k+')">✏️ Edit</button></div>'
+    +'<div class="cc-edit" id="cc_ed_'+k+'" hidden><label>Date<input type="date" data-f="date" value="'+e(src.date)+'" oninput="csvCheckCount()"></label><label>Amount<input type="number" step="0.01" inputmode="decimal" data-f="amount" value="'+e(String(+src.amount))+'" oninput="csvCheckCount()"></label><label>Description<input data-f="note" value="'+e(src.note||'')+'" oninput="csvCheckCount()"></label></div></div>';
+  };
+  const info=(date,note,amt,sub)=>'<div class="cc-r"><div class="cc-top"><span>'+e(day(date))+'<small>'+e(note||'')+'</small>'+(sub?'<span class="cc-sub">'+sub+'</span>':'')+'</span><b>'+money(amt)+'</b></div></div>';
+  const grp=(key,title,why,body)=>'<div class="cc-g" data-cc-group="'+key+'"><h3>'+title+'</h3><p class="fx-small">'+why+'</p>'+body+'</div>';
   const todo=[];
   if(ex.double.length)todo.push('👯 <b>'+ex.double.length+' double-up'+(ex.double.length===1?'':'s')+'</b> to remove');
   if(ex.add.length)todo.push('➕ <b>'+ex.add.length+'</b> to add to the app');
+  if(ex.other.length)todo.push('🔀 <b>'+ex.other.length+'</b> in the wrong account · move here');
+  if(ex.date.length)todo.push('📅 <b>'+ex.date.length+'</b> with a different date · use the bank date');
   if(ex.none.length)todo.push('❓ <b>'+ex.none.length+'</b> to check (not in the bank)');
-  if(ex.other.length)todo.push('🔀 <b>'+ex.other.length+'</b> in another account');
-  if(ex.date.length)todo.push('📅 <b>'+ex.date.length+'</b> dated differently · nothing to do');
   if(ex.zero.length)todo.push('⏭ <b>'+ex.zero.length+'</b> $0 card check'+(ex.zero.length===1?'':'s')+' · nothing to do');
-  let h=CC_CSS+(todo.length?'<div class="cc-todo"><b>What to do</b>'+todo.map(t=>'<div>'+t+'</div>').join('')+'</div>':'');
-  if(ex.double.length)h+=grp('double','👯 Double-ups ('+ex.double.length+')','The bank has each of these <b>once</b>, but the app has it <b>twice</b>. Ticked ones are removed (only the extra copy; the one that matches the bank stays).',
-   ex.double.slice(0,80).map(x=>row('data-cc-del',x.i,true,x.t.date,x.t.note,x.t.amount,'Already in the app: '+e(day(x.twin.date))+(x.twin.note?' · '+e(String(x.twin.note).slice(0,40)):''))).join(''));
-  if(ex.add.length)h+=grp('add','➕ Missing from the app ('+ex.add.length+' · '+tot(ex.add)+')','In the bank, not in the app. Ticked ones are added.',
-   ex.add.slice(0,80).map(x=>row('data-cc-add',x.j,true,x.r.date,x.r.note,x.r.amount,'')).join(''));
-  if(ex.none.length)h+=grp('none','❓ In the app, not in the bank ('+ex.none.length+' · '+tot(ex.none)+')','Check each one. Was it typed by hand, still pending, or put in the wrong account? Tick it only if it never came out of this account, and it will be removed.',
-   ex.none.slice(0,80).map(x=>row('data-cc-del',x.i,false,x.t.date,x.t.note,x.t.amount,x.t.pocketsmithId!=null?'From the bank feed':'Added by hand or from a statement')).join(''));
-  if(ex.other.length)h+=grp('other','🔀 In the app under another account ('+ex.other.length+')','The bank has these in this account, but the app has them under a different account. Open that account and move them here.',
-   ex.other.slice(0,80).map(x=>row('',0,false,x.r.date,x.r.note,x.r.amount,'In the app under <b>'+nm(x.txn.acct)+'</b> on '+e(day(x.txn.date)))).join(''));
-  if(ex.date.length)h+=grp('date','📅 Same payment, different date ('+ex.date.length+')','Nothing to add or remove. The app and the bank just have different dates.',
-   ex.date.slice(0,80).map(x=>row('',0,false,x.t.date,x.t.note,x.t.amount,'Bank date: '+e(day(x.row.date)))).join(''));
-  if(ex.zero.length)h+=grp('zero','⏭ $0 card checks ('+ex.zero.length+')','The bank checking your card. No money moved, so nothing to add.',
-   '<div class="cc-info">'+ex.zero.slice(0,20).map(x=>row('',0,false,x.r.date,x.r.note,0,'')).join('')+'</div>');
-  if(ex.double.length||ex.add.length||ex.none.length)h+='<div class="cc-done"><button class="btn dark" id="cc_apply" onclick="csvCheckApply()" style="display:block;width:100%;padding:14px;font-size:1.05em">✅ Done: update the app</button><p class="fx-small" style="margin:6px 0 0;text-align:center">Untick anything you want to leave as it is.</p></div>';
+  let h=CC_CSS+(todo.length?'<div class="cc-todo"><b>What to do</b>'+todo.map(t=>'<div>'+t+'</div>').join('')+'<div class="fx-small" style="margin-top:6px">Each payment already has a choice picked. Change any of them, or tap ✏️ Edit to fix the details, then tap Done.</div></div>':'');
+  if(ex.double.length)h+=grp('double','👯 Double-ups ('+ex.double.length+')','The bank has each of these <b>once</b>, but the app has it <b>twice</b>. Removing the extra copy is safe: the one that matches the bank stays.',
+   ex.double.slice(0,80).map(x=>row({txn:x.t,g:'double'},[['del','🗑 Remove this extra copy'],['keep','Leave it']],'del',x.t.date,x.t.note,x.t.amount,'Already in the app: '+e(day(x.twin.date))+(x.twin.note?' · '+e(String(x.twin.note).slice(0,40)):''))).join(''));
+  if(ex.add.length)h+=grp('add','➕ Missing from the app ('+ex.add.length+' · '+tot(ex.add)+')','In the bank, not in the app.',
+   ex.add.slice(0,80).map(x=>row({row:x.r,g:'add'},[['add','➕ Add to the app'],['keep','Leave it out']],'add',x.r.date,x.r.note,x.r.amount,'')).join(''));
+  if(ex.other.length)h+=grp('other','🔀 In the wrong account ('+ex.other.length+')','The bank has these in <b>'+e(here.name)+'</b>, but the app has them under another account.',
+   ex.other.slice(0,80).map(x=>row({txn:x.txn,g:'other'},[['here','🔀 Move it to '+here.name],['keep','Leave it in '+acc(x.txn.acct).name]],'here',x.r.date,x.r.note,x.r.amount,'In the app under <b>'+e(acc(x.txn.acct).name)+'</b> on '+e(day(x.txn.date)))).join(''));
+  if(ex.date.length)h+=grp('date','📅 Same payment, different date ('+ex.date.length+')','The app and the bank have this payment on different days.',
+   ex.date.slice(0,80).map(x=>row({txn:x.t,row:x.row,g:'date'},[['bankdate','📅 Use the bank date ('+day(x.row.date)+')'],['keep','Leave it']],'bankdate',x.t.date,x.t.note,x.t.amount,'Bank date: '+e(day(x.row.date)))).join(''));
+  if(ex.none.length)h+=grp('none','❓ In the app, not in the bank ('+ex.none.length+' · '+tot(ex.none)+')','Typed by hand, still pending, or in the wrong account? Pick what is right for each one.',
+   ex.none.slice(0,80).map(x=>row({txn:x.t,g:'none'},[['keep','Leave it for now'],['del','🗑 Remove (it never came out of '+here.name+')']].concat(others.map(a=>['move:'+a.id,'🔀 Move to '+a.name])),'keep',x.t.date,x.t.note,x.t.amount,x.t.pocketsmithId!=null?'From the bank feed':'Added by hand or from a statement')).join(''));
+  if(ex.zero.length)h+=grp('zero','⏭ $0 card checks ('+ex.zero.length+')','The bank checking your card. No money moved, so nothing to do.',
+   '<div class="cc-info">'+ex.zero.slice(0,20).map(x=>info(x.r.date,x.r.note,0,'')).join('')+'</div>');
+  if(st.refs.length)h+='<div class="cc-done"><button class="btn dark" id="cc_apply" onclick="csvCheckApply()" style="display:block;width:100%;padding:14px;font-size:1.05em">✅ Done: update the app</button><p class="fx-small" style="margin:6px 0 0;text-align:center">Nothing is saved until you tap Done.</p></div>';
   return h;
  }
- const scope=g=>(g&&document.querySelector('[data-cc-group="'+g+'"]'))||document;
- async function add(g){
-  const r=st.result;if(!r)return;const pick=[...scope(g).querySelectorAll('[data-cc-add]')].filter(b=>b.checked).map(b=>r.onlyBank[+b.dataset.ccAdd]).filter(Boolean);if(!pick.length)return;
-  const made=pick.map(x=>({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:x.date,amount:+x.amount,note:x.note||'From bank CSV',cat:+x.amount>0?'income':'other',src:'csv-check',needsReview:true}));
-  const before=TXNS.slice();made.forEach(t=>TXNS.push(t));
-  try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
-  toastMsg('Added '+made.length+' ✓ They are in Miscellaneous to sort');compute();paint();try{render();}catch(_){}
+ function edit(k){const p=$('cc_ed_'+k);if(p){p.hidden=!p.hidden;if(!p.hidden){const i=p.querySelector('input');if(i)i.focus();}}}
+ /* What each row will do: its choice plus any edited details. */
+ function plan(){
+  const out=[];
+  document.querySelectorAll('.cc-r[data-k]').forEach(el=>{
+   const ref=(st.refs||[])[+el.dataset.k];if(!ref)return;const v=(el.querySelector('.cc-sel')||{}).value||'keep',src=ref.txn||ref.row,ed={};
+   el.querySelectorAll('.cc-edit [data-f]').forEach(i=>{const f=i.dataset.f,val=f==='amount'?Math.round(+i.value*100)/100:String(i.value).trim();
+    if(f==='amount'?(i.value!==''&&Number.isFinite(val)&&Math.round(val*100)!==Math.round(+src.amount*100)):(f==='date'?/^\d{4}-\d{2}-\d{2}$/.test(val)&&val!==src.date:val!==String(src.note||'')))ed[f]=val;});
+   el.classList.toggle('cc-on',v!=='keep'||Object.keys(ed).length>0);
+   out.push({ref,v,ed});
+  });
+  return out;
  }
- async function remove(g){
-  const r=st.result;if(!r)return;const pick=[...scope(g).querySelectorAll('[data-cc-del]')].filter(b=>b.checked).map(b=>r.onlyApp[+b.dataset.ccDel]).filter(Boolean);if(!pick.length)return;
-  if(!confirm(g==='double'?'Remove '+pick.length+' extra cop'+(pick.length===1?'y':'ies')+'? The copy that matches the bank stays. You can bring them back from the account.':'Remove '+pick.length+' payment'+(pick.length===1?'':'s')+' that the bank does not have? They are kept as removed, so they can be brought back.'))return;
-  const ids=new Set(pick.map(t=>String(t.id))),now=new Date().toISOString(),before=TXNS.map(t=>({...t}));
-  TXNS.forEach(t=>{if(ids.has(String(t.id)))Object.assign(t,{deleted:true,deletedAt:now,deletedReason:g==='double'?'Double-up (bank CSV has it once)':'Not in the bank CSV'});});
-  try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
-  toastMsg('Removed '+pick.length+' ✓');compute();paint();try{render();}catch(_){}
- }
- /* Done: one button applies every ticked add and remove in one save, then checks again. */
- function ticked(){
-  const r=st.result;if(!r)return{adds:[],dels:[]};
-  const adds=[...document.querySelectorAll('[data-cc-add]')].filter(b=>b.checked).map(b=>r.onlyBank[+b.dataset.ccAdd]).filter(Boolean);
-  const dels=[...document.querySelectorAll('[data-cc-del]')].filter(b=>b.checked).map(b=>({t:r.onlyApp[+b.dataset.ccDel],g:(b.closest('[data-cc-group]')||{dataset:{}}).dataset.ccGroup})).filter(x=>x.t);
-  return{adds,dels};
+ function sums(p){
+  const c={add:0,del:0,move:0,fix:0};
+  p.forEach(x=>{if(x.v==='add')c.add++;else if(x.v==='del')c.del++;else if(x.v==='here'||x.v.startsWith('move:'))c.move++;else if(x.v==='bankdate'||(x.ref.txn&&Object.keys(x.ed).length))c.fix++;
+   if(x.v!=='del'&&x.v!=='bankdate'&&x.ref.txn&&Object.keys(x.ed).length&&(x.v==='here'||x.v.startsWith('move:')))c.fix++;});
+  return c;
  }
  function count(){
-  const b=$('cc_apply');if(!b)return;const{adds,dels}=ticked(),parts=[];
-  if(adds.length)parts.push('add '+adds.length);if(dels.length)parts.push('remove '+dels.length);
-  b.disabled=!parts.length;b.textContent=parts.length?'✅ Done: update the app ('+parts.join(' · ')+')':'Nothing ticked';
+  const b=$('cc_apply');if(!b)return;const c=sums(plan()),parts=[];
+  if(c.add)parts.push('add '+c.add);if(c.del)parts.push('remove '+c.del);if(c.move)parts.push('move '+c.move);if(c.fix)parts.push('fix '+c.fix);
+  b.disabled=!parts.length;b.textContent=parts.length?'✅ Done: update the app ('+parts.join(' · ')+')':'Nothing to change';
  }
  async function apply(){
-  const r=st.result;if(!r)return;const{adds,dels}=ticked();if(!adds.length&&!dels.length)return;
-  const lines=[];if(adds.length)lines.push('• Add '+adds.length+' payment'+(adds.length===1?'':'s')+' from the bank');
-  const dbl=dels.filter(x=>x.g==='double').length,oth=dels.length-dbl;
-  if(dbl)lines.push('• Remove '+dbl+' double-up'+(dbl===1?'':'s')+' (the copy that matches the bank stays)');
-  if(oth)lines.push('• Remove '+oth+' payment'+(oth===1?'':'s')+' the bank does not have');
+  const r=st.result;if(!r)return;const p=plan(),c=sums(p);if(!c.add&&!c.del&&!c.move&&!c.fix)return;
+  const nm=id=>(acctById(id)||{name:id}).name,lines=[];
+  if(c.add)lines.push('• Add '+c.add+' payment'+(c.add===1?'':'s')+' from the bank');
+  if(c.del)lines.push('• Remove '+c.del+' payment'+(c.del===1?'':'s')+' (double-ups keep the copy that matches the bank)');
+  if(c.move)lines.push('• Move '+c.move+' payment'+(c.move===1?'':'s')+' to the right account');
+  if(c.fix)lines.push('• Fix the date or details on '+c.fix);
   if(!confirm('Update the app?\n\n'+lines.join('\n')+'\n\nRemoved ones can be brought back from the account.'))return;
-  const now=new Date().toISOString(),before=TXNS.map(t=>({...t})),len=TXNS.length;
-  const made=adds.map(x=>({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:x.date,amount:+x.amount,note:x.note||'From bank CSV',cat:+x.amount>0?'income':'other',src:'csv-check',needsReview:true}));
-  const why=new Map(dels.map(x=>[String(x.t.id),x.g==='double'?'Double-up (bank CSV has it once)':'Not in the bank CSV']));
-  TXNS.forEach(t=>{if(why.has(String(t.id)))Object.assign(t,{deleted:true,deletedAt:now,deletedReason:why.get(String(t.id))});});
+  const now=new Date().toISOString(),before=TXNS.map(t=>({...t})),made=[];
+  const fixT=(t,ed)=>{if(ed.date!=null){t.date=ed.date;t.dateOverride=true;}if(ed.amount!=null){t.amount=ed.amount;t.amountOverride=true;}if(ed.note!=null){t.note=ed.note;t.noteOverride=true;}if(Object.keys(ed).length){t.editedAt=now;t.editedVia='csv-check';}};
+  p.forEach(({ref,v,ed})=>{
+   if(v==='add'){const x=ref.row;made.push({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:ed.date||x.date,amount:ed.amount!=null?ed.amount:+x.amount,note:ed.note||x.note||'From bank CSV',cat:+(ed.amount!=null?ed.amount:x.amount)>0?'income':'other',src:'csv-check',needsReview:true});return;}
+   const t=ref.txn;if(!t)return;
+   if(v==='del'){Object.assign(t,{deleted:true,deletedAt:now,deletedReason:ref.g==='double'?'Double-up (bank CSV has it once)':'Not in the bank CSV'});return;}
+   if(v==='here'||v.startsWith('move:')){const to=v==='here'?r.acct:v.slice(5);t.movedFrom=t.acct;t.acct=to;t.acctOverride=true;t.movedAt=now;}
+   if(v==='bankdate'&&ref.row){t.date=ref.row.date;t.dateOverride=true;}
+   fixT(t,ed);
+  });
   made.forEach(t=>TXNS.push(t));
   try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
-  const done=[];if(made.length)done.push('Added '+made.length);if(dels.length)done.push('removed '+dels.length);
+  const done=[];if(c.add)done.push('Added '+c.add);if(c.del)done.push('removed '+c.del);if(c.move)done.push('moved '+c.move);if(c.fix)done.push('fixed '+c.fix);
   st.applied=done.join(' · ');compute();paint();try{render();}catch(_){}
-  toastMsg('App updated ✓ '+st.applied+(made.length?'. New ones are in Miscellaneous to sort':''));
+  toastMsg('App updated ✓ '+st.applied);
   const sh=$('sheet');if(sh)sh.scrollTop=0;
  }
- Object.assign(window,{csvCheckApply:apply,csvCheckCount:count});
- Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckProcess:process,csvCheckAdd:add,csvCheckRemove:remove,csvCheckUseSuggested:useSuggested,csvWhereShort:whereShort,csvWhereHtml:whereHtml});
+ Object.assign(window,{csvCheckApply:apply,csvCheckCount:count,csvCheckEdit:edit});
+ Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckProcess:process,csvCheckUseSuggested:useSuggested,csvWhereShort:whereShort,csvWhereHtml:whereHtml});
 })();

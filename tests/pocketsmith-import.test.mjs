@@ -117,3 +117,14 @@ test('transactions from a bank account that is not matched yet are set aside, no
  const bad=planTransactions([],[{id:'b1',transactionAccountId:1,date:'not a date',amount:-1}],{'1':'everyday'},'2026-10-28T00:00:00Z',true);
  assert.equal(bad.skipped.length,1,'genuinely bad rows are still caught');
 });
+
+test('a bank feed update keeps an account, date or amount you changed yourself', () => {
+ const existing = [{ id: 'ps_9', pocketsmithId: '9', importKey: 'pocketsmith:9', acct: 'bills', acctOverride: true, date: '2026-10-09', dateOverride: true, amount: -22.9, cat: 'other', note: 'Swim' }];
+ const snap = [{ id: 9, transactionAccountId: 1, date: '2026-10-08', amount: -22.9, payee: 'Gympie ARC' }];
+ const plan = planTransactions(existing, snap, { '1': 'everyday' }, '2026-11-20');
+ assert.equal(plan.updates.length, 1);
+ assert.equal(plan.updates[0].acct, 'bills', 'moved account is kept');
+ assert.equal(plan.updates[0].date, '2026-10-09', 'your date is kept');
+ const plain = planTransactions([{ ...existing[0], acctOverride: false, dateOverride: false }], snap, { '1': 'everyday' }, '2026-11-20');
+ assert.equal(plain.updates[0].acct, 'everyday', 'without your change the feed still decides');
+});

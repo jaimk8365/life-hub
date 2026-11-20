@@ -143,3 +143,9 @@ test('CSV check: a $0 card check does not stop an account matching; one Done but
   assert.match(g, /✅ Done: update the app/);
   assert.ok(!/csvCheckRemove\(\\'double\\'\)/.test(g), 'no separate per-group buttons');
 });
+
+test('CSV check: every result row can be fixed here (choice + Edit), saved only on Done', () => {
+  const g = read('finance/csv-check.js');
+  for (const s of ['🗑 Remove this extra copy', '➕ Add to the app', "🔀 Move it to '", '📅 Use the bank date', "'🔀 Move to '", '✏️ Edit', 'csvCheckEdit:edit', 'acctOverride=true', 'dateOverride=true', 'Nothing is saved until you tap Done'])
+    assert.ok(g.includes(s), s);
+});
