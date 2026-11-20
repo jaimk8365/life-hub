@@ -91,3 +91,13 @@ test('My Finance never runs inside a Life Hub section; the Today money card open
   assert.ok(!/href="\.\.\/finance\/app\.html"/.test(read('src/copilot.html')));
   assert.equal(patchCopilotFinanceLink(read('src/copilot.html')), read('src/copilot.html'));
 });
+
+test('CSV check waits for Process: no results and no typed-statement option once a CSV is chosen', () => {
+  const g = read('finance/csv-check.js');
+  assert.match(g, /csvCheckProcess:process/, 'Process button is wired');
+  assert.match(g, /▶ Process: check every payment/);
+  assert.match(g, /if\(!st\.parsed\)h\+='<details class="ck-ev"/, 'typed statement only shows before a CSV');
+  assert.match(g, /if\(r&&st\.processed\)/, 'results only after Process');
+  const fileFn = g.slice(g.indexOf('async function file('), g.indexOf('function process('));
+  assert.ok(!/compute\(\)/.test(fileFn), 'choosing a file does not check straight away');
+});

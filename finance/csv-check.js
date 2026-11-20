@@ -108,23 +108,26 @@
  }
  function open(acct,back,dates){
   const accts=ACCTS.filter(a=>!a.hidden),def=defaults();
-  if(acct&&acct!==st.acct)st={acct,from:null,to:null,parsed:null,file:'',result:null,datesTouched:false};
+  if(acct&&acct!==st.acct)st={acct,from:null,to:null,parsed:null,file:'',result:null,datesTouched:false,processed:false,err:''};
   st.acct=st.acct||acct||(accts[0]&&accts[0].id);
-  if(dates&&dates.from){st.from=dates.from;st.to=dates.to||todayISO();st.datesTouched=true;st.result=null;compute();}
+  if(dates&&dates.from){st.from=dates.from;st.to=dates.to||todayISO();st.datesTouched=true;st.result=null;if(st.processed)compute();}
   st.from=st.from||def.from;st.to=st.to||def.to;st.back=back||st.back||'fix';
   paint();openSheet();
  }
- function useSuggested(){const w=where(st.acct);if(!w||!w.from)return;st.from=w.from;st.to=w.to;st.datesTouched=true;compute();paint();}
+ function useSuggested(){const w=where(st.acct);if(!w||!w.from)return;st.from=w.from;st.to=w.to;st.datesTouched=true;if(st.processed)compute();paint();}
  function paint(){
   const accts=ACCTS.filter(a=>!a.hidden),r=st.result;
   let h='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="'+(st.back==='match'?'fixMatchOpen()':'fixOpen()')+'">‹ '+(st.back==='match'?'Match to my bank':'Fix my numbers')+'</button><h2>📄 Check with a bank CSV</h2>'
-   +'<p>1. Download the CSV for one account from your bank app. 2. Pick the dates. 3. Choose the file. Every payment is matched one by one. Nothing changes unless you tick and tap.</p>'
+   +'<p>1. Download the CSV for one account from your bank app. 2. Pick the dates. 3. Choose the file. 4. Tap Process. Every payment is matched one by one. Nothing changes unless you tick and tap.</p>'
    +'<label class="ck-row"><span>Account</span><select id="cc_acct" onchange="csvCheckSet(\'acct\',this.value)">'+accts.map(a=>'<option value="'+e(a.id)+'"'+(a.id===st.acct?' selected':'')+'>'+e(a.name)+'</option>').join('')+'</select></label>'
    +'<label class="ck-row"><span>From</span><input type="date" id="cc_from" value="'+e(st.from)+'" onchange="csvCheckSet(\'from\',this.value)"></label>'
    +'<label class="ck-row"><span>To</span><input type="date" id="cc_to" value="'+e(st.to)+'" onchange="csvCheckSet(\'to\',this.value)"></label>'
    +'<label class="btn ghost cc-file" style="margin-top:10px;display:block;text-align:center;cursor:pointer">'+(st.parsed?'📄 '+e(st.file)+' · '+st.parsed.rows.length+' rows ('+e(day(st.parsed.min))+' – '+e(day(st.parsed.max))+') · change':'📄 Choose the bank CSV')+'<input type="file" accept=".csv,text/csv" id="cc_file" style="display:none" onchange="csvCheckFile(this)"></label>'
+   +(st.err?'<div class="tr-card tr-bad" role="alert" style="margin-top:10px"><div class="tr-h">⚠️ '+e(st.err)+'</div></div>':'')
+   +(st.parsed?'<button class="btn dark cc-process" id="cc_process" style="margin-top:10px;display:block;width:100%;font-size:1.05em;padding:14px" onclick="csvCheckProcess()">'+(st.processed?'🔁 Check again':'▶ Process: check every payment')+'</button>':'')
    +'<div id="cc_msg" class="fx-small" role="status"></div>'+(()=>{const w=where(st.acct);return w&&w.from&&(w.from!==st.from||w.to!==st.to)?'<p class="fx-small">📅 Suggested for this account: <b>'+e(day(w.from))+' to today</b> <button class="fh-link" onclick="csvCheckUseSuggested()">Use these dates</button></p>':'';})();
-  if(r){
+  h+='<div id="cc_result"></div>';
+  if(r&&st.processed){
    const acct=acctById(r.acct)||{name:r.acct};
    h+=r.ok?'<div class="tr-card tr-good"><div class="tr-h">✅ '+e(acct.name)+' matches the bank</div><p>'+r.matched.length+' payments from '+e(day(r.from))+' to '+e(day(r.to))+' are in both.'+(r.bankClose?' Closing balance '+money(r.bankClose.balance)+' in both.':'')+'</p></div>'
     :'<div class="tr-card tr-bad"><div class="tr-h">'+(r.onlyBank.length||r.onlyApp.length?'⚠️ '+r.onlyBank.length+' missing from the app · '+r.onlyApp.length+' not in the bank':'⚠️ The payments match, the balance does not')+'</div><p>'+r.matched.length+' of '+r.bankCount+' bank payments matched, '+e(day(r.from))+' – '+e(day(r.to))+'.</p>'
@@ -138,20 +141,20 @@
     +r.onlyApp.slice(0,80).map((t,i)=>'<label class="fx-row"><input type="checkbox" data-cc-del="'+i+'"><span>'+e(day(t.date))+'<small>'+e(t.note||'')+(t.pocketsmithId!=null?' · from bank feed':' · added by hand or statement')+'</small></span><b>'+money(t.amount)+'</b></label>').join('')
     +'<button class="btn ghost" onclick="csvCheckRemove()">Remove the ticked ones</button>';
   }
-  h+='<details class="ck-ev" style="margin-top:14px"><summary>No CSV? Type a statement closing balance instead</summary><button class="btn ghost" style="margin-top:8px" onclick="trustStatementTypedOpen(\''+e(st.acct)+'\')">Type the closing balance</button></details>';
+  if(!st.parsed)h+='<details class="ck-ev" style="margin-top:14px"><summary>No CSV? Type a statement closing balance instead</summary><button class="btn ghost" style="margin-top:8px" onclick="trustStatementTypedOpen(\''+e(st.acct)+'\')">Type the closing balance</button></details>';
   $('sheet').innerHTML=h;
  }
  function compute(){
   if(!st.parsed){st.result=null;return;}
   const a=acctById(st.acct)||{};
-  try{st.result=FinCsvCheck.run({rows:st.parsed.rows,txns:TXNS,acct:st.acct,from:st.from,to:st.to,openBal:+a.openBal||0});}catch(err){st.result=null;setTimeout(()=>{const m=$('cc_msg');if(m)m.textContent=err.message;},0);}
+  try{st.result=FinCsvCheck.run({rows:st.parsed.rows,txns:TXNS,acct:st.acct,from:st.from,to:st.to,openBal:+a.openBal||0});}catch(err){st.result=null;st.err=err.message||'Could not check this CSV.';}
   // A CSV with a balance column that matched to the cent counts as checked up to its last day, like a statement.
   const r=st.result;if(r&&r.ok&&r.bankClose){try{const cs=load(K_STATEMENTS_CC,{latest:{},history:[]})||{latest:{},history:[]};cs.history=cs.history||[];cs.latest=cs.latest||{};if(!cs.history.some(h=>h.acct===r.acct&&h.date===r.bankClose.date&&h.ok)){const rec={acct:r.acct,date:r.bankClose.date,closing:r.bankClose.balance,app:r.appClose,difference:0,ok:true,via:'csv',at:new Date().toISOString()};cs.history.unshift(rec);cs.history=cs.history.slice(0,60);cs.latest[r.acct]=rec;saveAtomic({[K_STATEMENTS_CC]:cs}).catch(()=>{});}}catch(_){}}
  }
  function set(k,v){
-  if(k==='acct'){st={acct:v,from:st.from,to:st.to,parsed:null,file:'',result:null,datesTouched:st.datesTouched,back:st.back};}
+  if(k==='acct'){st={acct:v,from:st.from,to:st.to,parsed:null,file:'',result:null,datesTouched:st.datesTouched,back:st.back,processed:false,err:''};}
   else{st[k]=v;st.datesTouched=true;}
-  compute();paint();
+  if(st.processed)compute();paint();
  }
  /* Some banks (CommBank and others) export with no header row: date, amount, description[, balance]. Add one. */
  function readCsv(text){
@@ -168,11 +171,17 @@
    if(f.size>2000000)throw Error('Use a CSV smaller than 2 MB. Export a shorter period.');
    const parsed=readCsv(await f.text()),a=acctById(st.acct),digits=String((a&&a.num)||'').replace(/\D/g,'');
    if(parsed.accountNumber&&digits&&!parsed.accountNumber.endsWith(digits))throw Error('This CSV is for a different account. Choose the right account above.');
-   st.parsed=parsed;st.file=f.name;
+   st.parsed=parsed;st.file=f.name;st.processed=false;st.result=null;st.err='';
    // The dates follow the file unless you already picked your own
    if(!st.datesTouched){st.from=parsed.min;st.to=parsed.max;}
-   compute();paint();
-  }catch(err){paint();const m=$('cc_msg');if(m)m.textContent=err.message||'Could not read this CSV.';}
+   paint();
+  }catch(err){st.err=err.message||'Could not read this CSV.';paint();}
+  input.value='';
+ }
+ /* Process: nothing is compared until you tap it, so you can check the dates first. */
+ function process(){
+  if(!st.parsed)return;const b=$('cc_process');if(b){b.disabled=true;b.textContent='⏳ Checking…';}
+  setTimeout(()=>{st.err='';st.processed=true;compute();paint();const t=$('cc_result');if(t&&t.scrollIntoView)t.scrollIntoView({behavior:'smooth',block:'start'});},30);
  }
  async function add(){
   const r=st.result;if(!r)return;const pick=[...document.querySelectorAll('[data-cc-add]')].filter(b=>b.checked).map(b=>r.onlyBank[+b.dataset.ccAdd]).filter(Boolean);if(!pick.length)return;
@@ -189,5 +198,5 @@
   try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
   toastMsg('Removed '+pick.length+' ✓');compute();paint();try{render();}catch(_){}
  }
- Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckAdd:add,csvCheckRemove:remove,csvCheckUseSuggested:useSuggested,csvWhereShort:whereShort,csvWhereHtml:whereHtml});
+ Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckProcess:process,csvCheckAdd:add,csvCheckRemove:remove,csvCheckUseSuggested:useSuggested,csvWhereShort:whereShort,csvWhereHtml:whereHtml});
 })();
