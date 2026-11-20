@@ -7,6 +7,7 @@
    todayISO, monthCursor, save, load, esc, uid, toast, render, setMode, setEnergy, clearEnergy, setSort, openBlock, catC, isDone, niceDate, dkey */
 import * as C from './core.mjs';
 import * as P from './pages.mjs';
+import * as R from './routines.mjs';
 
 const K_CARRY = 'plan_carry_v1', K_HINT = 'plan_plus_hint_v1';
 const K_ROUT = 'plan_plus_routines_v1', K_GOALS = 'plan_goals_v1';
@@ -247,6 +248,7 @@ function enhanceSheet(id) {
     const b = BLOCKS.find(x => x.id === id);
     if (b && b.adminRef) { const link = document.createElement('button'); link.type = 'button'; link.className = 'btn ghost pp-admin'; link.textContent = '📋 Open in Life Admin'; link.addEventListener('click', () => { try { parent.goAdminItem(b.adminRef); } catch { /* opened outside Life Hub */ } try { closeSheet(); } catch { /* leave it open */ } }); sheet.appendChild(link); }
     if (b) { const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn ghost pp-remind'; btn.textContent = '🔔 Remind me (adds to Calendar)'; btn.addEventListener('click', () => remind(b)); sheet.appendChild(btn); }
+    if (b) { const rt = document.createElement('button'); rt.type = 'button'; rt.className = 'btn ghost pp-rt'; rt.textContent = (b.steps && b.steps.length ? '🪜 Steps (' + b.steps.length + ') & stacking' : '🔁 Make it a routine · add steps'); rt.addEventListener('click', () => { try { closeSheet(); } catch { /* fine */ } P.listsOff(); R.open(b.id); }); sheet.appendChild(rt); }
   }
 }
 function remind(b) {
@@ -282,11 +284,13 @@ document.addEventListener('submit', e => {
   try { save(K_GOALS, 'ppNewgoal' in f.dataset ? C.goalAdd(load(K_GOALS, []), v, uid()) : C.goalStepAdd(load(K_GOALS, []), f.dataset.ppStep, v, uid())); render(); } catch (err) { say(err.message); }
 });
 document.addEventListener('input', e => { if (P.onInput(e)) return; if (e.target.id === 'pp-add-in') draft = e.target.value; });
-document.addEventListener('submit', e => { P.onSubmit(e); });
+document.addEventListener('submit', e => { if (R.onSubmit(e)) return; P.onSubmit(e); });
+document.addEventListener('change', e => { R.onChange(e); });
 document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.pg-body')) { e.preventDefault(); viewDate = e.target.dataset.ppDay; setMode('day'); } });
 document.addEventListener('change', e => { const id = e.target.dataset?.ppCarryday; if (id) carry(id, 'day', e.target.value); });
 document.addEventListener('click', e => {
-  if (P.onClick(e)) return;
+  if (R.onClick(e)) { P.listsOff(); return; }
+  if (P.onClick(e)) { R.off(); return; }
   const t = e.target.closest?.('[data-pp-carry],[data-pp-energy],[data-pp-more],[data-pp-day],[data-pp-routines],[data-pp-goal]'); if (!t) return;
   if (t.dataset.ppRoutines) { save(K_ROUT, load(K_ROUT, 'show') === 'hide' ? 'show' : 'hide'); return render(); }
   if (t.dataset.ppGoal) return goalAct(t.dataset.ppGoal, t.dataset.id, t.dataset.step);
@@ -299,10 +303,11 @@ document.addEventListener('click', e => {
 /* ---------- wire in ---------- */
 try { const w = document.getElementById('mt-week'); if (w) w.textContent = 'Week'; const d = document.getElementById('mt-day'); if (d) d.textContent = 'Day'; } catch { /* labels stay */ }
 try { Object.assign(PRI.high, { n: C.WORDS.high, e: '★' }); Object.assign(PRI.med, { n: C.WORDS.med, e: '·' }); Object.assign(PRI.low, { n: C.WORDS.low, e: '○' }); } catch { /* labels stay as they were */ }
-const style = document.createElement('style'); style.textContent = CSS + P.CSS; document.head.appendChild(style);
+const style = document.createElement('style'); style.textContent = CSS + P.CSS + R.CSS; document.head.appendChild(style);
 /* Life Hub can ask for a day (from Search, the Overview or a Life Admin link). */
 window.ppGoto = iso => { try { sessionStorage.setItem('plan_goto', ''); } catch { /* fine */ } if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) { viewDate = iso; setMode('day'); } };
 P.installTab();
+R.installTab(P.listsOff);
 const baseRender = window.render, baseOpen = window.openBlock;
 window.render = function () {
   if (P.typing()) return; // a note is being typed: leave the page alone until it is saved
@@ -311,7 +316,7 @@ window.render = function () {
   // energy answered in the morning check-in is not asked again here
   try { const t = todayISO(); if (viewDate === t && !ENERGY[t]) { const e = checkinEnergy(t); if (e) { ENERGY[t] = e; save(K_ENERGY, ENERGY); } } } catch { /* optional */ }
   baseRender.apply(this, arguments);
-  try { if (P.listsOn()) P.drawLists(); else if (mode === 'day') { enhanceDay(); P.dayExtras(); } else if (mode === 'week') enhanceWeek(); } catch (err) { console.warn('Planner extras skipped: ' + err.message); }
+  try { R.sync(); if (R.on()) R.draw(); else if (P.listsOn()) P.drawLists(); else if (mode === 'day') { enhanceDay(); P.dayExtras(); } else if (mode === 'week') enhanceWeek(); } catch (err) { console.warn('Planner extras skipped: ' + err.message); }
   if (typing) { const i = document.getElementById('pp-add-in'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch { /* fine */ } } }
 };
 const baseMonth = window.renderMonth;
@@ -321,3 +326,4 @@ C.startCountdowns(document, window);
 window.render();
 try { const want = sessionStorage.getItem('plan_goto'); if (want) window.ppGoto(want); } catch { /* fine */ }
 try { if (sessionStorage.getItem('plan_goto_lists')) P.openHomeCare(); } catch { /* fine */ }
+try { const r = sessionStorage.getItem('plan_goto_routines'); if (r) { P.listsOff(); R.open(r === '1' ? null : r); } } catch { /* fine */ }

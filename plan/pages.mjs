@@ -122,6 +122,7 @@ export function dayExtras() {
 
 /* ---------- Lists: its own page ---------- */
 export const listsOn = () => st.lists;
+export function listsOff() { st.lists = false; }
 export function drawLists() {
   const root = document.getElementById('root'); if (!root) return;
   for (const id of ['mt-day', 'mt-week', 'mt-month', 'mt-year']) document.getElementById(id)?.classList.remove('on');

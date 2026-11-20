@@ -43,7 +43,36 @@
    missingTotal:sum(onlyBank,r=>+r.amount),extraTotal:sum(onlyApp,t=>+t.amount),bankIn,bankOut,appIn,appOut,
    bankClose:close,appClose,closeDiff:close?r2(close.balance-appClose):null,ok};
  }
- return {run,closingOn};
+ /* Where to look: the dates most likely to hold what makes an account not match the bank, each with its reason.
+    - a statement or CSV check that matched means everything up to that day is right, so looking starts after it
+    - double-ups, transfers with no other side and payments waiting for details, by their dates
+    - quiet gaps: stretches with no payments at all in an account that is normally busy (likely missing)
+    - before the bank feed: payments typed or imported by hand are the usual source of old differences
+    Pure: problems come in as [{date,why}]. */
+ function whereToLook({txns=[],acct,today,lastGood=null,problems=[],different=true}){
+  const live=t=>t&&!t.deleted&&t.acct===acct&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'')&&t.src!=='balance-adjustment';
+  const rows=txns.filter(live).sort((a,b)=>a.date.localeCompare(b.date)),reasons=[];
+  if(!rows.length)return {from:null,to:today,reasons:[{from:null,to:today,why:'No payments in the app for this account yet.'}],lastGood};
+  const first=rows[0].date,feed=rows.filter(t=>t.pocketsmithId!=null).map(t=>t.date)[0]||null;
+  const after=d=>!lastGood||d>lastGood;
+  const groups=new Map();problems.filter(p=>p&&p.date&&after(p.date)).forEach(p=>{const g=groups.get(p.why)||{why:p.why,dates:[]};g.dates.push(p.date);groups.set(p.why,g);});
+  groups.forEach(g=>{g.dates.sort();reasons.push({from:g.dates[0],to:g.dates[g.dates.length-1],why:g.why,count:g.dates.length});});
+  // quiet gaps (only in a busy account: at least 2 payments a week on average)
+  const days=Math.max(1,Math.round((at(rows[rows.length-1].date)-at(first))/86400000));
+  if(rows.length/days*7>=2){
+   const dates=[...new Set(rows.map(t=>t.date))];
+   for(let i=1;i<dates.length;i++){const g=Math.round((at(dates[i])-at(dates[i-1]))/86400000);if(g>=10&&after(dates[i]))reasons.push({from:dates[i-1],to:dates[i],why:'No payments at all for '+g+' days. Some are probably missing.',count:1,gap:true});}
+  }
+  if(feed&&feed>first&&after(feed))reasons.push({from:lastGood&&lastGood>first?lastGood:first,to:feed,why:'Before the bank feed started, payments were typed or imported by hand. Old differences usually hide here.',count:1,beforeFeed:true});
+  reasons.sort((a,b)=>String(a.from).localeCompare(String(b.from)));
+  let from=reasons.length?reasons[0].from:(lastGood||first);
+  if(lastGood&&from<=lastGood)from=new Date(at(lastGood)+86400000).toISOString().slice(0,10);
+  if(!reasons.length&&different)reasons.push({from,to:today,why:lastGood?'Everything up to '+lastGood+' was checked and matched, so the difference is after that.':'Nothing stands out, so check from the first payment in the app.',count:0});
+  // still off after those? the rest is older: from the first payment the app has (or the last matched check)
+  const olderFrom=lastGood?new Date(at(lastGood)+86400000).toISOString().slice(0,10):first;
+  return {from,to:today,reasons,lastGood,first,feed,older:olderFrom<from?{from:olderFrom,to:from}:null};
+ }
+ return {run,closingOn,whereToLook};
 });
 
 /* ---------------- Screen (Finance page only) ---------------- */
@@ -54,12 +83,38 @@
  const day=d=>{try{return new Date(d+'T12:00:00').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',year:'numeric'});}catch(_){return d;}};
  let st={acct:null,from:null,to:null,parsed:null,file:'',result:null,datesTouched:false};
  function defaults(){const t=todayISO(),d=new Date(t+'T12:00:00');d.setDate(1);d.setMonth(d.getMonth()-1);const from=d.toISOString().slice(0,10),end=new Date(t+'T12:00:00');end.setDate(0);return {from,to:end.toISOString().slice(0,10)};}
- function open(acct,back){
+ /* Problems the app already knows about, by date, for whereToLook(). */
+ function where(acct){
+  try{
+   const moves=typeof FinMoves!=='undefined'?FinMoves.detectMoves(TXNS,ACCTS):[],paired=moves.flatMap(m=>[m.outId,m.inId]);
+   const problems=[];
+   FinFix.doubleUps(TXNS,acct).forEach(p=>problems.push({date:p.extra.date,why:'Possible double-ups (same day, same amount, twice)'}));
+   FinFix.oneSided(TXNS,acct,paired).forEach(t=>problems.push({date:t.date,why:'Transfers with no other side in your other accounts'}));
+   TXNS.filter(t=>!t.deleted&&t.acct===acct&&(t.needsDetails||t.sourceMissing||t.sourceChanged)).forEach(t=>problems.push({date:t.date,why:'Payments the bank feed changed or could not find'}));
+   const hist=(load(K_STATEMENTS_CC,{history:[]})||{}).history||[],good=hist.filter(h=>h&&h.acct===acct&&h.ok&&h.date).map(h=>h.date).sort();
+   const a=acctById(acct),g=a&&FinFix.gap(a,TXNS),different=!g||Math.abs(g.difference)>=.01;
+   return FinCsvCheck.whereToLook({txns:TXNS,acct,today:todayISO(),lastGood:good[good.length-1]||null,problems,different});
+  }catch(_){return null;}
+ }
+ const K_STATEMENTS_CC='fin_statement_checks_v1';
+ function whereShort(acct){const w=where(acct);if(!w||!w.from)return '';return 'Look at '+shortDay(w.from)+' – today'+(w.reasons.length>1?' · '+w.reasons.length+' things':'');}
+ const shortDay=d=>{try{return new Date(d+'T12:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'2-digit'});}catch(_){return d;}};
+ function whereHtml(acct){
+  const w=where(acct);if(!w)return '';
+  return '<div class="fx-note cc-where"><b>📅 Where to look: '+(w.from?e(day(w.from))+' to today':'')+'</b>'+w.reasons.map(r=>'<div style="margin-top:6px">• '+(r.from?'<b>'+e(shortDay(r.from))+(r.to&&r.to!==r.from?' – '+e(shortDay(r.to)):'')+'</b> · ':'')+e(r.why)+(r.count>1?' ('+r.count+')':'')+'</div>').join('')
+   +(w.lastGood?'<div style="margin-top:6px">✅ Checked and matched up to <b>'+e(day(w.lastGood))+'</b>, so nothing before that needs looking at.</div>':'')
+   +(w.older?'<div style="margin-top:6px">• If that does not explain all of it, the rest is older: <b>'+e(shortDay(w.older.from))+' – '+e(shortDay(w.older.to))+'</b> <button class="fh-link" onclick="csvCheckOpen(\''+e(acct)+'\',\'match\',{from:\''+w.older.from+'\',to:\''+w.older.to+'\'})">Check those dates</button></div>':'')
+   +(w.from?'<button class="btn dark" style="margin-top:10px" onclick="csvCheckOpen(\''+e(acct)+'\',\'match\',{from:\''+w.from+'\',to:\''+w.to+'\'})">📄 Check these dates with a bank CSV</button>':'')+'</div>';
+ }
+ function open(acct,back,dates){
   const accts=ACCTS.filter(a=>!a.hidden),def=defaults();
   if(acct&&acct!==st.acct)st={acct,from:null,to:null,parsed:null,file:'',result:null,datesTouched:false};
-  st.acct=st.acct||acct||(accts[0]&&accts[0].id);st.from=st.from||def.from;st.to=st.to||def.to;st.back=back||st.back||'fix';
+  st.acct=st.acct||acct||(accts[0]&&accts[0].id);
+  if(dates&&dates.from){st.from=dates.from;st.to=dates.to||todayISO();st.datesTouched=true;st.result=null;compute();}
+  st.from=st.from||def.from;st.to=st.to||def.to;st.back=back||st.back||'fix';
   paint();openSheet();
  }
+ function useSuggested(){const w=where(st.acct);if(!w||!w.from)return;st.from=w.from;st.to=w.to;st.datesTouched=true;compute();paint();}
  function paint(){
   const accts=ACCTS.filter(a=>!a.hidden),r=st.result;
   let h='<button class="close" onclick="closeSheet()">✕</button><button class="fx-back" onclick="'+(st.back==='match'?'fixMatchOpen()':'fixOpen()')+'">‹ '+(st.back==='match'?'Match to my bank':'Fix my numbers')+'</button><h2>📄 Check with a bank CSV</h2>'
@@ -68,7 +123,7 @@
    +'<label class="ck-row"><span>From</span><input type="date" id="cc_from" value="'+e(st.from)+'" onchange="csvCheckSet(\'from\',this.value)"></label>'
    +'<label class="ck-row"><span>To</span><input type="date" id="cc_to" value="'+e(st.to)+'" onchange="csvCheckSet(\'to\',this.value)"></label>'
    +'<label class="btn ghost cc-file" style="margin-top:10px;display:block;text-align:center;cursor:pointer">'+(st.parsed?'📄 '+e(st.file)+' · '+st.parsed.rows.length+' rows ('+e(day(st.parsed.min))+' – '+e(day(st.parsed.max))+') · change':'📄 Choose the bank CSV')+'<input type="file" accept=".csv,text/csv" id="cc_file" style="display:none" onchange="csvCheckFile(this)"></label>'
-   +'<div id="cc_msg" class="fx-small" role="status"></div>';
+   +'<div id="cc_msg" class="fx-small" role="status"></div>'+(()=>{const w=where(st.acct);return w&&w.from&&(w.from!==st.from||w.to!==st.to)?'<p class="fx-small">📅 Suggested for this account: <b>'+e(day(w.from))+' to today</b> <button class="fh-link" onclick="csvCheckUseSuggested()">Use these dates</button></p>':'';})();
   if(r){
    const acct=acctById(r.acct)||{name:r.acct};
    h+=r.ok?'<div class="tr-card tr-good"><div class="tr-h">✅ '+e(acct.name)+' matches the bank</div><p>'+r.matched.length+' payments from '+e(day(r.from))+' to '+e(day(r.to))+' are in both.'+(r.bankClose?' Closing balance '+money(r.bankClose.balance)+' in both.':'')+'</p></div>'
@@ -90,6 +145,8 @@
   if(!st.parsed){st.result=null;return;}
   const a=acctById(st.acct)||{};
   try{st.result=FinCsvCheck.run({rows:st.parsed.rows,txns:TXNS,acct:st.acct,from:st.from,to:st.to,openBal:+a.openBal||0});}catch(err){st.result=null;setTimeout(()=>{const m=$('cc_msg');if(m)m.textContent=err.message;},0);}
+  // A CSV with a balance column that matched to the cent counts as checked up to its last day, like a statement.
+  const r=st.result;if(r&&r.ok&&r.bankClose){try{const cs=load(K_STATEMENTS_CC,{latest:{},history:[]})||{latest:{},history:[]};cs.history=cs.history||[];cs.latest=cs.latest||{};if(!cs.history.some(h=>h.acct===r.acct&&h.date===r.bankClose.date&&h.ok)){const rec={acct:r.acct,date:r.bankClose.date,closing:r.bankClose.balance,app:r.appClose,difference:0,ok:true,via:'csv',at:new Date().toISOString()};cs.history.unshift(rec);cs.history=cs.history.slice(0,60);cs.latest[r.acct]=rec;saveAtomic({[K_STATEMENTS_CC]:cs}).catch(()=>{});}}catch(_){}}
  }
  function set(k,v){
   if(k==='acct'){st={acct:v,from:st.from,to:st.to,parsed:null,file:'',result:null,datesTouched:st.datesTouched,back:st.back};}
@@ -132,5 +189,5 @@
   try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
   toastMsg('Removed '+pick.length+' ✓');compute();paint();try{render();}catch(_){}
  }
- Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckAdd:add,csvCheckRemove:remove});
+ Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckAdd:add,csvCheckRemove:remove,csvCheckUseSuggested:useSuggested,csvWhereShort:whereShort,csvWhereHtml:whereHtml});
 })();

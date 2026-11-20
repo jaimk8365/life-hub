@@ -3,6 +3,7 @@
 // Nothing here deletes data or moves money.
 import * as QW from './questworld.mjs';
 import * as Day from '../plan/core.mjs';
+import * as Stacks from '../plan/stacks.mjs';
 
 const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -38,7 +39,7 @@ let foldOpen = false;
 function ensureLook() {
   const doc = globalThis.document; if (!doc || !doc.head || doc.getElementById('pp-shared-css')) return;
   const st = doc.createElement('style'); st.id = 'pp-shared-css';
-  st.textContent = Day.SHARED_CSS + HABIT_CSS + SORTED_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
+  st.textContent = Day.SHARED_CSS + HABIT_CSS + SORTED_CSS + RT_CSS + '.tg-fold{margin-top:6px}.tg-fold>summary{cursor:pointer;font-weight:800;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.08);list-style:none;margin-bottom:12px}.tg-myday h3{margin-bottom:10px}.tg-myday .pp-li b{font-size:15px}';
   doc.head.appendChild(st);
   doc.addEventListener('toggle', e => { if (e.target?.classList?.contains('tg-fold')) foldOpen = e.target.open; }, true);
   if (globalThis.window) Day.startCountdowns(doc, globalThis.window);
@@ -53,9 +54,20 @@ export function nowStrip(ctx) {
   publishAhead(ctx.events, ctx.today);
   ensureLook();
   const items = dayOf(ctx); if (!items.length) return '';
-  const now = ctx.nowMin ?? clockMin();
-  return Day.nowNextHtml(Day.nowNext(items, now), { esc: ctx.esc, nowMin: now, at: ctx.at ?? Date.now(), tickable: true });
+  const now = ctx.nowMin ?? clockMin(), nn = Day.nowNext(items, now);
+  return Day.nowNextHtml(nn, { esc: ctx.esc, nowMin: now, at: ctx.at ?? Date.now(), tickable: true }) + routineHtml(nn.current, ctx);
 }
+/* The block happening now, as a checklist: its steps, then habits stacked after it. Ticks are for today only. */
+const K_STEPS = 'plan_steps_v1';
+export function routineHtml(current, ctx) {
+  if (!current || current.kind !== 'block') return '';
+  const esc = ctx.esc, p = ctx.planner || { blocks: readLS('plan_blocks', []) }, block = (Array.isArray(p.blocks) ? p.blocks : []).find(b => b && b.id === current.id); if (!block) return '';
+  const hs = ctx.habits || readLS(K_HABITS, { habits: [], log: {} }), list = Stacks.checklist(block, { habits: hs.habits || [], habitLog: hs.log || {}, steps: ctx.steps || readLS(K_STEPS, {}), iso: ctx.today });
+  const link = `<button type="button" class="tg-rtlink" data-action="rt-edit" data-id="${esc(block.id)}">${list.total ? '✏️ Change steps or stack' : '🪜 Give it steps · stack a habit'}</button>`;
+  if (!list.total) return `<div class="tg-rt tg-rt-empty">${link}</div>`;
+  return `<section class="tg-rt" aria-label="${esc(block.title)} checklist"><div class="tg-rth"><b>${list.done} of ${list.total} done</b>${link}</div>${list.items.map(it => `<button type="button" class="tg-rtrow${it.done ? ' on' : ''}" ${it.kind === 'habit' ? `data-action="habit-tick" data-id="${esc(it.id)}"` : `data-action="rt-tick" data-id="${esc(block.id)}" data-i="${it.i}"`} aria-pressed="${it.done}"><span class="tg-rtbox" aria-hidden="true">${it.done ? '✓' : ''}</span><span>${esc(it.title)}${it.kind === 'habit' ? ' <small>habit</small>' : ''}</span></button>`).join('')}</section>`;
+}
+const RT_CSS = '.tg-rt{background:#fff;border:1px solid #E8DFF0;border-radius:18px;padding:10px 12px;margin:-6px 0 14px}.tg-rt-empty{background:none;border:0;padding:0;margin:-8px 0 12px}.tg-rth{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}.tg-rtlink{all:unset;cursor:pointer;font-weight:800;font-size:13px;color:#5B3FC4;padding:6px 0}.tg-rtrow{all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;width:100%;box-sizing:border-box;padding:9px 4px;border-top:1px solid rgba(0,0,0,.06);font-weight:700}.tg-rtrow:first-of-type{border-top:0}.tg-rtrow small{color:#675D70;font-weight:700}.tg-rtbox{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;border:2px solid #D9C9FA;font-weight:800;flex:none}.tg-rtrow.on .tg-rtbox{background:#2EC4B6;border-color:#2EC4B6;color:#fff}.tg-rtrow.on>span:last-child{text-decoration:line-through;opacity:.6}';
 export const foldAttr = () => (foldOpen ? 'open' : '');
 
 /* ---------- habits: up to five, one tap, seven dots. No streak that resets to zero. ---------- */
@@ -151,9 +163,55 @@ export function maybeRefresh(rerender, { ls = globalThis.localStorage, fetchFn =
   QW.refresh({ ls, fetchFn: (...a) => fetchFn(...a), today }).then(() => { refreshing = false; rerender(); }, () => { refreshing = false; });
 }
 
+/* Under the steps on Now: is this one step, the usual steps, or your own? Saved on the task. */
+export function stepChoice(task, steps, esc) {
+  if (!task || !task.id) return '';
+  const id = esc(task.id), mine = Array.isArray(task.recipeSteps) && task.recipeSteps.length;
+  const current = (steps || []).map(st => st.title).join('\n');
+  return `<div class="cp-stepx">${task.oneStep
+    ? `<button type="button" data-action="step-many" data-id="${id}">🪜 Break it into steps</button>`
+    : `<button type="button" data-action="step-one" data-id="${id}">☝️ It's just one step</button>`}
+    ${mine && !task.oneStep ? `<button type="button" data-action="step-reset" data-id="${id}">↩︎ Usual steps</button>` : ''}
+    <details><summary>✏️ My own steps</summary><textarea id="cp-steps-${id}" aria-label="One step per line">${esc(task.oneStep ? '' : current)}</textarea><button type="button" data-action="step-save" data-id="${id}">Save my steps</button></details></div>`;
+}
+/* Planner → Routines, on this routine. */
+function openRoutines(id) {
+  try { globalThis.sessionStorage.setItem('plan_goto_routines', id || '1'); } catch { /* fine */ }
+  const p = globalThis.parent;
+  try { if (p && p !== globalThis && typeof p.show === 'function') { p.show('plan'); const w = p.document.getElementById('f-plan')?.contentWindow; if (w && typeof w.ppRoutines === 'function') w.ppRoutines(id); return; } } catch { /* opened outside Life Hub */ }
+  globalThis.location.href = '../plan/';
+}
+/* The cards beside Now open the place they are about. Inside Life Hub that is a section; on its own, a Co-Pilot page. */
+function hubGo(where) {
+  const p = globalThis.parent;
+  try {
+    if (p && p !== globalThis) {
+      if (where.startsWith('cp:') && typeof p.showCopilot === 'function') { p.showCopilot(where.slice(3)); return; }
+      if (typeof p.show === 'function') { p.show(where); return; }
+    }
+  } catch { /* fall through */ }
+  if (where.startsWith('cp:')) globalThis.location.hash = where.slice(3);
+}
+
 export function act(action, button, ctx, fx) {
   const doc = globalThis.document, ls = globalThis.localStorage;
   if (action === 'today-open') { fx.openSection(button.dataset.section); return true; }
+  if (action === 'hub-go') { hubGo(button.dataset.hub || 'cp:today'); return true; }
+  if (action === 'rt-tick') { try { ls.setItem(K_STEPS, JSON.stringify(Stacks.stepToggle(readLS(K_STEPS, {}), ctx.today, button.dataset.id, +button.dataset.i))); } catch { fx.toast('Could not save that tick.'); } fx.render(); return true; }
+  if (action === 'rt-edit') { openRoutines(button.dataset.id); return true; }
+  if (['step-one', 'step-many', 'step-save', 'step-reset'].includes(action)) {
+    // the saved steps list (task.steps) wins over the choice, so it is cleared and made again from the choice
+    const task = fx.findTask && fx.findTask(button.dataset.id); if (!task || !fx.saveTask) return true;
+    if (action === 'step-one') { fx.saveTask({ ...task, oneStep: true, steps: [], stepIndex: 0 }); fx.toast('One step it is ✓'); }
+    else if (action === 'step-many') { fx.saveTask({ ...task, oneStep: false, steps: [], stepIndex: 0 }); }
+    else if (action === 'step-reset') { const next = { ...task, oneStep: false, steps: [], stepIndex: 0 }; delete next.recipeSteps; fx.saveTask(next); }
+    else {
+      const lines = String(doc.getElementById('cp-steps-' + task.id)?.value || '').split(/\n+/).map(x => x.trim()).filter(Boolean).slice(0, 10);
+      if (!lines.length) { fx.toast('Type one step per line.'); return true; }
+      fx.saveTask({ ...task, oneStep: false, recipeSteps: lines, steps: [], stepIndex: 0 }); fx.toast('Steps saved ✓');
+    }
+    fx.render(); return true;
+  }
   if (action === 'habit-tick' || action === 'habit-remove' || action === 'habit-add') {
     try {
       let st = readLS(K_HABITS, { habits: [], log: {} });

@@ -69,7 +69,7 @@ test('the week spread: words you can read, list tasks and routines counted, your
 
 test('the Planner page: Lists tab, spread and day extras are wired in, and nothing is thrown away', () => {
   const plus = read('plan/plus.mjs'), pages = read('plan/pages.mjs');
-  for (const bit of ["import * as P from './pages.mjs';", 'P.installTab();', 'P.spreadHtml(start)', 'P.dayExtras()', 'P.drawLists()', 'if (P.onClick(e)) return;', 'P.sync();']) assert.ok(plus.includes(bit), bit);
+  for (const bit of ["import * as P from './pages.mjs';", 'P.installTab();', 'P.spreadHtml(start)', 'P.dayExtras()', 'P.drawLists()', 'if (P.onClick(e))', 'P.sync();']) assert.ok(plus.includes(bit), bit);
   for (const bit of ["'home_tasks'", "'home_log'", 'data-pg-tick', 'data-pg-now', 'data-pg-stick', 'choreRef: id', 'data-pp-day']) assert.ok(pages.includes(bit), bit);
   assert.ok(!/localStorage\.(clear|removeItem)|removeChild/.test(pages));
   const sw = read('sw.js'); for (const f of ['./plan/chores.mjs', './plan/pages.mjs']) assert.ok(sw.includes(`'${f}'`), f);

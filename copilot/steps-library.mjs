@@ -33,6 +33,8 @@ export const STEPS_LIBRARY = [
 ];
 
 export function stepsFor(task, library = STEPS_LIBRARY) {
+  // Some things are just one thing (Luna's flea, tick & wormer). You choose on the Now screen.
+  if (task?.oneStep) return [{ id: 'step-1', title: String(task.title || 'Do it'), done: false }];
   if (Array.isArray(task?.recipeSteps) && task.recipeSteps.length) {
     return task.recipeSteps.map((title, index) => ({ id: `step-${index + 1}`, title: String(title), done: false }));
   }
