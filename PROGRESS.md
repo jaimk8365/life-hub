@@ -4,6 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 21/11 10:50pm: Check all my accounts: ask once per file, clearer saved files (PUSHED 21/11)
+- Jaimi's screenshot: it asked "Which account is Transactions-2.csv?" although Savings already had that file, and she didn't know why it asked her to "Forget".
+- finance/csv-check.js: matchAccount(parsed, accts, files) also recognises a file by a saved file's account number, or when every line is already in one account's saved file, so she is asked once. Saved files card: "Bank files saved", one-line why, "Remove file" (was Forget, with a clearer confirm), and "⚠️ Starts too late. The app has payments from X" when a file starts more than a week after the app's first payment in that account.
+- Proof: 731 passed (new test). Preview: picked Bills once, same file again was not asked; late-start warning shows. sw lifehub-v118.
+
 ### 21/11 10:10pm: Start the books on 1 Jul 2025 (PUSHED 21/11)
 - Jaimi: only keep from the start of the year and delete anything before. Asked: 1 Jul 2025 (start of the financial year, so the tax year stays whole) and delete for good (not archive).
 - finance/fix-numbers.js: FinFix.booksStartPlan (pure) + 📅 Start the books screen (fixBooksOpen / fixBooksApply), first guide step while anything older exists, and in More tools. Deletes every row before 1 Jul 2025 (incl. old removed rows and balancing lines); each account's openBal = its own balance at end 30 Jun 2025 from real payments (openDate 2025-06-30, openBalWas kept, openBalFrom 'books-start'), so no balance changes. Downloads finance-before-2025-07-01.json first; one saveAtomic for fin_txns + fin_accounts + fin_books_start_v1 (new key). Sync tombstones the removed ids.

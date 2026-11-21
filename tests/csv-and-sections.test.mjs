@@ -371,3 +371,16 @@ test('start the books on 1 Jul 2025: older payments deleted for good, every bala
   const s = F.guideSteps({ all: [], accounts: [] }, { booksDue: 12, fresh: [{ id: 'b', name: 'B', count: 1, amount: 1 }] });
   assert.deepEqual(s.map(x => x.id), ['books', 'fresh']);
 });
+
+test('a bank file you already put in an account is recognised next time; the saved-files list says what Remove does', () => {
+  const accts = [{ id: 'goals', name: 'Savings', num: '3269' }, { id: 'bills', name: 'Bills', num: '8232' }];
+  const rows = [{ date: '2025-08-18', amount: 10, note: 'Interest', balance: 100 }, { date: '2025-09-01', amount: 5, note: 'Tfr', balance: 105 }];
+  const saved = { goals: { rows, accountNumber: '061234 5555', min: '2025-08-18', max: '2025-09-01' } };
+  assert.equal(Csv.matchAccount({ accountNumber: '0612345555', rows }, accts), null, 'the number is not on any account');
+  assert.equal(Csv.matchAccount({ accountNumber: '0612345555', rows: rows.slice(1) }, accts, saved), 'goals', 'same number as a file already in Savings');
+  assert.equal(Csv.matchAccount({ accountNumber: '', rows }, accts, saved), 'goals', 'no number, but every line is already in Savings\' file');
+  assert.equal(Csv.matchAccount({ accountNumber: '', rows: [{ date: '2026-01-01', amount: 1, note: 'x' }] }, accts, saved), null);
+  assert.equal(Csv.matchAccount({ accountNumber: '9998232', rows }, accts, saved), 'bills', 'the account number still wins');
+  const c = read('finance/csv-check.js');
+  for (const x of ['Remove file', 'Kept so you never upload them twice', 'Starts too late', 'Pick it once and the app remembers', 'matchAccount(parsed,ACCTS.filter(a=>!a.hidden),mt.files)']) assert.ok(c.includes(x), x);
+});

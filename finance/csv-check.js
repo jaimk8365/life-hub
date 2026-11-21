@@ -144,10 +144,17 @@
   return out;
  }
  /* Which of your accounts a bank file belongs to, from the account number in the file (last digits match). */
- function matchAccount(parsed,accts){
-  const num=String((parsed&&parsed.accountNumber)||'').replace(/\D/g,'');if(!num)return null;
-  const hits=(accts||[]).filter(a=>{const d=String(a.num||'').replace(/\D/g,'');return d.length>=3&&num.endsWith(d);});
-  return hits.length===1?hits[0].id:null;
+ /* Which account a bank file belongs to: by the account's number; else by a file you already put in an account
+    (same account number in it, or every line already in that file), so you are only ever asked once. */
+ function matchAccount(parsed,accts,files){
+  const num=String((parsed&&parsed.accountNumber)||'').replace(/\D/g,''),ids=new Set((accts||[]).map(a=>a.id));
+  if(num){const hits=(accts||[]).filter(a=>{const d=String(a.num||'').replace(/\D/g,'');return d.length>=3&&num.endsWith(d);});if(hits.length===1)return hits[0].id;}
+  const saved=Object.entries(files||{}).filter(([id,f])=>ids.has(id)&&f&&Array.isArray(f.rows));
+  if(num){const same=saved.filter(([,f])=>String(f.accountNumber||'').replace(/\D/g,'')===num);if(same.length===1)return same[0][0];}
+  const rows=(parsed&&parsed.rows)||[];if(!rows.length)return null;
+  const key=r=>[r.date,cents(r.amount),String(r.note||'').trim(),r.balance==null?'':cents(r.balance)].join('|');
+  const inside=saved.filter(([,f])=>{const have=new Set(f.rows.map(key));return rows.every(r=>have.has(key(r)));});
+  return inside.length===1?inside[0][0]:null;
  }
  /* Keep a bank file for an account: a new export that overlaps (or follows on from) the saved one is joined to it,
     otherwise it replaces it, so there is never a hole in the middle of the dates. */
@@ -457,7 +464,7 @@
   for(const f of list){
    try{
     if(f.size>2000000)throw Error('is over 2 MB. Export a shorter period.');
-    const parsed=readCsv(await f.text()),acct=FinCsvCheck.matchAccount(parsed,ACCTS.filter(a=>!a.hidden));
+    const parsed=readCsv(await f.text()),acct=FinCsvCheck.matchAccount(parsed,ACCTS.filter(a=>!a.hidden),mt.files);
     if(acct)mt.files[acct]=FinCsvCheck.mergeFile(mt.files[acct],parsed,f.name,at);else mt.loose.push({name:f.name,parsed});
    }catch(err){mt.errs.push(f.name+': '+String(err.message||'could not be read').replace(/^This CSV /,''));}
   }
@@ -470,7 +477,7 @@
   mt.results=null;mt.processed=false;await keepFiles();multiPaint();
  }
  async function multiForget(acct){
-  if(!confirm('Forget the bank file for '+((acctById(acct)||{}).name||acct)+'? Your payments are not changed.'))return;
+  if(!confirm('Remove the saved bank file for '+((acctById(acct)||{}).name||acct)+'?\n\nOnly do this if it is the wrong file. Your payments are not changed.'))return;
   delete mt.files[acct];mt.results=null;mt.processed=false;await keepFiles();multiPaint();
  }
  function saveCheck(r){
@@ -504,8 +511,10 @@
    +'<p>Download a CSV for each account from your bank app (any dates, the longer the better). Choose them <b>all at once</b>. Each file finds its own account, and every account is checked against the others.</p>'
    +'<label class="btn dark cc-file" style="margin-top:8px;display:block;text-align:center;cursor:pointer;padding:14px">📄 Choose bank CSVs (pick several)<input type="file" accept=".csv,text/csv" multiple id="cc_files" style="display:none" onchange="csvMultiFiles(this)"></label>';
   if(mt.errs.length)h+='<div class="tr-card tr-bad" role="alert" style="margin-top:10px"><div class="tr-h">⚠️ Some files could not be used</div>'+mt.errs.map(x=>'<p class="fx-small" style="margin:4px 0">'+e(x)+'</p>').join('')+'</div>';
-  mt.loose.forEach((f,i)=>{h+='<div class="tr-card" style="margin-top:10px"><div class="tr-h">❓ Which account is '+e(f.name)+'?</div><p class="fx-small">'+f.parsed.rows.length+' payments · '+e(shortD(f.parsed.min))+' – '+e(shortD(f.parsed.max))+'. The file has no account number the app knows.</p><select class="cc-sel" onchange="csvMultiAssign('+i+',this.value)"><option value="">Choose the account…</option>'+accts.map(a=>'<option value="'+e(a.id)+'">'+e(a.name)+'</option>').join('')+'</select></div>';});
-  if(have.length)h+='<div class="cc-g"><h3>Bank files ('+have.length+')</h3>'+have.map(a=>{const f=mt.files[a.id];return '<div class="cc-frow"><span>'+e((a.emoji||'🏦')+' '+a.name)+'<small>'+e(f.name)+' · '+f.rows.length+' lines · '+e(shortD(f.min))+' – '+e(shortD(f.max))+'</small></span><button type="button" class="cc-ed" onclick="csvMultiForget(\''+e(a.id)+'\')">Forget</button></div>';}).join('')
+  mt.loose.forEach((f,i)=>{h+='<div class="tr-card" style="margin-top:10px"><div class="tr-h">❓ Which account is '+e(f.name)+'?</div><p class="fx-small">'+f.parsed.rows.length+' payments · '+e(shortD(f.parsed.min))+' – '+e(shortD(f.parsed.max))+'. The app can\'t tell which account it is. Pick it once and the app remembers.</p><select class="cc-sel" onchange="csvMultiAssign('+i+',this.value)"><option value="">Choose the account…</option>'+accts.map(a=>'<option value="'+e(a.id)+'">'+e(a.name)+'</option>').join('')+'</select></div>';});
+  // the app's first payment in each account: a saved file that starts later cannot check the payments before it
+  const firstPay=id=>TXNS.filter(t=>!t.deleted&&t.acct===id&&t.src!=='balance-adjustment'&&!t.startFresh&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'')).reduce((m,t)=>!m||t.date<m?t.date:m,null);
+  if(have.length)h+='<div class="cc-g"><h3>Bank files saved ('+have.length+')</h3><p class="fx-small">Kept so you never upload them twice. A newer file for the same account joins on. Remove one only if it is the wrong file.</p>'+have.map(a=>{const f=mt.files[a.id],fp=firstPay(a.id),short=fp&&fp<f.min&&Date.parse(f.min)-Date.parse(fp)>7*864e5;return '<div class="cc-frow"><span>'+e((a.emoji||'🏦')+' '+a.name)+'<small>'+e(shortD(f.min))+' – '+e(shortD(f.max))+' · '+f.rows.length+' lines</small>'+(short?'<small style="color:#9A4B12;opacity:1;font-weight:700">⚠️ Starts too late. The app has payments from '+e(shortD(fp))+'. Add a file from then.</small>':'')+'</span><button type="button" class="cc-ed" style="font-weight:600;opacity:.8" onclick="csvMultiForget(\''+e(a.id)+'\')">Remove file</button></div>';}).join('')
    +(missing.length?'<p class="fx-small" style="margin-top:8px">Not added yet: '+missing.map(a=>e(a.name)).join(', ')+'. Adding them helps find payments in the wrong account.</p>':'')+'</div>';
   if(have.length)h+='<button class="btn dark cc-process" id="cc_process" style="margin-top:6px;display:block;width:100%;font-size:1.05em;padding:14px" onclick="csvMultiProcess()">'+(mt.processed?'🔁 Check again':'▶ Check all '+have.length+' account'+(have.length===1?'':'s'))+'</button>';
   h+='<div id="cc_result"></div>';
