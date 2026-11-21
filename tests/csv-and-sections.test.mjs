@@ -274,3 +274,54 @@ test('funds: Health insurance extras (instead of an extras premium) and Braces, 
   for (const x of ["'Health insurance extras'", "name:'Braces'", 'isExtrasPremium', 'oldBill.active=false', "KEY='fin_funds_v4_extras_braces'"]) assert.ok(f.includes(x), x);
   assert.match(read('src/finance.html'), /finance\/fund-updates\.js\?v=20261121/);
 });
+
+test('no balancing lines: a "Start fresh" line is never matched or called "not in the bank"; the gap is found in real payments', () => {
+  const rows = [
+    { date: '2026-03-23', amount: -50, note: 'Power', balance: 600 },
+    { date: '2026-04-01', amount: 100, note: 'Pay', balance: 700 },
+  ];
+  const real = [
+    { id: 'p0', acct: 'bills', date: '2026-01-10', amount: 40, note: 'Older payment, before the file' },
+    { id: 'p1', acct: 'bills', date: '2026-03-23', amount: -50, note: 'Power' },
+    { id: 'p2', acct: 'bills', date: '2026-04-01', amount: 100, note: 'Pay' },
+  ];
+  const fresh = { id: 'sf', acct: 'bills', date: '2026-04-01', amount: 900, note: 'Start fresh: matched to bank balance', src: 'balance-adjustment', startFresh: true };
+  let r = Csv.run({ rows, txns: [...real, fresh], acct: 'bills', from: '2026-03-01', to: '2026-04-30', openBal: 0 });
+  assert.equal(r.onlyApp.length, 0, 'the balancing line is not listed as "in the app, not in the bank"');
+  assert.deepEqual(r.fresh.map(t => t.id), ['sf'], 'it is listed on its own, to remove');
+  assert.equal(r.appClose, 990, 'the app balance on screen still includes it');
+  assert.equal(r.realClose, 90, 'without it, only real payments');
+  assert.equal(r.realDiff, 610, 'the true difference');
+  assert.equal(r.ok, false, 'never "matches the bank" while a balancing line is there');
+  assert.equal(r.first, '2026-01-10');
+  assert.equal(r.openFix, null, 'the app has payments older than the file, so no opening-balance shortcut: older file needed');
+  assert.equal(r.wholeHistory, false);
+  // with a file that covers the account's whole history and every payment matching, only the opening balance can be wrong
+  const r2 = Csv.run({ rows, txns: real.slice(1), acct: 'bills', from: '2026-03-01', to: '2026-04-30', openBal: 0 });
+  assert.equal(r2.wholeHistory, true);
+  assert.deepEqual(r2.openFix, { was: 0, to: 650, date: '2026-03-22' }, 'the bank balance before the first row: 600 + 50');
+  assert.equal(r2.ok, false);
+  const r3 = Csv.run({ rows, txns: real.slice(1), acct: 'bills', from: '2026-03-01', to: '2026-04-30', openBal: 650 });
+  assert.equal(r3.ok, true, 'with the right opening balance it matches, no extra line');
+  assert.equal(r3.openFix, null);
+  // the screens: Remove balancing lines, set opening balance, never offer a new Start fresh line
+  const c = read('finance/csv-check.js'), f = read('finance/fix-numbers.js');
+  for (const x of ["grp('fresh'", 'csvSetOpen:setOpen', 'saveAtomic({[K_ACCTS]:ACCTS})', 'Balancing line removed (not a real payment)', '.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;color:#15384D']) assert.ok(c.includes(x), x);
+  assert.ok(!c.includes('use Start fresh'), 'the CSV check no longer suggests Start fresh');
+  assert.ok(!f.includes('Start fresh: match \'+esc(a.name)+\' to the bank'), 'the account screen no longer offers a Start fresh line');
+  assert.ok(!f.includes('onclick="fixGuideFresh('), 'the guide no longer adds a balancing line');
+  assert.ok(f.includes('window.fixRemoveFresh=fixRemoveFresh'));
+});
+
+test('Fix my numbers: balancing lines are removed first, and an old difference means older bank files, not a line', () => {
+  const F = require('../finance/fix-numbers.js');
+  const acct = (id, ok) => ({ id, name: id, checks: [{ key: 'fresh', tone: 'good' }, ok ? { key: 'match', tone: 'good' } : { key: 'match', tone: 'bad', amount: 403.67, fix: 'match' }] });
+  const r = { all: [], accounts: [acct('bills', false), acct('everyday', true)] };
+  let s = F.guideSteps(r, { csvLast: { bills: { clean: true } }, fresh: [{ id: 'everyday', name: 'Everyday', count: 1, amount: 12 }] });
+  assert.deepEqual(s.map(x => x.id), ['fresh', 'settle']);
+  assert.equal(s[1].title, 'Find the older payments');
+  assert.equal(s[1].act, "csvMultiOpen('fix')");
+  assert.ok(!/labelled line/.test(s[1].why));
+  s = F.guideSteps({ all: [{ key: 'feed', tone: 'warn' }], accounts: [] }, { fresh: [{ id: 'a', name: 'A', count: 2, amount: 5 }] });
+  assert.deepEqual(s.map(x => x.id), ['sync', 'fresh'], 'fresh bank balances first, then remove the lines');
+});

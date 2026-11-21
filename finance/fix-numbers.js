@@ -155,8 +155,13 @@
   if(+o.check)steps.push({id:'sortcheck',icon:'✨',title:'Check what the app sorted for you',why:o.check+(o.check===1?' payment it was':' payments it was')+' not sure about.',btn:'✨ Check them',act:'sortCheckOpen()'});
   if(+o.misc)steps.push({id:'misc',icon:'🗂️',title:'Sort out Miscellaneous',why:o.misc+(o.misc===1?' payment has':' payments have')+' no category yet, so budgets cannot see them.',btn:'🗂️ Sort them',act:'fixMiscOpen()'});
   const settle=off.filter(a=>a.clean);
-  if(settle.length)steps.push({id:'settle',icon:'🤝',title:'Settle the old difference',why:'Every payment in your bank files matches. What is left is older than the files (usually from before the bank feed started). One labelled line makes the app match the bank. It never counts as spending.',accounts:settle});
-  return steps;
+  // never a balancing line: the difference is real payments older than the files, found with older bank files
+  if(settle.length)steps.push({id:'settle',icon:'🔎',title:'Find the older payments',why:'Every payment in your bank files matches. What is left is from before your files start. Download bank CSVs that go back to when each account starts in the app, and add them. The check then finds the exact payments.',btn:'📚 Add older bank files',act:"csvMultiOpen('fix')",accounts:settle});
+  // balancing lines added before are not real payments: they hide the true difference, so they go first
+  const fresh=(o.fresh||[]).filter(a=>a.count);
+  if(!fresh.length)return steps;
+  const step={id:'fresh',icon:'🧾',title:'Remove the balancing lines',why:'These were added just to make the app agree with the bank. They are not real payments, so they hide what is really different. Remove them, then the real payments show the true difference.',accounts:fresh};
+  return steps[0]&&steps[0].id==='sync'?[steps[0],step].concat(steps.slice(1)):[step].concat(steps);
  }
  return {guideSteps,shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money,balanceOn,statementCheck,trustReport};
 });
@@ -285,7 +290,8 @@ window.trustStatementSave=trustStatementSave;window.trustCsvOpen=trustCsvOpen;wi
 const K_CSV_LAST='fin_csv_last_v1';
 function guideNow(){
  const r=trustData(),h=fixHome()||{misc:0,check:0};
- return {r,steps:FinFix.guideSteps(r,{csvLast:load(K_CSV_LAST,{}),misc:h.misc,check:h.check})};
+ const fresh=(typeof ACCTS!=='undefined'?ACCTS:[]).map(a=>{const l=TXNS.filter(t=>!t.deleted&&t.acct===a.id&&(t.startFresh||t.src==='balance-adjustment'));return {id:a.id,name:a.name,count:l.length,amount:l.reduce((s,t)=>s+(+t.amount||0),0)};}).filter(a=>a.count);
+ return {r,steps:FinFix.guideSteps(r,{csvLast:load(K_CSV_LAST,{}),misc:h.misc,check:h.check,fresh})};
 }
 window.fixGuideNext=function(){try{const g=guideNow();return g.steps[0]?g.steps[0].title:null;}catch(e){return null;}};
 function fixOpen(){
@@ -305,7 +311,8 @@ function fixOpen(){
   html+='<div class="fg-bar" aria-hidden="true">'+steps.map((x,k)=>'<i class="'+(k===0?'on':'')+'"></i>').join('')+'</div>';
   html+='<div class="fg-step"><div class="fg-n">NEXT STEP'+(total>1?' · 1 OF '+total:'')+'</div><h3>'+cur.icon+' '+esc(cur.title)+'</h3><p>'+esc(cur.why)+'</p>';
   if(cur.id==='check')html+=cur.accounts.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'</span><small>'+(a.amount?'off by '+FinFix.money(Math.abs(a.amount)):'possible double-ups')+'</small></div>').join('')+'<div style="height:10px"></div>';
-  if(cur.id==='settle')html+=cur.accounts.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'<small style="display:block">off by '+FinFix.money(Math.abs(a.amount))+'</small></span><button class="btn dark" style="width:auto;padding:10px 14px" onclick="fixGuideFresh(\''+esc(a.id)+'\')">Match to the bank</button></div>').join('');
+  if(cur.id==='settle')html+=cur.accounts.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'</span><small>off by '+FinFix.money(Math.abs(a.amount))+'</small></div>').join('')+'<div style="height:10px"></div>';
+  if(cur.id==='fresh')html+=cur.accounts.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'<small style="display:block">'+a.count+' line'+(a.count===1?'':'s')+' · '+FinFix.money(a.amount)+'</small></span><button class="btn dark" style="width:auto;padding:10px 14px" onclick="fixRemoveFresh(\''+esc(a.id)+'\')">🗑 Remove</button></div>').join('');
   if(cur.btn)html+='<button class="btn dark fg-big" onclick="'+cur.act+'">'+esc(cur.btn)+'</button>';
   html+='</div>';
   if(total>1)html+='<div class="fg-then"><b>Then</b>'+steps.slice(1).map(x=>'<div>'+x.icon+' '+esc(x.title)+'</div>').join('')+'</div>';
@@ -327,6 +334,16 @@ async function fixGuideFresh(id){
  toastMsg(a.name+' now matches the bank ✓');try{render();}catch(e){}fixOpen();
 }
 window.fixGuideFresh=fixGuideFresh;
+/* Remove every balancing line in an account (they can be brought back from the account), then back to the guide. */
+async function fixRemoveFresh(id){
+ const a=acctById(id),l=TXNS.filter(t=>!t.deleted&&t.acct===id&&(t.startFresh||t.src==='balance-adjustment'));if(!a||!l.length){fixOpen();return;}
+ if(!confirm('Remove '+l.length+' balancing line'+(l.length===1?'':'s')+' from '+a.name+'?\n\nThey are not real payments. The app will then show the true difference from the bank. They can be brought back from the account.'))return;
+ const now=fixNow(),before=l.map(t=>({...t}));
+ l.forEach(t=>Object.assign(t,{deleted:true,deletedAt:now,deletedReason:'Balancing line removed (not a real payment)'}));
+ try{await fixSaveTxns();}catch(e){l.forEach((t,i)=>{Object.keys(t).forEach(k=>delete t[k]);Object.assign(t,before[i]);});toastMsg('Could not save. Nothing changed.');return;}
+ toastMsg('Balancing lines removed from '+a.name+' ✓');try{render();}catch(e){}fixOpen();
+}
+window.fixRemoveFresh=fixRemoveFresh;
 window.fixOpen=fixOpen;
 
 /* Screen 2: Miscellaneous, grouped by shop. */
@@ -449,8 +466,8 @@ function fixAcctOpen(id){
  if(dups.length)html+='<h3>Possible double-ups ('+dups.length+')</h3><p class="fx-small">Same day and same amount, once from the bank feed and once added another way. Removing the extra copy can be undone.</p>'+dups.slice(0,30).map(p=>'<div class="fx-pair">'+line(p.keep)+line(p.extra)+'<button class="btn ghost" onclick="fixRemoveExtra(\''+esc(id)+'\',\''+esc(p.extra.id)+'\')">Remove the extra copy</button></div>').join('');
  if(lonely.length)html+='<details class="fx-group"><summary><span class="fx-shop">Transfers with no other side ('+lonely.length+')</span></summary><p class="fx-small">Money moved in or out here, but none of your other accounts has the matching record. Often the other account is not in the app, or its history starts later.</p><div class="fx-rows">'+lonely.slice(0,40).map(line).join('')+'</div></details>';
  html+='<details class="fx-group"><summary><span class="fx-shop">Where the history starts</span></summary><p>'+(first?'The first transaction in the app is '+esc(fixDay(first))+'. ':'')+((+a.openBal||0)!==0?'The starting balance was set to '+FinFix.money(a.openBal)+(a.openDate?' on '+esc(fixDay(a.openDate)):'')+'.':'No starting balance was ever set, so the app counts from $0.')+'</p></details>';
- if(g&&Math.abs(g.difference)>=.01)html+='<div class="fx-fresh"><h3>Start fresh from my bank balance</h3><p>Use this once the double-ups above are sorted. The app adds one labelled line of <b>'+FinFix.money(g.difference)+'</b> on '+esc(fixDay(g.date))+' so it matches the bank. Your transactions are not changed, and this line never counts as spending or income. From then on, each bank sync keeps it right.</p><button class="btn dark" onclick="fixStartFresh(\''+esc(id)+'\')">Start fresh: match '+esc(a.name)+' to the bank</button></div>';
- if(fresh.length)html+='<div class="fx-note">'+fresh.map(t=>'Started fresh on '+esc(fixDay(t.date))+' with '+FinFix.money(t.amount)+'. <button class="fh-link" onclick="fixUndoFresh(\''+esc(id)+'\',\''+esc(t.id)+'\')">Undo</button>').join('<br>')+'</div>';
+ // no "Start fresh" balancing line any more: the difference is found as real payments with older bank files
+ if(fresh.length)html+='<div class="fx-note">'+fresh.map(t=>'🧾 Balancing line on '+esc(fixDay(t.date))+' of '+FinFix.money(t.amount)+' (not a real payment). <button class="fh-link" onclick="fixUndoFresh(\''+esc(id)+'\',\''+esc(t.id)+'\')">Remove it</button>').join('<br>')+'</div>';
  $('sheet').innerHTML=html;openSheet();
 }
 window.fixAcctOpen=fixAcctOpen;
@@ -461,7 +478,7 @@ async function fixSoftDelete(id,txId,reason,msg){
  toastMsg(msg);if(typeof render==='function')render();fixAcctOpen(id);
 }
 function fixRemoveExtra(id,txId){fixSoftDelete(id,txId,'double-up','Extra copy removed ✓');}
-function fixUndoFresh(id,txId){fixSoftDelete(id,txId,'undo start fresh','Start fresh undone');}
+function fixUndoFresh(id,txId){fixSoftDelete(id,txId,'Balancing line removed (not a real payment)','Balancing line removed ✓');}
 window.fixRemoveExtra=fixRemoveExtra;window.fixUndoFresh=fixUndoFresh;
 async function fixStartFresh(id){
  const a=acctById(id),g=FinFix.gap(a,TXNS),row=FinFix.startFreshRow(a,g,uid(),fixNow());if(!row)return;

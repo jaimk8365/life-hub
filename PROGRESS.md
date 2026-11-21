@@ -4,6 +4,13 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 21/11 9:30pm: No balancing lines; find old differences as real payments (PUSHED 21/11)
+- Jaimi: "I don't want a line to make it balance, that isn't proper book keeping." Her Bills check: 328 of 328 bank payments match (23 Mar to 21 Nov), but a stale Start fresh line (+$1,942.46) made the app $2,176.10 vs bank $637.31.
+- finance/csv-check.js run(): "Start fresh" / balance-adjustment lines are never matched and never listed as "in the app, not in the bank". New: fresh, freshTotal, realClose/realDiff (balance without them), first (first real payment), wholeHistory, openFix, prevDay. ok needs no balancing lines.
+- Screen: 🧾 "Balancing lines, not real payments" group (default Remove, soft delete, reason "Balancing line removed (not a real payment)"). When every payment matches but the balance is out: "🔎 off by $X from before <date> · download a CSV from <first payment> to <day before>". When the file covers the account's whole history and all match: "📒 Set the opening balance to $X" from the bank's own balances (csvSetOpen saves fin_accounts, keeps openBalWas). Drop-down text readable (#15384D).
+- finance/fix-numbers.js: guide step "🧾 Remove the balancing lines" (fixRemoveFresh) goes first; "Settle" now "🔎 Find the older payments" → 📚 Add older bank files. Start fresh card removed from the account screen (old lines show with "Remove it").
+- Proof: 729 passed (2 new tests). Preview: stale line removed, gap message names 10 Jan to 22 Mar; an older file found the missing $403.67 refund → "✅ Bills matches the bank"; wrong opening balance → card → set → matches. sw lifehub-v116.
+
 ### 21/11 8:50pm: FIX "A save needs recovery" loop after the fund update (PUSHED 21/11)
 - Jaimi's screenshot: "A save needs recovery · Finance changed while syncing. Nothing from this sync was applied." + "Change not saved…"; Reload did not help.
 - Cause: the Life Hub device sync (sync.js runSync) commits with expected = every tracked Finance key as read before it went online. Any Finance save in that window (here the new fund-updates.js save ~1.2s after load, and loan sorting from finApplyCatRules) made the commit refuse (correct, nothing written) — but bulk-storage commitRaw then set `failure`, which blocks every later save until the hub page reloads. fund-updates never got saved, so it ran again on every load and caused the same clash: a loop.

@@ -10,6 +10,7 @@
  const r2=n=>Math.round((+n||0)*100)/100;
  const at=d=>Date.parse(d+'T12:00:00Z');
  const gap=(a,b)=>Math.abs(Math.round((at(a)-at(b))/86400000));
+ const addDays=(d,n)=>new Date(at(d)+n*86400000).toISOString().slice(0,10);
  /* The bank's balance at the end of `day`: of that day's rows, the last one is the one no other row follows on from. */
  function closingOn(rows,day){
   const withBal=rows.filter(r=>r.balance!=null&&Number.isFinite(+r.balance)&&r.date<=day);if(!withBal.length)return null;
@@ -28,7 +29,9 @@
   if(from>to)throw Error('Your CSV covers '+span[0]+' to '+span[span.length-1]+'. Pick dates inside those.');
   const bank=rows.filter(r=>r.date>=from&&r.date<=to).map((r,i)=>({...r,i}));
   const live=t=>t&&!t.deleted&&t.acct===acct&&Number.isFinite(+t.amount)&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'');
-  const app=txns.filter(t=>live(t)&&t.date>=from&&t.date<=to);
+  // a "Start fresh" balancing line is not a real payment: it is never matched against the bank, it is listed on its own
+  const isFresh=t=>t.src==='balance-adjustment'||!!t.startFresh;
+  const app=txns.filter(t=>live(t)&&!isFresh(t)&&t.date>=from&&t.date<=to);
   const used=new Set(),matched=[],onlyBank=[];
   // exact day first, then nearest day within 3, so a posting delay never steals another day's exact match
   const pass=(maxGap,list)=>list.filter(r=>{let best=null,bg=99;for(const t of app){if(used.has(t)||cents(t.amount)!==cents(r.amount))continue;const g=gap(t.date,r.date);if(g<=maxGap&&g<bg){best=t;bg=g;if(!g)break;}}if(best){used.add(best);matched.push({row:r,txn:best,days:bg});return false;}return true;});
@@ -42,10 +45,20 @@
   // a payment the bank posted on a different day from the app counts on the bank's day, so a posting delay is not a "difference"
   matched.forEach(m=>{if(m.row.date<=cut&&m.txn.date>cut)appClose+=+m.txn.amount;else if(m.row.date>cut&&m.txn.date<=cut)appClose-=+m.txn.amount;});
   appClose=r2(appClose);
-  const ok=!onlyBank.some(r=>cents(r.amount))&&!onlyApp.length&&(!close||cents(close.balance)===cents(appClose));
+  // balancing lines in this account (any date), and what the balance would be without them
+  const fresh=txns.filter(t=>live(t)&&isFresh(t)),freshTotal=sum(fresh,t=>+t.amount);
+  const realClose=r2(appClose-sum(fresh.filter(t=>t.date<=cut),t=>+t.amount)),realDiff=close?r2(close.balance-realClose):null;
+  const allMatch=!onlyBank.some(r=>cents(r.amount))&&!onlyApp.length;
+  // the file reaches back past the first real payment in the app, so every payment the account has ever had was checked:
+  // whatever is left can only be the account's opening balance, and the bank's own balance column says what it should be
+  const real=txns.filter(t=>live(t)&&!isFresh(t)).map(t=>t.date).sort(),first=real[0]||null;
+  const wholeHistory=!!span.length&&from===span[0]&&!real.some(d=>d<from);
+  const openFix=close&&allMatch&&wholeHistory&&cents(realDiff)?{was:r2(+openBal||0),to:r2((+openBal||0)+realDiff),date:addDays(from,-1)}:null;
+  const ok=allMatch&&!fresh.length&&(!close||cents(close.balance)===cents(appClose));
   return {acct,from,to,asked,clipped,bankCount:bank.length,appCount:app.length,matched,onlyBank,onlyApp,
    missingTotal:sum(onlyBank,r=>+r.amount),extraTotal:sum(onlyApp,t=>+t.amount),bankIn,bankOut,appIn,appOut,
-   bankClose:close,appClose,closeDiff:close?r2(close.balance-appClose):null,ok};
+   bankClose:close,appClose,closeDiff:close?r2(close.balance-appClose):null,
+   fresh,freshTotal,realClose,realDiff,first,wholeHistory,openFix,prevDay:addDays(from,-1),ok};
  }
  /* Where to look: the dates most likely to hold what makes an account not match the bank, each with its reason.
     - a statement or CSV check that matched means everything up to that day is right, so looking starts after it
@@ -209,9 +222,9 @@
   if(r&&st.processed){
    const acct=acctById(r.acct)||{name:r.acct};
    h+=r.ok?'<div class="tr-card tr-good"><div class="tr-h">✅ '+e(acct.name)+' matches the bank</div><p>'+r.matched.length+' payments from '+e(day(r.from))+' to '+e(day(r.to))+' are in both.'+(r.bankClose?' Closing balance '+money(r.bankClose.balance)+' in both.':'')+'</p></div>'
-    :'<div class="tr-card tr-bad"><div class="tr-h">'+(r.onlyBank.some(x=>Math.round(+x.amount*100))||r.onlyApp.length?'⚠️ Not matching yet · see What to do below':'⚠️ The payments match, the balance does not')+'</div><p>'+r.matched.length+' of '+r.bankCount+' bank payments matched, '+e(day(r.from))+' – '+e(day(r.to))+'.</p>'
+    :'<div class="tr-card tr-bad"><div class="tr-h">'+(r.onlyBank.some(x=>Math.round(+x.amount*100))||r.onlyApp.length?'⚠️ Not matching yet · see What to do below':!r.closeDiff&&(r.fresh||[]).length?'⚠️ It only matches because of a balancing line':'⚠️ The payments match, the balance does not')+'</div><p>'+r.matched.length+' of '+r.bankCount+' bank payments matched, '+e(day(r.from))+' – '+e(day(r.to))+'.</p>'
      +(r.bankClose?'<p>Bank balance on '+e(day(r.bankClose.date))+': <b>'+money(r.bankClose.balance)+'</b> · App: <b>'+money(r.appClose)+'</b>'+(r.closeDiff?' · off by '+money(Math.abs(r.closeDiff)):'')+(r.bankClose.unsure?' (several payments that day; check the order)':'')+'</p>':'<p class="fx-small">This CSV has no balance column, so only the payments are compared.</p>')
-     +((!r.onlyBank.length&&!r.onlyApp.length&&r.closeDiff)?'<p class="fx-small">Every payment in these dates matches, so the difference is from before '+e(day(r.from))+'. Pick an earlier From date, or use Start fresh in Match to my bank.</p>':'')+'</div>';
+     +'</div>'+gapHtml(r);
    if(r.clipped)h+='<p class="fx-small" style="margin:10px 0">📅 Your CSV covers <b>'+e(day(r.from))+' to '+e(day(r.to))+'</b>, so only those dates were checked. Payments outside them are not counted as missing.</p>';
    h+='<p class="fx-small" style="margin:10px 0">💰 Money in: bank '+money(r.bankIn)+' · app '+money(r.appIn)+'<br>🛒 Money out: bank '+money(-r.bankOut)+' · app '+money(-r.appOut)+'</p>';
    h+=groupsHtml(r);
@@ -262,7 +275,7 @@
  /* The leftovers in plain groups. Every row has a choice (with a sensible default) and ✏️ Edit, so anything can be
     fixed right here: remove, add, move to the right account, use the bank's date, or change date/amount/description.
     Nothing is saved until "✅ Done: update the app". */
- const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;color:#15384D;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;color:#15384D;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-r{padding:10px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.cc-top small{display:block}.cc-act{display:flex;gap:8px;margin-top:8px;align-items:center}.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;font:inherit;font-size:.92em}.cc-ed{border:0;background:none;color:#3A73A8;font:inherit;font-weight:700;padding:6px;cursor:pointer;white-space:nowrap}.cc-edit{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#FBF4E6}.cc-edit[hidden]{display:none}.cc-edit label{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92em}.cc-edit input{width:62%;padding:7px 8px;border-radius:8px;border:1px solid #E2D6C0;font:inherit}.cc-r.cc-on{background:linear-gradient(90deg,rgba(127,183,155,.12),transparent)}.cc-info{opacity:.8}.cc-ready{margin:12px 0}.cc-ready>summary{cursor:pointer;background:#E6F2EA;color:#15384D;border-radius:14px;padding:12px 14px;font-weight:800;list-style:none}.cc-ready>summary::-webkit-details-marker{display:none}.cc-acct{background:#fff;color:#15384D;border-radius:16px;margin:12px 0;padding:4px 12px}.cc-acct>summary{cursor:pointer;padding:10px 2px;font-weight:800;font-size:1.05em;list-style:none}.cc-acct>summary::-webkit-details-marker{display:none}.cc-acct>summary small{display:block;font-weight:600;opacity:.75;font-size:.85em}.cc-acct .cc-g{background:#FFFCF6}.cc-frow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-frow small{display:block;opacity:.75}.cc-done{position:sticky;bottom:0;background:#FEF6E8;color:#15384D;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
+ const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;color:#15384D;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;color:#15384D;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-r{padding:10px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.cc-top small{display:block}.cc-act{display:flex;gap:8px;margin-top:8px;align-items:center}.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;color:#15384D;font:inherit;font-size:.92em}.cc-sel option{color:#15384D;background:#fff}.cc-gap{background:#FFF7E6;color:#15384D;border:1px solid #F0D9A8;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-gap p{margin:6px 0}.cc-gap .btn{display:block;width:100%;margin-top:8px}.cc-g .fx-small,.cc-gap .fx-small,.cc-todo .fx-small{color:#3D5A6B}.cc-ed{border:0;background:none;color:#3A73A8;font:inherit;font-weight:700;padding:6px;cursor:pointer;white-space:nowrap}.cc-edit{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#FBF4E6}.cc-edit[hidden]{display:none}.cc-edit label{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92em}.cc-edit input{width:62%;padding:7px 8px;border-radius:8px;border:1px solid #E2D6C0;font:inherit}.cc-r.cc-on{background:linear-gradient(90deg,rgba(127,183,155,.12),transparent)}.cc-info{opacity:.8}.cc-ready{margin:12px 0}.cc-ready>summary{cursor:pointer;background:#E6F2EA;color:#15384D;border-radius:14px;padding:12px 14px;font-weight:800;list-style:none}.cc-ready>summary::-webkit-details-marker{display:none}.cc-acct{background:#fff;color:#15384D;border-radius:16px;margin:12px 0;padding:4px 12px}.cc-acct>summary{cursor:pointer;padding:10px 2px;font-weight:800;font-size:1.05em;list-style:none}.cc-acct>summary::-webkit-details-marker{display:none}.cc-acct>summary small{display:block;font-weight:600;opacity:.75;font-size:.85em}.cc-acct .cc-g{background:#FFFCF6}.cc-frow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-frow small{display:block;opacity:.75}.cc-done{position:sticky;bottom:0;background:#FEF6E8;color:#15384D;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
  const catOpts=cur=>{let list=[];try{list=CATS;}catch(_){}return list.map(c=>'<option value="'+e(c.id)+'"'+(c.id===cur?' selected':'')+'>'+e(((c.e||'')+' '+c.n).trim())+'</option>').join('');};
  /* What a bank line most likely is: a loan line by the bank's wording, otherwise Miscellaneous. */
  function suggestCat(x,acct){const a=acctById(acct);if(a&&a.type==='loan'&&typeof FinCats!=='undefined'&&FinCats.loanKind){const k=FinCats.loanKind({note:x.note,amount:x.amount,sourceType:x.type});if(k)return k==='transfer'?'transfer':'loan_'+acct+'_'+k;}return 'other';}
@@ -320,12 +333,32 @@
    '<div class="cc-info">'+ex.zero.slice(0,20).map(x=>info(x.r.date,x.r.note,0,'')).join('')+'</div>');
   if(ex.none.length)needs+=grp('none','❓ Needs you: in the app, not in the bank ('+ex.none.length+' · '+tot(ex.none)+')','Not in any bank file you added. Typed by hand, still pending, or in an account you have not added yet? Pick what is right for each one.',
    ex.none.slice(0,80).map(x=>row({txn:x.t,g:'none'},[['keep','Leave it for now']].concat(loanOpts(x.t,r.acct),[['del','🗑 Remove (it never came out of '+here.name+')']],others.map(a=>['move:'+a.id,'🔀 Move to '+a.name])),'keep',x.t.date,x.t.note,x.t.amount,x.t.pocketsmithId!=null?'From the bank feed':'Added by hand or from a statement')).join(''));
-  const nReady=ex.double.length+(ex.dupelse||[]).length+(ex.elsewhere||[]).length+ex.transfer.length+ex.add.length+ex.other.length+ex.date.length;
+  const fresh=r.fresh||[];
+  if(fresh.length){
+   ready+=grp('fresh','🧾 Balancing lines, not real payments ('+fresh.length+' · '+money(r.freshTotal)+')','Added earlier just to make the app agree with the bank. They hide what is really different, so remove them. The real payments then show the true difference.',
+    fresh.map(t=>row({txn:t,g:'fresh'},[['del','🗑 Remove this balancing line'],['keep','Leave it for now']],'del',t.date,t.note,t.amount,'Not a payment · can be brought back from the account')).join(''));
+   todo.unshift('🧾 <b>'+fresh.length+' balancing line'+(fresh.length===1?'':'s')+'</b> to remove (not real payments)');
+  }
+  const nReady=fresh.length+ex.double.length+(ex.dupelse||[]).length+(ex.elsewhere||[]).length+ex.transfer.length+ex.add.length+ex.other.length+ex.date.length;
   let h=(opts.multi?'':CC_CSS+(todo.length?'<div class="cc-todo"><b>What to do</b>'+todo.map(t=>'<div>'+t+'</div>').join('')+'<div class="fx-small" style="margin-top:6px">The sure ones are already picked in <b>Ready to fix</b>. Only <b>Needs you</b> needs a decision. Then tap Done.</div></div>':''));
   h+=needs;
   if(ready)h+='<details class="cc-ready"'+(opts.openReady?' open':'')+'><summary>✅ Ready to fix'+(nReady?' ('+nReady+')':'')+' · already picked for you · tap to look</summary>'+ready+'</details>';
+  if(opts.multi)h+=gapHtml(r);
   if(!opts.multi&&st.refs.length)h+=doneBtn();
   return h;
+ }
+ /* Every payment matches but the balance is still out: say where the difference must be, in real payments.
+    Never a balancing line. If the file goes back past the first payment in the app, the only thing left is the
+    account's opening balance, and the bank's balance column says what it should be. */
+ function gapHtml(r){
+  const allMatch=!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100));
+  if(!allMatch||!r.bankClose||!Math.round((+r.realDiff||0)*100))return '';
+  const name=e((acctById(r.acct)||{name:r.acct}).name),poss=name+(/s$/i.test(name)?'\'':'\'s'),off=money(Math.abs(r.realDiff)),fr=Math.round((+r.realDiff||0)*100)!==Math.round((+r.closeDiff||0)*100)?' once the balancing lines are removed':'';
+  if(r.openFix)return '<div class="cc-gap"><b>📒 Only the opening balance is left</b><p>Your file goes back to '+e(day(r.from))+', as far as the first payment '+name+' has in the app, and every payment matches. So the app is off by '+off+fr+' only because '+poss+' opening balance is '+money(r.openFix.was)+'. The bank\'s balances say it was <b>'+money(r.openFix.to)+'</b> at the end of '+e(day(r.openFix.date))+'.</p>'
+   +'<button class="btn dark" onclick="csvSetOpen(\''+e(r.acct)+'\','+r.openFix.to+',\''+e(r.openFix.date)+'\')">📒 Set the opening balance to '+money(r.openFix.to)+'</button><p class="fx-small">This is the account\'s starting balance, not a payment. You can change it back in the account.</p></div>';
+  const back=r.first&&r.first<r.from?r.first:null;
+  return '<div class="cc-gap"><b>🔎 Every payment from '+e(day(r.from))+' matches</b><p>The app is still off by <b>'+off+'</b>'+fr+'. That has to come from payments <b>before '+e(day(r.from))+'</b>, which this file can\'t see.</p>'
+   +'<p>'+(back?'The first payment '+name+' has in the app is '+e(day(back))+'. Download a bank CSV from <b>'+e(day(back))+' to '+e(day(r.prevDay))+'</b> and add it with 📚 Check all my accounts. It joins the file you already have, and the check finds the exact payments.':'Pick an earlier From date, or add an older bank CSV, so the check can see those payments.')+'</p></div>';
  }
  /* The "Fix my numbers" alert, live: the same count Home shows, worked out again from the data as it is now. */
  const FIXL={sync:'Sync now',feed:'Bank feed settings',match:'Open Match to my bank',sortcheck:'Check them',misc:'Sort them',conflicts:'Review',statement:'Check a statement'};
@@ -342,7 +375,7 @@
   h+=mine.length?'<p class="fx-small" style="margin-top:6px">Still on the list for <b>'+name+'</b>:</p>'+mine.map(c=>'<div class="cc-r"><span>'+(ICON[c.tone]||'')+' '+e(c.text)+'</span>'+(c.fix&&typeof trustFix==='function'&&FIXL[c.fix]?'<div><button type="button" class="cc-ed" style="padding-left:0" onclick="trustFix(\''+e(c.fix)+'\',\''+e(acct)+'\')">'+FIXL[c.fix]+' ›</button></div>':'')+'</div>').join('')
    :'<p class="fx-small" style="margin-top:6px">✅ Nothing left on the list for <b>'+name+'</b>.</p>';
   const r=st.result,clean=r&&!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100));
-  if(clean&&mine.some(c=>c.key==='match'&&c.tone==='bad'))h+='<p class="fx-small" style="margin-top:8px">💡 Every payment from '+e(day(r.from))+' to '+e(day(r.to))+' matches, so the balance difference is from <b>before '+e(day(r.from))+'</b>. Check an earlier CSV, or use Start fresh in Match to my bank.</p>';
+  if(clean&&mine.some(c=>c.key==='match'&&c.tone==='bad'))h+='<p class="fx-small" style="margin-top:8px">💡 Every payment from '+e(day(r.from))+' to '+e(day(r.to))+' matches, so the balance difference is from <b>before '+e(day(r.from))+'</b>. Add an older bank CSV to find which payments.</p>';
   if(rest)h+='<p class="fx-small" style="margin-top:8px">Plus '+rest+' thing'+(rest===1?'':'s')+' in other accounts or sorting. The CSV check cannot fix those.</p>';
   return h+'<button class="btn ghost" style="margin-top:8px" onclick="fixOpen()">Open Fix my numbers</button></div>';
  }
@@ -384,7 +417,7 @@
    const r=ref.res||st.result;
    if(v==='add'){const x=ref.row;made.push({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:ed.date||x.date,amount:ed.amount!=null?ed.amount:+x.amount,note:ed.note||x.note||'From bank CSV',cat:ed.cat||ref.cat||(()=>{const sc=suggestCat(x,r.acct);return sc!=='other'?sc:+(ed.amount!=null?ed.amount:x.amount)>0?'income':'other';})(),categoryOverride:!!(ed.cat||ref.cat),src:'csv-check',needsReview:true});return;}
    const t=ref.txn;if(!t)return;
-   if(v==='del'){Object.assign(t,{deleted:true,deletedAt:now,deletedReason:ref.g==='double'?'Double-up (bank CSV has it once)':ref.g==='dupelse'?'Extra copy (another account has it)':'Not in the bank CSV'});return;}
+   if(v==='del'){Object.assign(t,{deleted:true,deletedAt:now,deletedReason:ref.g==='fresh'?'Balancing line removed (not a real payment)':ref.g==='double'?'Double-up (bank CSV has it once)':ref.g==='dupelse'?'Extra copy (another account has it)':'Not in the bank CSV'});return;}
    if(v==='here'||v.startsWith('move:')){const to=v==='here'?r.acct:v.slice(5);t.movedFrom=t.acct;t.acct=to;t.acctOverride=true;t.movedAt=now;}
    if(v.startsWith('cat:')){t.cat=v.slice(4);t.categoryOverride=true;t.sortedAt=now;}
    if(v==='bankdate'&&ref.row){t.date=ref.row.date;t.dateOverride=true;}
@@ -479,12 +512,13 @@
    if(t)h+='<div class="cc-todo"><b>🧰 Fix my numbers: '+e(t.headline)+'</b>'+(b0&&trustCount(b0)!==trustCount(t)?' <span class="fx-small">(was '+trustCount(b0)+')</span>':'')+'</div>';
    const all={double:[],dupelse:[],add:[],transfer:[],other:[],elsewhere:[],date:[],none:[],zero:[]};
    mt.results.forEach(o=>Object.keys(all).forEach(k=>all[k]=all[k].concat(o.ex[k]||[])));
-   const todo=todoLines(all),okN=mt.results.filter(o=>o.res.ok).length;
+   const todo=todoLines(all),okN=mt.results.filter(o=>o.res.ok).length,freshN=mt.results.reduce((n,o)=>n+(o.res.fresh||[]).length,0);
+   if(freshN)todo.unshift('🧾 <b>'+freshN+' balancing line'+(freshN===1?'':'s')+'</b> to remove (not real payments)');
    if(!todo.length&&mt.back==='fix')h+='<button class="btn dark" style="display:block;width:100%;margin:8px 0" onclick="fixOpen()">✓ Nothing to fix here · Next step ›</button>';
    h+='<div class="cc-todo"><b>What to do · all accounts</b>'+(todo.length?todo.map(x=>'<div>'+x+'</div>').join(''):'<div>✅ Nothing to fix.</div>')+'<div class="fx-small" style="margin-top:6px">'+okN+' of '+mt.results.length+' accounts already match. The sure fixes are picked for you. Only <b>Needs you</b> needs a decision. Then tap Done once.</div></div>';
    mt.results.forEach(o=>{
-    const a=acctById(o.acct)||{name:o.acct},r=o.res,k=kinds(o.ex),fixN=k.double+k.add+k.move+k.transfer+k.date;
-    const status=r.ok?'✅ Matches the bank':(k.none?'❓ '+k.none+' need'+(k.none===1?'s':'')+' you · ':'⚠️ ')+(fixN?fixN+' ready to fix':'')+(!fixN&&!k.none&&r.closeDiff?'Payments match, balance off by '+money(Math.abs(r.closeDiff)):'');
+    const a=acctById(o.acct)||{name:o.acct},r=o.res,k=kinds(o.ex),fixN=k.double+k.add+k.move+k.transfer+k.date+(r.fresh||[]).length;
+    const status=r.ok?'✅ Matches the bank':(k.none?'❓ '+k.none+' need'+(k.none===1?'s':'')+' you · ':'⚠️ ')+(fixN?fixN+' ready to fix':'')+(!fixN&&!k.none&&r.realDiff?'Payments match, balance off by '+money(Math.abs(r.realDiff)):'');
     h+='<details class="cc-acct"'+(r.ok?'':' open')+'><summary>'+e((a.emoji||'🏦')+' '+a.name)+' · '+e(status)+'<small>'+r.matched.length+' of '+(r.bankCount-k.zero)+' bank payments match · '+e(shortD(r.from))+' – '+e(shortD(r.to))+(r.bankClose?' · bank '+money(r.bankClose.balance)+', app '+money(r.appClose):'')+'</small></summary>'
      +(r.ok?'':groupsHtml(r,{multi:true,ex:o.ex}))+'</details>';
    });
@@ -493,6 +527,18 @@
   $('sheet').innerHTML=h;count();
  }
  Object.assign(window,{csvMultiOpen:multiOpen,csvMultiFiles:multiFiles,csvMultiAssign:multiAssign,csvMultiForget:multiForget,csvMultiProcess:multiProcess});
- Object.assign(window,{csvCheckApply:apply,csvCheckCount:count,csvCheckEdit:edit});
+ /* The account's opening balance, from the bank's own balances, once a file covering its whole history matches every payment.
+   This is the account's starting figure, not a payment, and the old one is kept so it can be put back. */
+async function setOpen(id,val,date){
+ const a=acctById(id);if(!a||!Number.isFinite(+val))return;
+ if(!confirm('Set '+a.name+'\'s opening balance to '+money(+val)+' (end of '+day(date)+')?\n\nIt is '+money(+a.openBal||0)+' now. Every payment after that matches the bank, so this makes the app agree with the bank. No payments are added or changed.'))return;
+ const was={openBal:a.openBal,openDate:a.openDate};
+ a.openBalWas=+a.openBal||0;a.openBal=Math.round(+val*100)/100;a.openDate=date;a.openBalFrom='bank-csv';a.openBalSetAt=new Date().toISOString();
+ try{await saveAtomic({[K_ACCTS]:ACCTS});}catch(err){Object.assign(a,was);delete a.openBalWas;delete a.openBalFrom;delete a.openBalSetAt;toastMsg('Could not save. Nothing changed.');return;}
+ toastMsg(a.name+' opening balance set ✓');
+ st.applied='Opening balance set to '+money(a.openBal);
+ if(st.mode==='multi'){mt.applied=st.applied;multiRun();try{render();}catch(_){}multiPaint();}else{compute();try{render();}catch(_){}paint();}
+}
+Object.assign(window,{csvCheckApply:apply,csvCheckCount:count,csvCheckEdit:edit,csvSetOpen:setOpen});
  Object.assign(window,{csvCheckOpen:open,csvCheckSet:set,csvCheckFile:file,csvCheckProcess:process,csvCheckUseSuggested:useSuggested,csvWhereShort:whereShort,csvWhereHtml:whereHtml});
 })();
