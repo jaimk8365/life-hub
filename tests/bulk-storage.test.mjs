@@ -62,6 +62,13 @@ test('sync rejects a concurrent edit instead of applying a stale pull',async()=>
  const env=fixture({fin_txns:'[]'}),store=create(env);await store.ready;await store.save({fin_txns:[{id:'edited'}]});
  await assert.rejects(store.commitRaw({fin_txns:'[{"id":"remote"}]'},{expected:{fin_txns:'[]'}}),/while syncing/);assert.equal((await inspect(env)).values.fin_txns,'[{"id":"edited"}]');
 });
+test('a sync that meets a newer local save tries again later and never stops later saves (Jaimi 21/11)',async()=>{
+ const env=fixture({fin_txns:'[]',fin_funds:'[]'}),store=create(env);await store.ready;await store.save({fin_funds:[{id:'braces'}]});
+ const err=await store.commitRaw({fin_txns:'[{"id":"remote"}]',fin_funds:'[]'},{expected:{fin_txns:'[]',fin_funds:'[]'},source:'sync'}).catch(e=>e);
+ assert.equal(err.retry,true);assert.equal(store.state().error,'','no lock');
+ assert.equal(store.getItem('fin_funds'),'[{"id":"braces"}]');assert.equal(store.getItem('fin_txns'),'[]','the refused pull is not left showing');
+ await store.save({fin_txns:[{id:'mine'}]});assert.equal((await inspect(env)).values.fin_txns,'[{"id":"mine"}]','later saves work');
+});
 /* Two windows of Finance on one device: the one that falls behind hears about it, and can catch up without a page reload. */
 const channels=()=>{const all=[];return ()=>{const c={onmessage:null,postMessage(d){all.filter(x=>x!==c).forEach(x=>x.onmessage&&x.onmessage({data:d}));}};all.push(c);return c;};};
 test('another window saving marks this copy stale at once',async()=>{

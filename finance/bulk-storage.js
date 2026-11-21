@@ -56,7 +56,7 @@
     if(current.revision!==revision)throw new Error('Finance changed in another tab. Your unsaved changes are still here; export recovery before reloading.');
     if(await read(db,'journal'))throw new Error('An interrupted Finance save needs recovery before another save.');
     for(const key of BULK)if(storage.getItem(key)!==null)throw new Error('An older Finance tab wrote to the previous store. Both copies were kept; export recovery before continuing.');
-    if(expected)for(const [key,value]of Object.entries(expected))if((isBulk(key)?current.values[key]??null:storage.getItem(key))!==value)throw new Error('Finance changed while syncing. Nothing from this sync was applied.');
+    if(expected)for(const [key,value]of Object.entries(expected))if((isBulk(key)?current.values[key]??null:storage.getItem(key))!==value){const e=new Error('Finance changed while syncing. Nothing from this sync was applied.');e.retry=true;throw e;}
     const bulk={...current.values},small={},smallBefore={};
     for(const [key,value]of Object.entries(records)){
      if(isBulk(key)){if(value===null)delete bulk[key];else bulk[key]=value;}
@@ -76,10 +76,16 @@
   function commitRaw(records,{expected,source='local'}={}){
    const texts={...records};for(const v of Object.values(texts))if(v!==null&&typeof v!=='string')throw new Error('Storage values must be serialized before saving.');
    // Cache remains available for recovery if persistence fails.
+   // what each key held before, so a sync that has to try again leaves this copy exactly as it was
+   const before=Object.keys(texts).map(k=>[k,overlay.has(k),overlay.get(k),Object.hasOwn(cache,k),cache[k]]);
    for(const [k,v]of Object.entries(texts)){overlay.set(k,v);if(isBulk(k))v===null?delete cache[k]:cache[k]=v;}
    pending++;emit();
    const task=tail.then(()=>commit(texts,expected));
-   tail=task.then(()=>{for(const [k,v]of Object.entries(texts))if(overlay.get(k)===v){overlay.delete(k);if(isBulk(k))v===null?delete cache[k]:cache[k]=v;}pending--;emit();onCommit({keys:Object.keys(texts),source});},error=>{pending--;failure=error;emit();throw error;});tail.catch(()=>{});task.catch(()=>{});
+   tail=task.then(()=>{for(const [k,v]of Object.entries(texts))if(overlay.get(k)===v){overlay.delete(k);if(isBulk(k))v===null?delete cache[k]:cache[k]=v;}pending--;emit();onCommit({keys:Object.keys(texts),source});},error=>{pending--;
+    // A sync that found newer local changes wrote nothing: put this copy back and let the sync try again later.
+    // Only a real save problem stops later saves.
+    if(error&&error.retry){for(const [k,hadO,o,hadC,c]of before){if(overlay.get(k)===texts[k]){if(hadO)overlay.set(k,o);else overlay.delete(k);}if(isBulk(k)){if(hadC)cache[k]=c;else delete cache[k];}}emit();return;} // the caller still hears about it (task rejects); the queue carries on
+    failure=error;emit();throw error;});tail.catch(()=>{});task.catch(()=>{});
    return task;
   }
   async function refresh(){await ready;await tail;if(failure)throw failure;return lock(async()=>{const current=await read(db,'current');if(await read(db,'journal'))throw new Error('Finance recovery is in progress.');cache={...current.values};revision=current.revision;});}

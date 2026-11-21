@@ -238,6 +238,7 @@ function applyRemote(k, entry){
 }
 
 /* ---------- the sync cycle: pull → merge → push if needed ---------- */
+let retrySoon = false;
 async function runSync(){
   if (!token()) { setState('off', ''); return; }
   if (!pass())  { setState('locked', ''); return; }
@@ -323,10 +324,13 @@ async function runSync(){
     localStorage.setItem(LAST_KEY, String(Date.now()));
     const conflicts=read('lifehub_finance_sync_conflicts',[]);setState(conflicts.length?'attention':'ok',conflicts.length?'Some records changed on two devices. Both versions were preserved; review sync conflicts in Finance.':'');
   } catch(e){
-    setState('err', e.message || String(e));
+    // Finance was saved while this sync was online: nothing was applied, so simply sync again in a moment
+    if (e && e.retry) { retrySoon = true; setState('busy', ''); }
+    else setState('err', e.message || String(e));
   } finally {
     busy = false;
-    if (queued) { queued = false; schedulePush(800); }
+    if (retrySoon) { retrySoon = false; queued = false; schedulePush(3000); }
+    else if (queued) { queued = false; schedulePush(800); }
   }
 }
 function schedulePush(ms){
