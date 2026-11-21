@@ -4,6 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 21/11 midnight: "Needs you" choices in plain words; updates show on the first reload (PUSHED 21/11)
+- Jaimi's screenshot (still the old wording, so her phone had the old csv-check.js: GitHub Pages caches files 10 minutes and the service worker fetched with the normal cache): "why are there options to move to another account, what happens if I leave it for now?"
+- finance/csv-check.js: choices now read "🤷 Not sure · keep it, ask me next time", "🗑 Remove · it never came out of X", "🔀 It came out of Y instead", with a 3-line key above the list.
+- sw.js: scripts and data files are fetched with cache: 'no-cache' (revalidated, cheap 304 when unchanged), page navigations unchanged, so a push shows on the first reload. sw lifehub-v120. 733 passed. Preview: Needs you shows the new key and choices.
+
 ### 21/11 11:50pm: CSV check accuracy pass on her real files (PUSHED 21/11)
 - Jaimi: "double check this checking against csv file is smart and accurate". Read-only run of every CSV in Downloads against her 16/11 backup (stale but real), looking at every line left over.
 - Found and fixed in finance/csv-check.js: (1) a feed line still on its old pending amount next to the bank's real line (Coles Online −349.14 vs −350.85), or a typed guess next to it (Woolworths −382.60 vs −381.10): now an extra copy ("as −$350.85, the bank's amount"). (2) the same line typed in twice, neither in the bank: the second is a copy. (3) a move between two accounts that neither bank file has (old "account consolidation" lines): new "🔁 Moves the bank never had", remove both. (4) $0 lines (Visa provisioning, Linkt) never show as something to fix.

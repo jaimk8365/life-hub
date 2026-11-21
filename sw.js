@@ -1,5 +1,5 @@
 /* Life Hub service worker — network-first with offline fallback to cache. */
-const CACHE = 'lifehub-v119';
+const CACHE = 'lifehub-v120';
 const PRECACHE = [
   './finance/bulk-storage.js', './finance/recovery.html', './finance/recovery.js', './finance/app.html', './finance/standalone.js', './finance/pocketsmith-client.js', './finance/pocketsmith-import.js', './finance/manifest.webmanifest',
   './', './index.html', './manifest.webmanifest', './sync.js', './theme-jaimi.css', './theme-matthew.css',
@@ -30,7 +30,8 @@ self.addEventListener('fetch', (e) => {
   if(!url.pathname.startsWith(scope.pathname))return;
   const cacheable=!url.search;
   e.respondWith(
-    fetch(e.request)
+    // scripts and pages are always checked with the server (cheap when unchanged), so an update shows on the first reload
+    fetch(e.request, e.request.mode === 'navigate' ? undefined : { cache: 'no-cache' })
       .then(res => {
         if (res.ok && cacheable) {
           const copy = res.clone();
