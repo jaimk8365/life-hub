@@ -325,3 +325,49 @@ test('Fix my numbers: balancing lines are removed first, and an old difference m
   s = F.guideSteps({ all: [{ key: 'feed', tone: 'warn' }], accounts: [] }, { fresh: [{ id: 'a', name: 'A', count: 2, amount: 5 }] });
   assert.deepEqual(s.map(x => x.id), ['sync', 'fresh'], 'fresh bank balances first, then remove the lines');
 });
+
+test('start the books on 1 Jul 2025: older payments deleted for good, every balance stays the same, the feed never brings them back', () => {
+  const F = require('../finance/fix-numbers.js');
+  const importer = require('../finance/pocketsmith-import.js');
+  const accts = [{ id: 'bills', name: 'Bills', openBal: 100 }, { id: 'car', name: 'Car Loan', openBal: -5000 }, { id: 'new', name: 'New', openBal: 0 }];
+  const txns = [
+    { id: 'a', acct: 'bills', date: '2024-09-26', amount: -40 },
+    { id: 'b', acct: 'bills', date: '2025-06-30', amount: 250 },
+    { id: 'c', acct: 'bills', date: '2025-05-01', amount: -999, deleted: true },
+    { id: 'd', acct: 'bills', date: '2025-06-01', amount: 500, src: 'balance-adjustment', startFresh: true },
+    { id: 'e', acct: 'bills', date: '2025-07-01', amount: -10 },
+    { id: 'f', acct: 'car', date: '2025-01-01', amount: 300 },
+    { id: 'g', acct: 'car', date: '2025-08-01', amount: 300 },
+    { id: 'h', acct: 'gone', date: '2025-01-01', amount: 5 },
+  ];
+  const bal = (a, list) => a.openBal + list.filter(t => !t.deleted && t.acct === a.id && !t.startFresh).reduce((s, t) => s + t.amount, 0);
+  const p = F.booksStartPlan(accts, txns, '2025-07-01');
+  assert.deepEqual(p.remove.map(t => t.id), ['a', 'b', 'c', 'd', 'f', 'h'], 'everything before 1 Jul goes, including old removed rows and balancing lines');
+  assert.deepEqual(p.keep.map(t => t.id), ['e', 'g']);
+  assert.equal(p.openDate, '2025-06-30');
+  const after = accts.map(a => ({ ...a, openBal: p.accounts.find(x => x.id === a.id).open }));
+  assert.equal(p.accounts[0].open, 310, 'Bills: 100 − 40 + 250, never the balancing line or a removed row');
+  assert.equal(p.accounts[0].fresh, 1);
+  after.forEach((a, i) => assert.equal(bal(a, p.keep), bal(accts[i], txns), a.name + ' balance today is unchanged'));
+  assert.equal(p.accounts[2].removed, 0);
+  assert.throws(() => F.booksStartPlan(accts, txns, ''));
+  // the bank feed keeps history for 2 years; rows before the books start are never added back
+  const src = [{ id: 1, transactionAccountId: 9, date: '2025-03-01', amount: -40, payee: 'Old' }, { id: 2, transactionAccountId: 9, date: '2025-09-01', amount: -5, payee: 'New' }];
+  const plan = importer.planTransactions([], src, { 9: 'bills' }, '2026-11-21', false, '2025-07-01');
+  assert.deepEqual(plan.additions.map(r => r.pocketsmithId), ['2']);
+  assert.deepEqual(plan.outsideWindow, ['1']);
+  assert.equal(importer.planTransactions([], src, { 9: 'bills' }, '2026-11-21').additions.length, 2, 'without a books start nothing changes');
+  // the bank check starts on the books start; a file from before then counts as the whole history
+  const rows = [{ date: '2025-06-20', amount: -5, balance: 400 }, { date: '2025-07-02', amount: -10, balance: 390 }, { date: '2025-08-01', amount: 20, balance: 410 }];
+  const app = [{ id: 'x', acct: 'bills', date: '2025-07-02', amount: -10 }, { id: 'y', acct: 'bills', date: '2025-08-01', amount: 20 }];
+  const r = Csv.run({ rows, txns: app, acct: 'bills', from: '2025-06-01', to: '2025-08-31', openBal: 380, start: '2025-07-01' });
+  assert.equal(r.from, '2025-07-01');
+  assert.equal(r.onlyBank.length, 0, 'the June bank row is before the books start, not "missing"');
+  assert.equal(r.wholeHistory, true);
+  assert.deepEqual(r.openFix, { was: 380, to: 400, date: '2025-06-30' }, 'opening balance from the bank on 30 Jun');
+  assert.throws(() => Csv.run({ rows: rows.slice(0, 1), txns: app, acct: 'bills', from: '2025-06-01', to: '2025-06-30', start: '2025-07-01' }), /books start/);
+  const g = read('finance/fix-numbers.js');
+  for (const x of ['window.fixBooksOpen=fixBooksOpen', "a.download='finance-before-2025-07-01.json'", "[K_BOOKS_START]:p.start", 'fixBooksOpen()']) assert.ok(g.includes(x), x);
+  const s = F.guideSteps({ all: [], accounts: [] }, { booksDue: 12, fresh: [{ id: 'b', name: 'B', count: 1, amount: 1 }] });
+  assert.deepEqual(s.map(x => x.id), ['books', 'fresh']);
+});

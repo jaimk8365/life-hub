@@ -158,12 +158,29 @@
   // never a balancing line: the difference is real payments older than the files, found with older bank files
   if(settle.length)steps.push({id:'settle',icon:'🔎',title:'Find the older payments',why:'Every payment in your bank files matches. What is left is from before your files start. Download bank CSVs that go back to when each account starts in the app, and add them. The check then finds the exact payments.',btn:'📚 Add older bank files',act:"csvMultiOpen('fix')",accounts:settle});
   // balancing lines added before are not real payments: they hide the true difference, so they go first
-  const fresh=(o.fresh||[]).filter(a=>a.count);
-  if(!fresh.length)return steps;
-  const step={id:'fresh',icon:'🧾',title:'Remove the balancing lines',why:'These were added just to make the app agree with the bank. They are not real payments, so they hide what is really different. Remove them, then the real payments show the true difference.',accounts:fresh};
-  return steps[0]&&steps[0].id==='sync'?[steps[0],step].concat(steps.slice(1)):[step].concat(steps);
+  const fresh=(o.fresh||[]).filter(a=>a.count),first=[];
+  // starting the books on 1 Jul 2025 goes first: it clears the old history (and old balancing lines) in one go
+  if(+o.booksDue)first.push({id:'books',icon:'📅',title:'Start the books on 1 Jul 2025',why:o.booksDue+' payments are older than the financial year. Delete them for good; every account keeps its balance.',btn:'📅 Start the books',act:'fixBooksOpen()'});
+  if(fresh.length)first.push({id:'fresh',icon:'🧾',title:'Remove the balancing lines',why:'These were added just to make the app agree with the bank. They are not real payments, so they hide what is really different. Remove them, then the real payments show the true difference.',accounts:fresh});
+  if(!first.length)return steps;
+  return steps[0]&&steps[0].id==='sync'?[steps[0]].concat(first,steps.slice(1)):first.concat(steps);
  }
- return {guideSteps,shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money,balanceOn,statementCheck,trustReport};
+ /* ---------- Start the books on a date ----------
+    Every payment before `start` goes. Each account's opening balance becomes its own balance at the end of the day
+    before, worked out from the real payments being removed (never a balancing line), so no balance today changes.
+    The bank check from `start` then proves that opening balance, or finds the payments that are wrong. Pure. */
+ function booksStartPlan(accts,txns,start){
+  if(!validISO(start))throw Error('Pick the date the books start.');
+  const isFresh=t=>t.src==='balance-adjustment'||!!t.startFresh,old=t=>validISO(t&&t.date)&&t.date<start;
+  const remove=(txns||[]).filter(old),keep=(txns||[]).filter(t=>!old(t));
+  const accounts=(accts||[]).map(a=>{
+   const mine=remove.filter(t=>t.acct===a.id),real=mine.filter(t=>live(t)&&!isFresh(t)&&Number.isFinite(+t.amount));
+   return {id:a.id,name:a.name,was:round(+a.openBal||0),open:round((+a.openBal||0)+real.reduce((s,t)=>s+(+t.amount||0),0)),removed:mine.length,fresh:mine.filter(t=>live(t)&&isFresh(t)).length};
+  });
+  const d=new Date(Date.parse(start+'T12:00:00Z')-dayMs).toISOString().slice(0,10);
+  return {start,openDate:d,accounts,remove,keep};
+ }
+ return {booksStartPlan,guideSteps,shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money,balanceOn,statementCheck,trustReport};
 });
 
 /* ---------- Screens (Jaimi's Finance page only) ---------- */
@@ -291,7 +308,9 @@ const K_CSV_LAST='fin_csv_last_v1';
 function guideNow(){
  const r=trustData(),h=fixHome()||{misc:0,check:0};
  const fresh=(typeof ACCTS!=='undefined'?ACCTS:[]).map(a=>{const l=TXNS.filter(t=>!t.deleted&&t.acct===a.id&&(t.startFresh||t.src==='balance-adjustment'));return {id:a.id,name:a.name,count:l.length,amount:l.reduce((s,t)=>s+(+t.amount||0),0)};}).filter(a=>a.count);
- return {r,steps:FinFix.guideSteps(r,{csvLast:load(K_CSV_LAST,{}),misc:h.misc,check:h.check,fresh})};
+ const booksDue=TXNS.filter(t=>/^\d{4}-\d{2}-\d{2}$/.test(t.date||'')&&t.date<'2025-07-01').length;
+ const fresh2=booksDue?fresh.map(a=>({...a,count:TXNS.filter(t=>!t.deleted&&t.acct===a.id&&(t.startFresh||t.src==='balance-adjustment')&&t.date>='2025-07-01').length})):fresh;
+ return {r,steps:FinFix.guideSteps(r,{csvLast:load(K_CSV_LAST,{}),misc:h.misc,check:h.check,fresh:fresh2,booksDue})};
 }
 window.fixGuideNext=function(){try{const g=guideNow();return g.steps[0]?g.steps[0].title:null;}catch(e){return null;}};
 function fixOpen(){
@@ -320,9 +339,10 @@ function fixOpen(){
  html+='<details class="ck-ev" style="margin-top:16px"><summary>More tools and every check</summary>'
   +(h.check?'<button class="fx-job" onclick="sortCheckOpen()"><b>✨ Check what I sorted</b><span>'+h.check+(h.check===1?' payment I was not sure about':' payments I was not sure about')+'</span></button>':'')
   +'<button class="fx-job" onclick="fixMiscOpen()"><b>Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
+  +'<button class="fx-job" onclick="fixBooksOpen()"><b>📅 Start the books on 1 Jul 2025</b><span>'+(load('fin_books_start_v1',null)?'Done · books start 1 Jul 2025':'Delete older payments for good; balances stay the same')+'</span></button>'
   +'<button class="fx-job" onclick="fixMatchOpen()"><b>Match to my bank (one account at a time)</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
   +'<button class="fx-job" onclick="trustStatementOpen()"><b>Check one account with a bank CSV</b><span>Pick the dates and match every payment</span></button>'
-  +trustBlock()+'</details><p class="fx-small">Nothing moves money. Every change can be undone.</p>';
+  +trustBlock()+'</details><p class="fx-small">Nothing moves money. Every change can be undone, except starting the books.</p>';
  $('sheet').innerHTML=html;openSheet();
 }
 /* Settle: the same "Start fresh" line, from the guide, then straight back to the guide. */
@@ -344,6 +364,34 @@ async function fixRemoveFresh(id){
  toastMsg('Balancing lines removed from '+a.name+' ✓');try{render();}catch(e){}fixOpen();
 }
 window.fixRemoveFresh=fixRemoveFresh;
+/* Start the books on 1 Jul 2025 (start of the financial year): payments before it are deleted for good, after a
+   backup file is saved; each account carries its own balance forward as its opening balance, so no balance changes. */
+const K_BOOKS_START='fin_books_start_v1',BOOKS_START='2025-07-01';
+function fixBooksOpen(){
+ const cur=load(K_BOOKS_START,null),p=FinFix.booksStartPlan(ACCTS,TXNS,BOOKS_START),rows=p.accounts.filter(a=>a.removed);
+ let html='<button class="close" onclick="closeSheet()">✕</button><button class="fh-link" onclick="fixOpen()">‹ Fix my numbers</button><h2>📅 Start the books on 1 Jul 2025</h2>';
+ if(cur&&!p.remove.length){html+='<div class="fg-done" style="text-align:left"><b>✅ Your books start on 1 Jul 2025.</b><p>Nothing older is left. Bank feed history before then is skipped. Next: check each account from that date.</p><button class="btn dark" onclick="csvMultiOpen(\'fix\')">📚 Check my accounts</button></div>';$('sheet').innerHTML=html;openSheet();return;}
+ html+='<p>The start of the financial year. Everything before it is deleted <b>for good</b>. Each account starts with its own balance at the end of 30 Jun 2025, so <b>no balance changes</b> today.</p>'
+  +'<div class="fg-step" style="border-color:#E2D6C0"><b>What happens</b>'+rows.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'<small style="display:block">'+a.removed+' payment'+(a.removed===1?'':'s')+' deleted'+(a.fresh?' (incl. '+a.fresh+' balancing line'+(a.fresh===1?'':'s')+')':'')+'</small></span><small>opening '+FinFix.money(a.open)+'</small></div>').join('')
+  +(p.remove.length-rows.reduce((n,a)=>n+a.removed,0)>0?'<div class="fg-acc"><span>Not in any account</span><small>'+(p.remove.length-rows.reduce((n,a)=>n+a.removed,0))+' deleted</small></div>':'')+'</div>'
+  +'<p class="fx-small">A backup file of what is deleted downloads first, just in case. Then check each account with a bank CSV from <b>1 Jul 2025</b>: the check proves each opening balance against the bank, or finds the payments that are wrong.</p>'
+  +(p.remove.length?'<button class="btn dark fg-big" onclick="fixBooksApply()">🗑 Delete '+p.remove.length+' payments before 1 Jul 2025</button>':'<p>Nothing before 1 Jul 2025.</p>');
+ $('sheet').innerHTML=html;openSheet();
+}
+async function fixBooksApply(){
+ const p=FinFix.booksStartPlan(ACCTS,TXNS,BOOKS_START);if(!p.remove.length){fixBooksOpen();return;}
+ if(!confirm('Delete '+p.remove.length+' payments before 1 Jul 2025 for good?\n\nThis cannot be undone in the app. A backup file downloads first. Each account keeps its balance: its opening balance becomes its own balance at the end of 30 Jun 2025.'))return;
+ try{const blob=new Blob([JSON.stringify({deletedAt:fixNow(),booksStart:p.start,accountsBefore:ACCTS.map(a=>({id:a.id,name:a.name,openBal:a.openBal,openDate:a.openDate})),payments:p.remove})],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finance-before-2025-07-01.json';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);}
+ catch(e){toastMsg('Could not save the backup file, so nothing was deleted.');return;}
+ const oldT=TXNS.slice(),oldA=ACCTS.map(a=>({...a}));
+ p.accounts.forEach(x=>{if(!x.removed)return;const a=acctById(x.id);if(a){a.openBalWas=+a.openBal||0;a.openBal=x.open;a.openDate=p.openDate;a.openBalFrom='books-start';}});
+ TXNS.length=0;p.keep.forEach(t=>TXNS.push(t));
+ try{await saveAtomic({[K_TXNS]:TXNS,[K_ACCTS]:ACCTS,[K_BOOKS_START]:p.start});}
+ catch(e){TXNS.length=0;oldT.forEach(t=>TXNS.push(t));ACCTS.length=0;oldA.forEach(a=>ACCTS.push(a));toastMsg('Could not save. Nothing changed.');return;}
+ toastMsg('Books now start on 1 Jul 2025 ✓');try{render();}catch(e){}fixBooksOpen();
+}
+window.fixBooksOpen=fixBooksOpen;window.fixBooksApply=fixBooksApply;
 window.fixOpen=fixOpen;
 
 /* Screen 2: Miscellaneous, grouped by shop. */

@@ -20,12 +20,15 @@
   const ends=same.filter(r=>!prevs.has(cents(r.balance)));
   return {date:last,balance:r2((ends.length===1?ends[0]:same[0]).balance),unsure:ends.length!==1};
  }
- function run({rows=[],txns=[],acct,from,to,openBal=0}){
+ function run({rows=[],txns=[],acct,from,to,openBal=0,start=null}){
   if(!acct)throw Error('Choose an account.');
   if(!from||!to||from>to)throw Error('Choose the dates to check (from must be on or before to).');
   // Only the dates the CSV actually covers: a payment the file cannot show is not "missing from the bank".
   const asked={from,to},span=rows.map(r=>r.date).filter(Boolean).sort();let clipped=false;
   if(span.length){if(from<span[0]){from=span[0];clipped=true;}if(to>span[span.length-1]){to=span[span.length-1];clipped=true;}}
+  // the books start on a date: nothing before it is checked (it is not in the app any more)
+  if(start&&from<start){from=start;clipped=true;}
+  if(start&&to<start)throw Error('Your books start on '+start+'. This file is all before that.');
   if(from>to)throw Error('Your CSV covers '+span[0]+' to '+span[span.length-1]+'. Pick dates inside those.');
   const bank=rows.filter(r=>r.date>=from&&r.date<=to).map((r,i)=>({...r,i}));
   const live=t=>t&&!t.deleted&&t.acct===acct&&Number.isFinite(+t.amount)&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'');
@@ -52,7 +55,7 @@
   // the file reaches back past the first real payment in the app, so every payment the account has ever had was checked:
   // whatever is left can only be the account's opening balance, and the bank's own balance column says what it should be
   const real=txns.filter(t=>live(t)&&!isFresh(t)).map(t=>t.date).sort(),first=real[0]||null;
-  const wholeHistory=!!span.length&&from===span[0]&&!real.some(d=>d<from);
+  const wholeHistory=!!span.length&&(from===span[0]||!!start&&from===start&&span[0]<=start)&&!real.some(d=>d<from);
   const openFix=close&&allMatch&&wholeHistory&&cents(realDiff)?{was:r2(+openBal||0),to:r2((+openBal||0)+realDiff),date:addDays(from,-1)}:null;
   const ok=allMatch&&!fresh.length&&(!close||cents(close.balance)===cents(appClose));
   return {acct,from,to,asked,clipped,bankCount:bank.length,appCount:app.length,matched,onlyBank,onlyApp,
@@ -235,7 +238,7 @@
  function compute(){
   if(!st.parsed){st.result=null;return;}
   const a=acctById(st.acct)||{};
-  try{st.result=FinCsvCheck.run({rows:st.parsed.rows,txns:TXNS,acct:st.acct,from:st.from,to:st.to,openBal:+a.openBal||0});}catch(err){st.result=null;st.err=err.message||'Could not check this CSV.';}
+  try{st.result=FinCsvCheck.run({rows:st.parsed.rows,txns:TXNS,acct:st.acct,from:st.from,to:st.to,openBal:+a.openBal||0,start:booksStart()});}catch(err){st.result=null;st.err=err.message||'Could not check this CSV.';}
   if(st.result)keepLast([st.result]);
   // A CSV with a balance column that matched to the cent counts as checked up to its last day, like a statement.
   const r=st.result;if(r&&r.ok&&r.bankClose){try{const cs=load(K_STATEMENTS_CC,{latest:{},history:[]})||{latest:{},history:[]};cs.history=cs.history||[];cs.latest=cs.latest||{};if(!cs.history.some(h=>h.acct===r.acct&&h.date===r.bankClose.date&&h.ok)){const rec={acct:r.acct,date:r.bankClose.date,closing:r.bankClose.balance,app:r.appClose,difference:0,ok:true,via:'csv',at:new Date().toISOString()};cs.history.unshift(rec);cs.history=cs.history.slice(0,60);cs.latest[r.acct]=rec;saveAtomic({[K_STATEMENTS_CC]:cs}).catch(()=>{});}}catch(_){}}
@@ -350,6 +353,7 @@
  /* Every payment matches but the balance is still out: say where the difference must be, in real payments.
     Never a balancing line. If the file goes back past the first payment in the app, the only thing left is the
     account's opening balance, and the bank's balance column says what it should be. */
+ function booksStart(){try{return typeof load==='function'?load('fin_books_start_v1',null):null;}catch(_){return null;}}
  function gapHtml(r){
   const allMatch=!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100));
   if(!allMatch||!r.bankClose||!Math.round((+r.realDiff||0)*100))return '';
@@ -483,7 +487,7 @@
  function multiRun(){
   const list=[];mt.errs=mt.errs.filter(x=>!/^⚠️/.test(x));
   ACCTS.filter(a=>mt.files[a.id]).forEach(a=>{const f=mt.files[a.id];
-   try{list.push({acct:a.id,res:FinCsvCheck.run({rows:f.rows,txns:TXNS,acct:a.id,from:f.min,to:f.max,openBal:+a.openBal||0})});}
+   try{list.push({acct:a.id,res:FinCsvCheck.run({rows:f.rows,txns:TXNS,acct:a.id,from:f.min,to:f.max,openBal:+a.openBal||0,start:booksStart()})});}
    catch(err){mt.errs.push('⚠️ '+a.name+': '+(err.message||'could not be checked'));}
   });
   mt.results=FinCsvCheck.explainAll(list,TXNS);mt.processed=true;

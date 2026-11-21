@@ -4,6 +4,13 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 21/11 10:10pm: Start the books on 1 Jul 2025 (PUSHED 21/11)
+- Jaimi: only keep from the start of the year and delete anything before. Asked: 1 Jul 2025 (start of the financial year, so the tax year stays whole) and delete for good (not archive).
+- finance/fix-numbers.js: FinFix.booksStartPlan (pure) + 📅 Start the books screen (fixBooksOpen / fixBooksApply), first guide step while anything older exists, and in More tools. Deletes every row before 1 Jul 2025 (incl. old removed rows and balancing lines); each account's openBal = its own balance at end 30 Jun 2025 from real payments (openDate 2025-06-30, openBalWas kept, openBalFrom 'books-start'), so no balance changes. Downloads finance-before-2025-07-01.json first; one saveAtomic for fin_txns + fin_accounts + fin_books_start_v1 (new key). Sync tombstones the removed ids.
+- finance/pocketsmith-import.js: planTransactions(…, booksStart) puts feed rows before the books start in outsideWindow, so the 2-year feed history never re-adds them.
+- finance/csv-check.js: run({start}) checks from the books start; a file reaching back past it counts as the whole history, so the opening balance can be set from the bank's own 30 Jun balance.
+- Proof: 730 passed (new test: removal, balances unchanged, feed guard, check from start). Preview: 4 old Bills rows + an old balancing line deleted, every ledger balance identical, opening $606.35, survives reload. sw lifehub-v117.
+
 ### 21/11 9:30pm: No balancing lines; find old differences as real payments (PUSHED 21/11)
 - Jaimi: "I don't want a line to make it balance, that isn't proper book keeping." Her Bills check: 328 of 328 bank payments match (23 Mar to 21 Nov), but a stale Start fresh line (+$1,942.46) made the app $2,176.10 vs bank $637.31.
 - finance/csv-check.js run(): "Start fresh" / balance-adjustment lines are never matched and never listed as "in the app, not in the bank". New: fresh, freshTotal, realClose/realDiff (balance without them), first (first real payment), wholeHistory, openFix, prevDay. ok needs no balancing lines.

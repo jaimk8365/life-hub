@@ -110,7 +110,7 @@
     return matches.length===1?matches[0]:null;
   }
 
-  function planTransactions(existing=[],snapshotTransactions=[],accountMap={},asAt=null,largeStore=false){
+  function planTransactions(existing=[],snapshotTransactions=[],accountMap={},asAt=null,largeStore=false,booksStart=null){
     // Keep every existing row, including manual edits and older linked records.
     // Only previously unseen source history is subject to the import window.
     const anchor=validDate(asAt)?new Date(String(asAt).slice(0,10)+'T00:00:00Z'):null;
@@ -142,7 +142,7 @@
       }
       const match=existingMatch(existing.filter(t=>!used.has(String(t.id))&&!t.pocketsmithId),row);
       if(match&&match.id!=null){used.add(String(match.id));links.push({existingId:match.id,pocketsmithId:psId,importKey:row.importKey,sourceCategory:row.sourceCategory,sourceCat:row.sourceCat});}
-      else if(cutoff&&row.date<cutoff)outsideWindow.push(psId);
+      else if(cutoff&&row.date<cutoff||validDate(booksStart)&&row.date<booksStart)outsideWindow.push(psId); // before the books start: never brought back
       else additions.push(row);
     }
     const bankRows=existing.filter(t=>t.pocketsmithId!=null||String(t.importKey||'').startsWith('pocketsmith:')).length;
@@ -180,7 +180,7 @@
   }
 
   function financeModel(){
-    return evalFinance(`(()=>({accounts:ACCTS.map(a=>({...a})),transactions:TXNS.map(t=>({...t}))}))()`);
+    return evalFinance(`(()=>({accounts:ACCTS.map(a=>({...a})),transactions:TXNS.map(t=>({...t})),booksStart:(typeof load==='function'?load('fin_books_start_v1',null):null)}))()`);
   }
 
   async function applyOps(snapshot,mapping,plan){
@@ -267,7 +267,7 @@
       if(!mapping.mappings.length)return setState('attention','PocketSmith downloaded data, but none of its accounts matched your Finance accounts.',{mapping});
       const invalid=snapshot.accounts.filter(a=>mapping.map[String(a.id)]).map(a=>{const problems=[];if(a.currentBalance==null||a.currentBalance===''||!Number.isFinite(Number(a.currentBalance)))problems.push('missing valid balance');if(!validDate(a.currentBalanceDate))problems.push('missing valid balance date');if(a.currencyCode&&String(a.currencyCode).trim().toUpperCase()!=='AUD')problems.push('unsupported currency');return problems.length?String(a.title||a.name||'Bank account')+': '+problems.join(', '):null;}).filter(Boolean);
       if(invalid.length)throw new Error('Bank feed needs attention — '+invalid.join('; ')+'. Nothing was imported.');
-      const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt,!!financeFrame()?.contentWindow?.FinanceStore);
+      const plan=planTransactions(model.transactions,snapshot.transactions,mapping.map,snapshot.generatedAt,!!financeFrame()?.contentWindow?.FinanceStore,model.booksStart);
       if(plan.skipped.length)return setState('attention','Some bank transactions look invalid, so nothing was imported. Open Bank feed to review them.',{mapping});
       const applied=await applyOps(snapshot,mapping,plan);
       if(!applied||!applied.ok)throw new Error('Finance runtime did not accept the PocketSmith update.');
