@@ -384,3 +384,54 @@ test('a bank file you already put in an account is recognised next time; the sav
   const c = read('finance/csv-check.js');
   for (const x of ['Remove file', 'Kept so you never upload them twice', 'Starts too late', 'Pick it once and the app remembers', 'matchAccount(parsed,ACCTS.filter(a=>!a.hidden),mt.files)']) assert.ok(c.includes(x), x);
 });
+
+test('the day you paid (in the description) matches the bank feed; a copy typed in twice is an extra copy; same shop, different amount is paired', () => {
+  assert.equal(Csv.paidOn({ date: '2026-08-07', note: 'V3928 03/08 PAYPAL *SUPERSPARES 0287119711 74245376217' }), '2026-08-03');
+  assert.equal(Csv.paidOn({ date: '2026-11-02', note: 'EFTPOS 30/10 09:49PHARMALCHEM PTY LTD GYMPIE' }), '2026-10-30');
+  assert.equal(Csv.paidOn({ date: '2026-01-02', note: 'V3928 30/12 SHOP' }), '2025-12-30', 'across the new year');
+  assert.equal(Csv.paidOn({ date: '2026-08-07', note: 'ONLINE L9749372334 QLD TMR' }), null);
+  const rows = [
+    { date: '2026-08-07', amount: -152.96, note: 'V3928 03/08 PAYPAL *SUPERSPARES 0287119711 74245376217', balance: 1000 },
+    { date: '2026-04-23', amount: 9.49, note: 'V3993 10/04 Google One Barangaroo 74773886112', balance: 900 },
+    { date: '2026-09-17', amount: -381.10, note: 'V3993 16/09 Woolworths Online BellaVista 74238246259', balance: 800 },
+  ];
+  const txns = [
+    { id: 'hand', acct: 'e', date: '2026-08-03', amount: -152.96, note: 'SuperSpares (car parts) via PayPal' },
+    { id: 'feed', acct: 'e', date: '2026-08-03', amount: -152.96, note: 'V3928 03/08 PAYPAL *SUPERSPARES', pocketsmithId: 1 },
+    { id: 'g1', acct: 'e', date: '2026-04-10', amount: 9.49, note: 'Google One', pocketsmithId: 2 },
+    { id: 'woo', acct: 'e', date: '2026-09-15', amount: -382.60, note: 'Woolworths Online' },
+  ];
+  const r = Csv.run({ rows, txns, acct: 'e', from: '2026-04-01', to: '2026-09-30' });
+  assert.deepEqual(r.matched.map(m => m.txn.id).sort(), ['feed', 'g1'], 'the feed copy is kept, matched on the day it was paid');
+  const ex = Csv.explain(r, txns);
+  assert.deepEqual(ex.double.map(x => x.t.id), ['hand'], 'the copy typed in by hand is the extra one');
+  assert.deepEqual(ex.amount.map(x => [x.t.id, x.row.amount]), [['woo', -381.10]]);
+  assert.equal(ex.add.length, 0);
+  assert.equal(ex.none.length, 0, 'nothing left for her to decide');
+  const c = read('finance/csv-check.js');
+  for (const x of ["grp('amount'", "v==='bankamt'", 'the bank never had these']) assert.ok(c.includes(x), x);
+});
+
+test('extra copies the bank never had: a different amount next to the bank\'s own line, the same line typed twice, a move both banks lack, $0 lines', () => {
+  const rows = [{ date: '2026-10-01', amount: 0, note: 'PLEASE NOTE', balance: 396.19 }, { date: '2026-11-02', amount: -350.85, note: 'V3993 30/10 Coles Online Hawthorn E 74039196303', balance: 45.34 }];
+  const txns = [
+    { id: 'bank', acct: 'e', date: '2026-10-30', amount: -350.85, note: 'Coles Online', src: 'import' },
+    { id: 'pend', acct: 'e', date: '2026-10-30', amount: -349.14, note: 'POS 30/10 Coles Online Hawthorn Eas', pocketsmithId: 9 },
+    { id: 't1', acct: 'e', date: '2026-10-20', amount: -100, note: 'Linked account transfer' },
+    { id: 't2', acct: 'e', date: '2026-10-20', amount: -100, note: 'Linked account transfer' },
+    { id: 'zero', acct: 'e', date: '2026-10-25', amount: 0, note: 'Visa Provisioning Service', pocketsmithId: 8 },
+    { id: 'g1', acct: 'e', date: '2026-10-13', amount: -0.15, note: 'Transferred to Sinking Funds' },
+    { id: 'g2', acct: 's', date: '2026-10-13', amount: 0.15, note: 'Transferred from Goal Savings' },
+  ];
+  const r = Csv.run({ rows, txns, acct: 'e', from: '2026-10-01', to: '2026-11-02' });
+  assert.ok(!r.onlyApp.some(t => t.id === 'zero'), 'a $0 line is never something to fix');
+  const ex = Csv.explain(r, txns);
+  const d = Object.fromEntries(ex.double.map(x => [x.t.id, x]));
+  assert.ok(d.pend && d.pend.near, 'the feed\'s old pending amount next to the bank\'s $350.85 is an extra copy');
+  assert.ok(d.t2 && d.t2.copy, 'the second of two identical typed lines is a copy');
+  assert.ok(!d.t1, 'the first one stays for her to decide');
+  const s = Csv.run({ rows: [{ date: '2026-10-01', amount: 0, note: 'x', balance: 1 }, { date: '2026-11-02', amount: 0, note: 'y', balance: 1 }], txns, acct: 's', from: '2026-10-01', to: '2026-11-02' });
+  const all = Csv.explainAll([{ acct: 'e', res: r }, { acct: 's', res: s }], txns);
+  assert.deepEqual(all.flatMap(o => o.ex.ghost.map(x => x.t.id)).sort(), ['g1', 'g2'], 'a move neither bank file has: both sides');
+  assert.ok(read('finance/csv-check.js').includes("grp('ghost'"));
+});

@@ -4,6 +4,18 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 21/11 11:50pm: CSV check accuracy pass on her real files (PUSHED 21/11)
+- Jaimi: "double check this checking against csv file is smart and accurate". Read-only run of every CSV in Downloads against her 16/11 backup (stale but real), looking at every line left over.
+- Found and fixed in finance/csv-check.js: (1) a feed line still on its old pending amount next to the bank's real line (Coles Online −349.14 vs −350.85), or a typed guess next to it (Woolworths −382.60 vs −381.10): now an extra copy ("as −$350.85, the bank's amount"). (2) the same line typed in twice, neither in the bank: the second is a copy. (3) a move between two accounts that neither bank file has (old "account consolidation" lines): new "🔁 Moves the bank never had", remove both. (4) $0 lines (Visa provisioning, Linkt) never show as something to fix.
+- Result on her data: every bank line matched in 9 of 10 accounts (2601/2602 Everyday; the one left is after the backup date); what is left to decide went from 35-ish to 1–2 per account. Savings: its CSV (account …4944) doesn't match the number saved on Savings in the app (…3269), which is why it asked; it now remembers once picked.
+- Proof: 733 passed (new tests from her real lines). Preview: two-account check shows the near copy, the typed copy and the ghost move correctly. sw lifehub-v119 (same release as 11:20pm).
+
+### 21/11 11:20pm: CSV check matches on the day you paid; same shop, different amount (PUSHED 21/11)
+- Jaimi's screenshot: Everyday "35 need you": SuperSpares $152.96 on 3 Aug twice (feed + typed), Woolworths Online −$382.60 typed, Google One +$9.49 from the feed, and she didn't know what to do.
+- Cause (from her Everyday CSV in Downloads): the CSV's date is the day the bank processed it (SuperSpares 07 Aug, Google refund 23 Apr), the feed uses the day paid, which is in the description ("V3928 03/08", "V3993 10/04"); 4–13 days apart, beyond the 3-day window. Woolworths: bank −$381.10 on 17 Sep (order changed).
+- finance/csv-check.js: paidOn(row) reads the day paid from card/EFTPOS descriptions; matching, double-ups, transfers, dates and other-account checks use whichever bank date is closer; the feed's own copy is matched first (so a typed copy is the extra); app payments a few days before the file's first line are looked at too. New "💲 Same shop, different amount" group (shared shop word, ≤7 days, ≤20%): default "Use the bank's $X on <day>" (amount/date overrides, userNote keeps the old amount). "Needs you" now says what to do: Remove / Move / Leave it for now.
+- Proof: 732 passed (new test with her real descriptions). Read-only run on her CSV + 16/11 backup: 2598 of 2602 matched, 7 left to decide. Preview: typed copy → double-up, Woolworths → bank amount, saved. sw lifehub-v119.
+
 ### 21/11 10:50pm: Check all my accounts: ask once per file, clearer saved files (PUSHED 21/11)
 - Jaimi's screenshot: it asked "Which account is Transactions-2.csv?" although Savings already had that file, and she didn't know why it asked her to "Forget".
 - finance/csv-check.js: matchAccount(parsed, accts, files) also recognises a file by a saved file's account number, or when every line is already in one account's saved file, so she is asked once. Saved files card: "Bank files saved", one-line why, "Remove file" (was Forget, with a clearer confirm), and "⚠️ Starts too late. The app has payments from X" when a file starts more than a week after the app's first payment in that account.

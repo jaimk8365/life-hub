@@ -11,6 +11,21 @@
  const at=d=>Date.parse(d+'T12:00:00Z');
  const gap=(a,b)=>Math.abs(Math.round((at(a)-at(b))/86400000));
  const addDays=(d,n)=>new Date(at(d)+n*86400000).toISOString().slice(0,10);
+ /* The day you actually paid: card and EFTPOS lines carry it in the description ("V3928 03/08 …", "EFTPOS 30/10 …"),
+    while the CSV's own date is the day the bank processed it, often days later. The bank feed uses the day you paid. */
+ function paidOn(r){
+  const m=/(?:^|\s)(?:V\d{4}|EFTPOS|POS)\s+(\d{1,2})\/(\d{1,2})(?=\s|\d|$)/i.exec(String(r&&r.note||''));if(!m||!r.date)return null;
+  const dd=+m[1],mm=+m[2];if(dd<1||dd>31||mm<1||mm>12)return null;
+  let y=+r.date.slice(0,4),d=y+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+  if(d>r.date)d=(y-1)+d.slice(4);
+  return Number.isFinite(at(d))&&new Date(at(d)).toISOString().slice(0,10)===d&&gap(d,r.date)<=14?d:null;
+ }
+ // days between an app payment and a bank line, by whichever of the bank's two dates is closer
+ const dgap=(t,r)=>Math.min(gap(t.date,r.date),r.paid?gap(t.date,r.paid):99);
+ /* Same shop: a word of 4+ letters both descriptions share, leaving out words every bank line has. */
+ const COMMON=new Set(['debit','credit','eftpos','visa','online','payment','paypal','transfer','linked','trns','miscellaneous','gympie','brisbane','qld','australia','pty','ltd','from','kyte','card','purchase','direct','internet','banking']);
+ const words=n=>new Set(String(n||'').toLowerCase().split(/[^a-z]+/).filter(w=>w.length>=4&&!COMMON.has(w)));
+ const sameShop=(a,b)=>{const A=words(a);for(const w of words(b))if(A.has(w))return true;return false;};
  /* The bank's balance at the end of `day`: of that day's rows, the last one is the one no other row follows on from. */
  function closingOn(rows,day){
   const withBal=rows.filter(r=>r.balance!=null&&Number.isFinite(+r.balance)&&r.date<=day);if(!withBal.length)return null;
@@ -30,16 +45,21 @@
   if(start&&from<start){from=start;clipped=true;}
   if(start&&to<start)throw Error('Your books start on '+start+'. This file is all before that.');
   if(from>to)throw Error('Your CSV covers '+span[0]+' to '+span[span.length-1]+'. Pick dates inside those.');
-  const bank=rows.filter(r=>r.date>=from&&r.date<=to).map((r,i)=>({...r,i}));
+  const bank=rows.filter(r=>r.date>=from&&r.date<=to).map((r,i)=>({...r,i,paid:paidOn(r)}));
   const live=t=>t&&!t.deleted&&t.acct===acct&&Number.isFinite(+t.amount)&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'');
   // a "Start fresh" balancing line is not a real payment: it is never matched against the bank, it is listed on its own
   const isFresh=t=>t.src==='balance-adjustment'||!!t.startFresh;
-  const app=txns.filter(t=>live(t)&&!isFresh(t)&&t.date>=from&&t.date<=to);
+  // a card payment made a few days before the file's first line is processed inside it, so look back to the earliest day paid
+  const appFrom=bank.reduce((m,r)=>r.paid&&r.paid<m?r.paid:m,from);
+  const app=txns.filter(t=>live(t)&&!isFresh(t)&&t.date>=appFrom&&t.date<=to);
   const used=new Set(),matched=[],onlyBank=[];
   // exact day first, then nearest day within 3, so a posting delay never steals another day's exact match
-  const pass=(maxGap,list)=>list.filter(r=>{let best=null,bg=99;for(const t of app){if(used.has(t)||cents(t.amount)!==cents(r.amount))continue;const g=gap(t.date,r.date);if(g<=maxGap&&g<bg){best=t;bg=g;if(!g)break;}}if(best){used.add(best);matched.push({row:r,txn:best,days:bg});return false;}return true;});
+  // the bank feed's own copy is tried first, so when a payment is in the app twice the copy that stays is the feed's
+  const order=app.filter(t=>t.pocketsmithId!=null).concat(app.filter(t=>t.pocketsmithId==null));
+  const pass=(maxGap,list)=>list.filter(r=>{let best=null,bg=99;for(const t of order){if(used.has(t)||cents(t.amount)!==cents(r.amount))continue;const g=dgap(t,r);if(g<=maxGap&&g<bg){best=t;bg=g;if(!g)break;}}if(best){used.add(best);matched.push({row:r,txn:best,days:bg});return false;}return true;});
   pass(3,pass(0,bank)).forEach(r=>onlyBank.push(r));
-  const onlyApp=app.filter(t=>!used.has(t));
+  // a $0 line (card checks, toll tags) moves no money, so it is never something to fix
+  const onlyApp=app.filter(t=>!used.has(t)&&t.date>=from&&cents(t.amount)!==0);
   const sum=(list,f)=>r2(list.reduce((s,x)=>s+f(x),0));
   const bankIn=sum(bank,r=>Math.max(0,+r.amount)),bankOut=sum(bank,r=>Math.min(0,+r.amount)),appIn=sum(app,t=>Math.max(0,+t.amount)),appOut=sum(app,t=>Math.min(0,+t.amount));
   const close=closingOn(rows,to);
@@ -103,15 +123,26 @@
  const isTransfer=r=>/transfer|\btrns?\b|\btfr\b|linked acc|osko|payid|pay anyone|internet banking|online b\d|\bbpay\b/i.test(String(r.type||'')+' '+String(r.note||''));
  function explain(res,txns=[]){
   const app=res.onlyApp.map((t,i)=>({i,t,kind:'none'})),bank=res.onlyBank.map((r,j)=>({j,r,kind:'add'}));
-  app.forEach(a=>{const m=res.matched.find(m=>m.txn!==a.t&&cents(m.txn.amount)===cents(a.t.amount)&&gap(m.txn.date,a.t.date)<=3);if(m){a.kind='double';a.twin=m.txn;a.row=m.row;}});
+  app.forEach(a=>{const m=res.matched.find(m=>m.txn!==a.t&&cents(m.txn.amount)===cents(a.t.amount)&&(gap(m.txn.date,a.t.date)<=3||dgap(a.t,m.row)<=3));if(m){a.kind='double';a.twin=m.txn;a.row=m.row;}});
   bank.forEach(b=>{if(!cents(b.r.amount))b.kind='zero';});
   // a bank transfer (between your accounts, or paying someone by transfer) with the same amount, either way round
-  app.filter(a=>a.kind==='none').forEach(a=>{let best=null,bg=99;bank.forEach(b=>{if(b.kind!=='add'||!isTransfer(b.r)||Math.abs(cents(b.r.amount))!==Math.abs(cents(a.t.amount)))return;const g=gap(b.r.date,a.t.date);if(g<=10&&g<bg){best=b;bg=g;}});if(best){a.kind='transfer';a.row=best.r;a.flip=Math.sign(+best.r.amount)!==Math.sign(+a.t.amount);best.kind='transfer';best.txn=a.t;}});
-  app.filter(a=>a.kind==='none').forEach(a=>{let best=null,bg=99;bank.forEach(b=>{if(b.kind!=='add'||cents(b.r.amount)!==cents(a.t.amount))return;const g=gap(b.r.date,a.t.date);if(g<=10&&g<bg){best=b;bg=g;}});if(best){a.kind='date';a.row=best.r;best.kind='date';best.txn=a.t;}});
+  app.filter(a=>a.kind==='none').forEach(a=>{let best=null,bg=99;bank.forEach(b=>{if(b.kind!=='add'||!isTransfer(b.r)||Math.abs(cents(b.r.amount))!==Math.abs(cents(a.t.amount)))return;const g=dgap(a.t,b.r);if(g<=10&&g<bg){best=b;bg=g;}});if(best){a.kind='transfer';a.row=best.r;a.flip=Math.sign(+best.r.amount)!==Math.sign(+a.t.amount);best.kind='transfer';best.txn=a.t;}});
+  app.filter(a=>a.kind==='none').forEach(a=>{let best=null,bg=99;bank.forEach(b=>{if(b.kind!=='add'||cents(b.r.amount)!==cents(a.t.amount))return;const g=dgap(a.t,b.r);if(g<=10&&g<bg){best=b;bg=g;}});if(best){a.kind='date';a.row=best.r;best.kind='date';best.txn=a.t;}});
+  // same shop, a few days apart, a slightly different amount (an online order that changed, a tip, a typed estimate)
+  app.filter(a=>a.kind==='none').forEach(a=>{let best=null,bs=1e9;bank.forEach(b=>{if(b.kind!=='add'||!cents(b.r.amount)||Math.sign(+b.r.amount)!==Math.sign(+a.t.amount)||isTransfer(b.r)||!sameShop(a.t.note,b.r.note))return;
+   const d=Math.abs(cents(b.r.amount)-cents(a.t.amount)),g=dgap(a.t,b.r);if(!d||g>7||d>Math.abs(cents(b.r.amount))*0.2)return;const sc=d+g*100;if(sc<bs){best=b;bs=sc;}});
+   if(best){a.kind='amount';a.row=best.r;best.kind='amount';best.txn=a.t;}});
+  // an extra copy with a slightly different amount: the same shop a few days from a payment that DOES match the bank
+  // (a pending amount the feed never updated, or a typed guess next to the bank's own line)
+  app.filter(a=>a.kind==='none').forEach(a=>{const m=res.matched.find(m=>m.txn!==a.t&&Math.sign(+m.txn.amount)===Math.sign(+a.t.amount)&&(sameShop(a.t.note,m.txn.note)||sameShop(a.t.note,m.row.note))
+    &&(gap(m.txn.date,a.t.date)<=7||dgap(a.t,m.row)<=7)&&Math.abs(cents(m.txn.amount)-cents(a.t.amount))<=Math.abs(cents(m.txn.amount))*0.2);
+   if(m){a.kind='double';a.twin=m.txn;a.row=m.row;a.near=true;}});
+  // the same line typed in twice, and neither is in the bank: the second one is a copy
+  const seen=new Map();app.filter(a=>a.kind==='none').forEach(a=>{const k=a.t.date+'|'+cents(a.t.amount)+'|'+String(a.t.note||'').trim().toLowerCase();if(seen.has(k)){a.kind='double';a.twin=seen.get(k);a.copy=true;}else seen.set(k,a.t);});
   const live=t=>t&&!t.deleted&&t.acct!==res.acct&&Number.isFinite(+t.amount)&&/^\d{4}-\d{2}-\d{2}$/.test(t.date||'');
-  bank.filter(b=>b.kind==='add').forEach(b=>{const o=txns.find(t=>live(t)&&cents(t.amount)===cents(b.r.amount)&&gap(t.date,b.r.date)<=3);if(o){b.kind='other';b.txn=o;}});
+  bank.filter(b=>b.kind==='add').forEach(b=>{const o=txns.find(t=>live(t)&&cents(t.amount)===cents(b.r.amount)&&dgap(t,b.r)<=3);if(o){b.kind='other';b.txn=o;}});
   const of=(list,k)=>list.filter(x=>x.kind===k);
-  return {app,bank,transfer:of(app,'transfer'),double:of(app,'double'),none:of(app,'none'),date:of(app,'date'),add:of(bank,'add'),other:of(bank,'other'),zero:of(bank,'zero')};
+  return {app,bank,transfer:of(app,'transfer'),double:of(app,'double'),none:of(app,'none'),date:of(app,'date'),amount:of(app,'amount'),add:of(bank,'add'),other:of(bank,'other'),zero:of(bank,'zero')};
  }
  /* Several accounts at once, each checked against the others:
     elsewhere = in the app under this account, but it is in ANOTHER account's bank file (and that account's app lacks it) → move it there
@@ -124,7 +155,7 @@
   const by=new Map(out.map(o=>[o.acct,o]));
   // 1) a payment sitting in the wrong account, seen from both sides
   out.forEach(A=>A.ex.none.forEach(a=>{if(a.kind!=='none')return;
-   for(const B of out){if(B===A)continue;const b=B.ex.add.find(b=>b.kind==='add'&&cents(b.r.amount)===cents(a.t.amount)&&gap(b.r.date,a.t.date)<=3);
+   for(const B of out){if(B===A)continue;const b=B.ex.add.find(b=>b.kind==='add'&&cents(b.r.amount)===cents(a.t.amount)&&dgap(a.t,b.r)<=3);
     if(b){a.kind='elsewhere';a.toAcct=B.acct;a.row=b.r;b.kind='covered';b.txn=a.t;break;}}
   }));
   // a "wrong account" row found from the other side hides its twin in that account's "not in the bank" list
@@ -139,8 +170,13 @@
    for(const B of out){if(B===A)continue;const c=B.ex.add.find(c=>c.kind==='add'&&!c.pair&&isTransfer(c.r)&&cents(c.r.amount)===-cents(b.r.amount)&&gap(c.r.date,b.r.date)<=3);
     if(c){b.pair={acct:B.acct,row:c.r};c.pair={acct:A.acct,row:b.r};break;}}
   }));
+  // 4) a move between two of your accounts that only the app has: neither bank file has either side, so the money never moved
+  out.forEach(A=>A.ex.none.forEach(a=>{if(a.kind!=='none')return;
+   for(const B of out){if(B===A)continue;const b=B.ex.none.find(b=>b.kind==='none'&&cents(b.t.amount)===-cents(a.t.amount)&&gap(b.t.date,a.t.date)<=3);
+    if(b){a.kind='ghost';a.otherAcct=B.acct;b.kind='ghost';b.otherAcct=A.acct;break;}}
+  }));
   const of=(l,k)=>l.filter(x=>x.kind===k);
-  out.forEach(o=>{const x=o.ex;Object.assign(x,{double:of(x.app,'double'),none:of(x.app,'none'),date:of(x.app,'date'),transfer:of(x.app,'transfer'),elsewhere:of(x.app,'elsewhere'),dupelse:of(x.app,'dupelse'),add:of(x.bank,'add'),other:of(x.bank,'other'),zero:of(x.bank,'zero')});});
+  out.forEach(o=>{const x=o.ex;Object.assign(x,{ghost:of(x.app,'ghost'),double:of(x.app,'double'),none:of(x.app,'none'),date:of(x.app,'date'),amount:of(x.app,'amount'),transfer:of(x.app,'transfer'),elsewhere:of(x.app,'elsewhere'),dupelse:of(x.app,'dupelse'),add:of(x.bank,'add'),other:of(x.bank,'other'),zero:of(x.bank,'zero')});});
   return out;
  }
  /* Which of your accounts a bank file belongs to, from the account number in the file (last digits match). */
@@ -171,7 +207,7 @@
   rows.sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0);
   return {name:saved.name===name?name:name+' + earlier',rows,min:rows[rows.length-1].date,max:rows[0].date,accountNumber:fresh.accountNumber||saved.accountNumber||'',at:at||null};
  }
- return {run,closingOn,whereToLook,explain,isTransfer,explainAll,matchAccount,mergeFile};
+ return {run,closingOn,whereToLook,explain,isTransfer,explainAll,matchAccount,mergeFile,paidOn};
 });
 
 /* ---------------- Screen (Finance page only) ---------------- */
@@ -295,14 +331,15 @@
   return [['cat:loan_'+acct+'_repay','💸 Mark as loan repayment'],['cat:transfer','↔️ Mark as redraw / drawdown (to another account)'],['cat:loan_'+acct+'_interest','📈 Mark as interest charged'],['cat:loan_'+acct+'_fees','🧾 Mark as fees']].filter(o=>o[0].slice(4)!==t.cat);
  }
  const doneBtn=()=>'<div class="cc-done"><button class="btn dark" id="cc_apply" onclick="csvCheckApply()" style="display:block;width:100%;padding:14px;font-size:1.05em">✅ Done: update the app</button><p class="fx-small" style="margin:6px 0 0;text-align:center">Nothing is saved until you tap Done.</p></div>';
- function kinds(ex){const n=k=>(ex[k]||[]).length;return {double:n('double')+n('dupelse'),add:n('add'),transfer:n('transfer'),move:n('other')+n('elsewhere'),date:n('date'),none:n('none'),zero:n('zero')};}
+ function kinds(ex){const n=k=>(ex[k]||[]).length;return {ghost:n('ghost'),double:n('double')+n('dupelse'),add:n('add'),transfer:n('transfer'),move:n('other')+n('elsewhere'),date:n('date')+n('amount'),none:n('none'),zero:n('zero')};}
  function todoLines(ex){
   const k=kinds(ex),t=[];
   if(k.double)t.push('👯 <b>'+k.double+' double-up'+(k.double===1?'':'s')+'</b> to remove');
+  if(k.ghost)t.push('🔁 <b>'+k.ghost+'</b> move'+(k.ghost===1?'':'s')+' between accounts the bank never had');
   if(k.add)t.push('➕ <b>'+k.add+'</b> to add to the app');
   if(k.move)t.push('🔀 <b>'+k.move+'</b> in the wrong account · move');
   if(k.transfer)t.push('🔁 <b>'+k.transfer+'</b> bank transfer'+(k.transfer===1?'':'s')+' to match');
-  if(k.date)t.push('📅 <b>'+k.date+'</b> with a different date · use the bank date');
+  if(k.date)t.push('📅 <b>'+k.date+'</b> with a different date or amount · use the bank\'s');
   if(k.none)t.push('❓ <b>'+k.none+'</b> need you (not in any bank file)');
   if(k.zero)t.push('⏭ <b>'+k.zero+'</b> $0 lines · nothing to do');
   return t;
@@ -322,12 +359,14 @@
   const grp=(key,title,why,body)=>'<div class="cc-g" data-cc-group="'+key+'"><h3>'+title+'</h3><p class="fx-small">'+why+'</p>'+body+'</div>';
   const todo=todoLines(ex);
   let ready='',needs='';
-  if(ex.double.length)ready+=grp('double','👯 Double-ups ('+ex.double.length+')','The bank has each of these <b>once</b>, but the app has it <b>twice</b>. Removing the extra copy is safe: the one that matches the bank stays.',
-   ex.double.slice(0,80).map(x=>row({txn:x.t,g:'double'},[['del','🗑 Remove this extra copy'],['keep','Leave it']],'del',x.t.date,x.t.note,x.t.amount,'Already in the app: '+e(day(x.twin.date))+(x.twin.note?' · '+e(String(x.twin.note).slice(0,40)):''))).join(''));
+  if(ex.double.length)ready+=grp('double','👯 Double-ups ('+ex.double.length+')','The app has each of these <b>twice</b>. Removing the extra copy is safe: the other one stays.',
+   ex.double.slice(0,80).map(x=>row({txn:x.t,g:'double'},[['del','🗑 Remove this extra copy'],['keep','Leave it']],'del',x.t.date,x.t.note,x.t.amount,(x.copy?'Typed in twice. The bank has neither. ':'')+'Already in the app: '+e(day(x.twin.date))+(x.near?' as <b>'+money(+x.twin.amount)+'</b> (the bank\'s amount)':'')+(x.twin.note?' · '+e(String(x.twin.note).slice(0,40)):''))).join(''));
   if((ex.dupelse||[]).length)ready+=grp('dupelse','👯 Extra copies in the wrong account ('+ex.dupelse.length+')','Another account already has each of these, and it matches <b>that</b> account\'s bank file. This copy is extra.',
    ex.dupelse.slice(0,80).map(x=>row({txn:x.t,g:'dupelse'},[['del','🗑 Remove this extra copy'],['keep','Leave it']],'del',x.t.date,x.t.note,x.t.amount,'Already in <b>'+e(acc(x.twinAcct).name)+'</b> on '+e(day(x.twin.date))+', matching its bank file')).join(''));
   if((ex.elsewhere||[]).length)ready+=grp('elsewhere','🔀 Belongs in another account ('+ex.elsewhere.length+')','Not in <b>'+e(here.name)+'</b>\'s bank file, but it <b>is</b> in another account\'s bank file, and that account is missing it.',
    ex.elsewhere.slice(0,80).map(x=>row({txn:x.t,row:x.row,g:'elsewhere'},[['move:'+x.toAcct,'🔀 Move to '+acc(x.toAcct).name],['keep','Leave it'],['del','🗑 Remove']],'move:'+x.toAcct,x.t.date,x.t.note,x.t.amount,'In <b>'+e(acc(x.toAcct).name)+'</b>\'s bank file on '+e(day(x.row.date)))).join(''));
+  if((ex.ghost||[]).length)ready+=grp('ghost','🔁 Moves the bank never had ('+ex.ghost.length+')','Both sides are in the app (here and in another account), but <b>neither</b> bank file has them, so the money never moved. Removing both is safe.',
+   ex.ghost.slice(0,80).map(x=>row({txn:x.t,g:'ghost'},[['del','🗑 Remove (the bank never had it)'],['keep','Leave it']],'del',x.t.date,x.t.note,x.t.amount,'Other side in <b>'+e(acc(x.otherAcct).name)+'</b>, not in its bank file either')).join(''));
   if(ex.transfer.length)ready+=grp('transfer','🔁 Bank transfers ('+ex.transfer.length+')','The bank shows these as a <b>transfer</b>. The app has them as something else, or the other way round.',
    ex.transfer.slice(0,80).map(x=>{const amt=+x.row.amount,io=amt>0?'in':'out',opts=x.flip
      ?[['trflip','🔁 Make it '+money(amt)+' transfer '+io+' (as the bank shows)'],['keep','Leave it'],['del','🗑 Remove']].concat(others.map(a=>['move:'+a.id,'🔀 Move to '+a.name]))
@@ -339,9 +378,11 @@
    ex.other.slice(0,80).map(x=>row({txn:x.txn,g:'other'},[['here','🔀 Move it to '+here.name],['keep','Leave it in '+acc(x.txn.acct).name]],'here',x.r.date,x.r.note,x.r.amount,'In the app under <b>'+e(acc(x.txn.acct).name)+'</b> on '+e(day(x.txn.date)))).join(''));
   if(ex.date.length)ready+=grp('date','📅 Same payment, different date ('+ex.date.length+')','The app and the bank have this payment on different days.',
    ex.date.slice(0,80).map(x=>row({txn:x.t,row:x.row,g:'date'},[['bankdate','📅 Use the bank date ('+day(x.row.date)+')'],['keep','Leave it']].concat(loanOpts(x.t,r.acct)),'bankdate',x.t.date,x.t.note,x.t.amount,'Bank date: '+e(day(x.row.date)))).join(''));
+  if((ex.amount||[]).length)ready+=grp('amount','💲 Same shop, different amount ('+ex.amount.length+')','The bank has the same shop a few days apart, for a slightly different amount (an online order that changed, or a typed guess). The bank is right.',
+   ex.amount.slice(0,80).map(x=>row({txn:x.t,row:x.row,g:'amount'},[['bankamt','💲 Use the bank\'s '+money(+x.row.amount)+' on '+day(x.row.date)],['keep','Leave it']],'bankamt',x.t.date,x.t.note,x.t.amount,'Bank: <b>'+money(+x.row.amount)+'</b> on '+e(day(x.row.date))+' · '+e(String(x.row.note||'').slice(0,50)))).join(''));
   if(ex.zero.length)ready+=grp('zero','⏭ $0 card checks and notices ('+ex.zero.length+')','No money moved, so nothing to do.',
    '<div class="cc-info">'+ex.zero.slice(0,20).map(x=>info(x.r.date,x.r.note,0,'')).join('')+'</div>');
-  if(ex.none.length)needs+=grp('none','❓ Needs you: in the app, not in the bank ('+ex.none.length+' · '+tot(ex.none)+')','Not in any bank file you added. Typed by hand, still pending, or in an account you have not added yet? Pick what is right for each one.',
+  if(ex.none.length)needs+=grp('none','❓ Needs you: the bank never had these ('+ex.none.length+' · '+tot(ex.none)+')','<b>Remove</b> it if you typed it in twice, or it was a pending payment that never went through. <b>Move</b> it if it came out of another account. Not sure? <b>Leave it for now</b>.',
    ex.none.slice(0,80).map(x=>row({txn:x.t,g:'none'},[['keep','Leave it for now']].concat(loanOpts(x.t,r.acct),[['del','🗑 Remove (it never came out of '+here.name+')']],others.map(a=>['move:'+a.id,'🔀 Move to '+a.name])),'keep',x.t.date,x.t.note,x.t.amount,x.t.pocketsmithId!=null?'From the bank feed':'Added by hand or from a statement')).join(''));
   const fresh=r.fresh||[];
   if(fresh.length){
@@ -349,7 +390,7 @@
     fresh.map(t=>row({txn:t,g:'fresh'},[['del','🗑 Remove this balancing line'],['keep','Leave it for now']],'del',t.date,t.note,t.amount,'Not a payment · can be brought back from the account')).join(''));
    todo.unshift('🧾 <b>'+fresh.length+' balancing line'+(fresh.length===1?'':'s')+'</b> to remove (not real payments)');
   }
-  const nReady=fresh.length+ex.double.length+(ex.dupelse||[]).length+(ex.elsewhere||[]).length+ex.transfer.length+ex.add.length+ex.other.length+ex.date.length;
+  const nReady=fresh.length+(ex.ghost||[]).length+ex.double.length+(ex.dupelse||[]).length+(ex.elsewhere||[]).length+ex.transfer.length+ex.add.length+ex.other.length+ex.date.length+(ex.amount||[]).length;
   let h=(opts.multi?'':CC_CSS+(todo.length?'<div class="cc-todo"><b>What to do</b>'+todo.map(t=>'<div>'+t+'</div>').join('')+'<div class="fx-small" style="margin-top:6px">The sure ones are already picked in <b>Ready to fix</b>. Only <b>Needs you</b> needs a decision. Then tap Done.</div></div>':''));
   h+=needs;
   if(ready)h+='<details class="cc-ready"'+(opts.openReady?' open':'')+'><summary>✅ Ready to fix'+(nReady?' ('+nReady+')':'')+' · already picked for you · tap to look</summary>'+ready+'</details>';
@@ -405,7 +446,7 @@
  }
  function sums(p){
   const c={add:0,del:0,move:0,fix:0};
-  p.forEach(x=>{if(x.v==='add')c.add++;else if(x.v==='del')c.del++;else if(x.v==='here'||x.v.startsWith('move:'))c.move++;else if(x.v==='bankdate'||x.v==='trflip'||x.v==='trmatch'||x.v.startsWith('cat:')||(x.ref.txn&&Object.keys(x.ed).length))c.fix++;
+  p.forEach(x=>{if(x.v==='add')c.add++;else if(x.v==='del')c.del++;else if(x.v==='here'||x.v.startsWith('move:'))c.move++;else if(x.v==='bankdate'||x.v==='bankamt'||x.v==='trflip'||x.v==='trmatch'||x.v.startsWith('cat:')||(x.ref.txn&&Object.keys(x.ed).length))c.fix++;
    if(x.v!=='del'&&x.v!=='bankdate'&&x.ref.txn&&Object.keys(x.ed).length&&(x.v==='here'||x.v.startsWith('move:')))c.fix++;});
   return c;
  }
@@ -428,10 +469,11 @@
    const r=ref.res||st.result;
    if(v==='add'){const x=ref.row;made.push({id:'csv_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),acct:r.acct,date:ed.date||x.date,amount:ed.amount!=null?ed.amount:+x.amount,note:ed.note||x.note||'From bank CSV',cat:ed.cat||ref.cat||(()=>{const sc=suggestCat(x,r.acct);return sc!=='other'?sc:+(ed.amount!=null?ed.amount:x.amount)>0?'income':'other';})(),categoryOverride:!!(ed.cat||ref.cat),src:'csv-check',needsReview:true});return;}
    const t=ref.txn;if(!t)return;
-   if(v==='del'){Object.assign(t,{deleted:true,deletedAt:now,deletedReason:ref.g==='fresh'?'Balancing line removed (not a real payment)':ref.g==='double'?'Double-up (bank CSV has it once)':ref.g==='dupelse'?'Extra copy (another account has it)':'Not in the bank CSV'});return;}
+   if(v==='del'){Object.assign(t,{deleted:true,deletedAt:now,deletedReason:ref.g==='fresh'?'Balancing line removed (not a real payment)':ref.g==='ghost'?'Move between accounts that neither bank file has':ref.g==='double'?'Double-up (bank CSV has it once)':ref.g==='dupelse'?'Extra copy (another account has it)':'Not in the bank CSV'});return;}
    if(v==='here'||v.startsWith('move:')){const to=v==='here'?r.acct:v.slice(5);t.movedFrom=t.acct;t.acct=to;t.acctOverride=true;t.movedAt=now;}
    if(v.startsWith('cat:')){t.cat=v.slice(4);t.categoryOverride=true;t.sortedAt=now;}
    if(v==='bankdate'&&ref.row){t.date=ref.row.date;t.dateOverride=true;}
+   if(v==='bankamt'&&ref.row){t.userNote=('Was '+money(+t.amount)+' in the app').slice(0,200);t.amount=+ref.row.amount;t.amountOverride=true;t.date=ref.row.date;t.dateOverride=true;}
    if((v==='trflip'||v==='trmatch')&&ref.row){if(v==='trflip'){t.userNote=('Was in the app as '+money(+t.amount)+(t.note?' · '+t.note:'')).slice(0,200);t.amount=+ref.row.amount;t.amountOverride=true;t.note=ref.row.note||t.note;t.noteOverride=true;}t.date=ref.row.date;t.dateOverride=true;t.cat='transfer';t.categoryOverride=true;t.catOnce=true;}
    fixT(t,ed);
   });
@@ -523,14 +565,14 @@
    if(mt.applied)h+='<div class="tr-card tr-good"><div class="tr-h">✓ App updated</div><p>'+e(mt.applied)+'. Every account was checked again.</p>'+(mt.back==='fix'?'<button class="btn dark" style="margin-top:8px" onclick="fixOpen()">Next step ›</button>':'')+'</div>';
    const t=trustNow(),b0=st.trustBefore;
    if(t)h+='<div class="cc-todo"><b>🧰 Fix my numbers: '+e(t.headline)+'</b>'+(b0&&trustCount(b0)!==trustCount(t)?' <span class="fx-small">(was '+trustCount(b0)+')</span>':'')+'</div>';
-   const all={double:[],dupelse:[],add:[],transfer:[],other:[],elsewhere:[],date:[],none:[],zero:[]};
+   const all={double:[],dupelse:[],ghost:[],add:[],transfer:[],other:[],elsewhere:[],date:[],amount:[],none:[],zero:[]};
    mt.results.forEach(o=>Object.keys(all).forEach(k=>all[k]=all[k].concat(o.ex[k]||[])));
    const todo=todoLines(all),okN=mt.results.filter(o=>o.res.ok).length,freshN=mt.results.reduce((n,o)=>n+(o.res.fresh||[]).length,0);
    if(freshN)todo.unshift('🧾 <b>'+freshN+' balancing line'+(freshN===1?'':'s')+'</b> to remove (not real payments)');
    if(!todo.length&&mt.back==='fix')h+='<button class="btn dark" style="display:block;width:100%;margin:8px 0" onclick="fixOpen()">✓ Nothing to fix here · Next step ›</button>';
    h+='<div class="cc-todo"><b>What to do · all accounts</b>'+(todo.length?todo.map(x=>'<div>'+x+'</div>').join(''):'<div>✅ Nothing to fix.</div>')+'<div class="fx-small" style="margin-top:6px">'+okN+' of '+mt.results.length+' accounts already match. The sure fixes are picked for you. Only <b>Needs you</b> needs a decision. Then tap Done once.</div></div>';
    mt.results.forEach(o=>{
-    const a=acctById(o.acct)||{name:o.acct},r=o.res,k=kinds(o.ex),fixN=k.double+k.add+k.move+k.transfer+k.date+(r.fresh||[]).length;
+    const a=acctById(o.acct)||{name:o.acct},r=o.res,k=kinds(o.ex),fixN=k.ghost+k.double+k.add+k.move+k.transfer+k.date+(r.fresh||[]).length;
     const status=r.ok?'✅ Matches the bank':(k.none?'❓ '+k.none+' need'+(k.none===1?'s':'')+' you · ':'⚠️ ')+(fixN?fixN+' ready to fix':'')+(!fixN&&!k.none&&r.realDiff?'Payments match, balance off by '+money(Math.abs(r.realDiff)):'');
     h+='<details class="cc-acct"'+(r.ok?'':' open')+'><summary>'+e((a.emoji||'🏦')+' '+a.name)+' · '+e(status)+'<small>'+r.matched.length+' of '+(r.bankCount-k.zero)+' bank payments match · '+e(shortD(r.from))+' – '+e(shortD(r.to))+(r.bankClose?' · bank '+money(r.bankClose.balance)+', app '+money(r.appClose):'')+'</small></summary>'
      +(r.ok?'':groupsHtml(r,{multi:true,ex:o.ex}))+'</details>';
