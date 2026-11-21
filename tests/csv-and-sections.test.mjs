@@ -249,3 +249,28 @@ test('a bank file finds its account by number; a new export joins the saved one 
   const g = read('finance/csv-check.js');
   for (const s of ['📚 Check all my accounts', "K_BANK_FILES='fin_bank_files_v1'", 'Ready to fix', 'Needs you', 'csvMultiOpen:multiOpen']) assert.ok(g.includes(s), s);
 });
+
+test('Fix my numbers is one step at a time: fresh balances → check against bank files → sort → settle', () => {
+  const F = require('../finance/fix-numbers.js');
+  const acct = (id, match, extra = []) => ({ id, name: id, checks: [{ key: 'fresh', tone: 'good' }, match ? { key: 'match', tone: 'good' } : { key: 'match', tone: 'bad', amount: -120.5, fix: 'match' }, ...extra] });
+  const r = { all: [{ key: 'feed', tone: 'warn', fix: 'sync' }], accounts: [acct('everyday', false), acct('bills', false), acct('savings', true)] };
+  let s = F.guideSteps(r, { csvLast: {}, misc: 4, check: 0 });
+  assert.deepEqual(s.map(x => x.id), ['sync', 'check', 'misc']);
+  assert.deepEqual(s[1].accounts.map(a => a.id), ['everyday', 'bills']);
+  s = F.guideSteps({ ...r, all: [] }, { csvLast: { everyday: { clean: true } }, misc: 0, check: 2 });
+  assert.deepEqual(s.map(x => x.id), ['check', 'sortcheck', 'settle'], 'an account whose payments all match moves on to "settle"');
+  assert.deepEqual(s[2].accounts.map(a => a.id), ['everyday']);
+  assert.deepEqual(F.guideSteps({ all: [], accounts: [acct('a', true)] }, {}), [], 'nothing left: all done');
+  const dupe = acct('a', true, [{ key: 'dups', tone: 'warn' }]);
+  assert.deepEqual(F.guideSteps({ all: [], accounts: [dupe] }, {}).map(x => x.id), ['check'], 'possible double-ups: check');
+  assert.deepEqual(F.guideSteps({ all: [], accounts: [dupe] }, { csvLast: { a: { clean: true } } }), [], 'the bank file says they are fine: done');
+  const g = read('finance/fix-numbers.js');
+  for (const x of ['NEXT STEP', 'More tools and every check', 'fixGuideFresh', "K_CSV_LAST='fin_csv_last_v1'"]) assert.ok(g.includes(x), x);
+  assert.ok(read('finance/csv-check.js').includes("Next step ›"));
+});
+
+test('funds: Health insurance extras (instead of an extras premium) and Braces, once, on her device', () => {
+  const f = read('finance/fund-updates.js');
+  for (const x of ["'Health insurance extras'", "name:'Braces'", 'isExtrasPremium', 'oldBill.active=false', "KEY='fin_funds_v4_extras_braces'"]) assert.ok(f.includes(x), x);
+  assert.match(read('src/finance.html'), /finance\/fund-updates\.js\?v=20261121/);
+});

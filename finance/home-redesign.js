@@ -137,7 +137,7 @@ function feedHtml(f){
   if(!f&&!t)return '';
   const bits=[];if(f&&f.misc)bits.push(f.misc+' payments in Miscellaneous');if(f&&f.off)bits.push(f.off+(f.off===1?' account does':' accounts do')+' not match the bank');if(f&&f.check)bits.push(f.check+' sorted for you to check');
   const head=t?(t.tone==='bad'?'❌ ':'⚠️ ')+t.headline:'🧰 Fix my numbers';
-  return '<section class="fh-coach fh-fix" aria-label="Fix my numbers"><div><div class="fh-coach-h">'+esc(head)+'</div><div class="fh-coach-s">'+(bits.length?esc(bits.join(' · '))+'. ':'')+(t?t.matched+' of '+t.accounts+' accounts match the bank. ':'')+'Sorting these makes every other number right.</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'fixnumbers\')">Fix</button></section>';
+  return '<section class="fh-coach fh-fix" aria-label="Fix my numbers"><div><div class="fh-coach-h">'+esc(head)+'</div><div class="fh-coach-s">'+(t&&t.next?'<b>Next step: '+esc(t.next)+'</b><br>':'')+(bits.length?esc(bits.join(' · '))+'. ':'')+(t?t.matched+' of '+t.accounts+' accounts match the bank.':'')+'</div></div><button type="button" class="fh-btn" onclick="FinHome.act(\'fixnumbers\')">Fix</button></section>';
  }
  function coachCard(c){
   if(!c)return '';

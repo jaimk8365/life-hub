@@ -223,6 +223,7 @@
   if(!st.parsed){st.result=null;return;}
   const a=acctById(st.acct)||{};
   try{st.result=FinCsvCheck.run({rows:st.parsed.rows,txns:TXNS,acct:st.acct,from:st.from,to:st.to,openBal:+a.openBal||0});}catch(err){st.result=null;st.err=err.message||'Could not check this CSV.';}
+  if(st.result)keepLast([st.result]);
   // A CSV with a balance column that matched to the cent counts as checked up to its last day, like a statement.
   const r=st.result;if(r&&r.ok&&r.bankClose){try{const cs=load(K_STATEMENTS_CC,{latest:{},history:[]})||{latest:{},history:[]};cs.history=cs.history||[];cs.latest=cs.latest||{};if(!cs.history.some(h=>h.acct===r.acct&&h.date===r.bankClose.date&&h.ok)){const rec={acct:r.acct,date:r.bankClose.date,closing:r.bankClose.balance,app:r.appClose,difference:0,ok:true,via:'csv',at:new Date().toISOString()};cs.history.unshift(rec);cs.history=cs.history.slice(0,60);cs.latest[r.acct]=rec;saveAtomic({[K_STATEMENTS_CC]:cs}).catch(()=>{});}}catch(_){}}
  }
@@ -261,7 +262,7 @@
  /* The leftovers in plain groups. Every row has a choice (with a sensible default) and ✏️ Edit, so anything can be
     fixed right here: remove, add, move to the right account, use the bank's date, or change date/amount/description.
     Nothing is saved until "✅ Done: update the app". */
- const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-r{padding:10px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.cc-top small{display:block}.cc-act{display:flex;gap:8px;margin-top:8px;align-items:center}.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;font:inherit;font-size:.92em}.cc-ed{border:0;background:none;color:#3A73A8;font:inherit;font-weight:700;padding:6px;cursor:pointer;white-space:nowrap}.cc-edit{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#FBF4E6}.cc-edit[hidden]{display:none}.cc-edit label{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92em}.cc-edit input{width:62%;padding:7px 8px;border-radius:8px;border:1px solid #E2D6C0;font:inherit}.cc-r.cc-on{background:linear-gradient(90deg,rgba(127,183,155,.12),transparent)}.cc-info{opacity:.8}.cc-ready{margin:12px 0}.cc-ready>summary{cursor:pointer;background:#E6F2EA;border-radius:14px;padding:12px 14px;font-weight:800;list-style:none}.cc-ready>summary::-webkit-details-marker{display:none}.cc-acct{background:#fff;border-radius:16px;margin:12px 0;padding:4px 12px}.cc-acct>summary{cursor:pointer;padding:10px 2px;font-weight:800;font-size:1.05em;list-style:none}.cc-acct>summary::-webkit-details-marker{display:none}.cc-acct>summary small{display:block;font-weight:600;opacity:.75;font-size:.85em}.cc-acct .cc-g{background:#FFFCF6}.cc-frow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-frow small{display:block;opacity:.75}.cc-done{position:sticky;bottom:0;background:#FEF6E8;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
+ const CC_CSS='<style id="cc-css">.cc-todo{background:#fff;color:#15384D;border-radius:14px;padding:12px 14px;margin:12px 0}.cc-todo div{margin:4px 0}.cc-g{background:#fff;color:#15384D;border-radius:14px;padding:10px 14px 12px;margin:12px 0}.cc-g h3{margin:4px 0 2px}.cc-g .fx-small{margin:0 0 6px}.cc-sub{display:block;font-size:.85em;opacity:.75;margin-top:2px}.cc-r{padding:10px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.cc-top small{display:block}.cc-act{display:flex;gap:8px;margin-top:8px;align-items:center}.cc-sel{flex:1;min-width:0;padding:9px 10px;border-radius:10px;border:1px solid #E2D6C0;background:#FFFDF8;font:inherit;font-size:.92em}.cc-ed{border:0;background:none;color:#3A73A8;font:inherit;font-weight:700;padding:6px;cursor:pointer;white-space:nowrap}.cc-edit{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:10px;background:#FBF4E6}.cc-edit[hidden]{display:none}.cc-edit label{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92em}.cc-edit input{width:62%;padding:7px 8px;border-radius:8px;border:1px solid #E2D6C0;font:inherit}.cc-r.cc-on{background:linear-gradient(90deg,rgba(127,183,155,.12),transparent)}.cc-info{opacity:.8}.cc-ready{margin:12px 0}.cc-ready>summary{cursor:pointer;background:#E6F2EA;color:#15384D;border-radius:14px;padding:12px 14px;font-weight:800;list-style:none}.cc-ready>summary::-webkit-details-marker{display:none}.cc-acct{background:#fff;color:#15384D;border-radius:16px;margin:12px 0;padding:4px 12px}.cc-acct>summary{cursor:pointer;padding:10px 2px;font-weight:800;font-size:1.05em;list-style:none}.cc-acct>summary::-webkit-details-marker{display:none}.cc-acct>summary small{display:block;font-weight:600;opacity:.75;font-size:.85em}.cc-acct .cc-g{background:#FFFCF6}.cc-frow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-top:1px solid rgba(0,0,0,.07)}.cc-frow small{display:block;opacity:.75}.cc-done{position:sticky;bottom:0;background:#FEF6E8;color:#15384D;padding:10px 0 8px;margin-top:6px;box-shadow:0 -10px 12px -10px rgba(0,0,0,.18)}</style>';
  const catOpts=cur=>{let list=[];try{list=CATS;}catch(_){}return list.map(c=>'<option value="'+e(c.id)+'"'+(c.id===cur?' selected':'')+'>'+e(((c.e||'')+' '+c.n).trim())+'</option>').join('');};
  /* What a bank line most likely is: a loan line by the bank's wording, otherwise Miscellaneous. */
  function suggestCat(x,acct){const a=acctById(acct);if(a&&a.type==='loan'&&typeof FinCats!=='undefined'&&FinCats.loanKind){const k=FinCats.loanKind({note:x.note,amount:x.amount,sourceType:x.type});if(k)return k==='transfer'?'transfer':'loan_'+acct+'_'+k;}return 'other';}
@@ -440,6 +441,12 @@
   try{const cs=load(K_STATEMENTS_CC,{latest:{},history:[]})||{latest:{},history:[]};cs.history=cs.history||[];cs.latest=cs.latest||{};
    if(!cs.history.some(h=>h.acct===r.acct&&h.date===r.bankClose.date&&h.ok)){const rec={acct:r.acct,date:r.bankClose.date,closing:r.bankClose.balance,app:r.appClose,difference:0,ok:true,via:'csv',at:new Date().toISOString()};cs.history.unshift(rec);cs.history=cs.history.slice(0,60);cs.latest[r.acct]=rec;saveAtomic({[K_STATEMENTS_CC]:cs}).catch(()=>{});}}catch(_){}
  }
+ /* What the guide in Fix my numbers needs: per account, did the last bank-file check leave anything to fix? */
+ function keepLast(results){
+  try{const last=load('fin_csv_last_v1',{})||{},at=new Date().toISOString();
+   results.forEach(r=>{if(r)last[r.acct]={clean:!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100)),at,from:r.from,to:r.to};});
+   saveAtomic({fin_csv_last_v1:last}).catch(()=>{});}catch(_){}
+ }
  function multiRun(){
   const list=[];mt.errs=mt.errs.filter(x=>!/^⚠️/.test(x));
   ACCTS.filter(a=>mt.files[a.id]).forEach(a=>{const f=mt.files[a.id];
@@ -447,7 +454,7 @@
    catch(err){mt.errs.push('⚠️ '+a.name+': '+(err.message||'could not be checked'));}
   });
   mt.results=FinCsvCheck.explainAll(list,TXNS);mt.processed=true;
-  mt.results.forEach(o=>saveCheck(o.res));
+  mt.results.forEach(o=>saveCheck(o.res));keepLast(mt.results.map(o=>o.res));
  }
  function multiProcess(){
   const b=$('cc_process');if(b){b.disabled=true;b.textContent='⏳ Checking every account…';}
@@ -467,12 +474,13 @@
   h+='<div id="cc_result"></div>';
   if(mt.processed&&mt.results){
    st.refs=[];
-   if(mt.applied)h+='<div class="tr-card tr-good"><div class="tr-h">✓ App updated</div><p>'+e(mt.applied)+'. Every account was checked again.</p></div>';
+   if(mt.applied)h+='<div class="tr-card tr-good"><div class="tr-h">✓ App updated</div><p>'+e(mt.applied)+'. Every account was checked again.</p>'+(mt.back==='fix'?'<button class="btn dark" style="margin-top:8px" onclick="fixOpen()">Next step ›</button>':'')+'</div>';
    const t=trustNow(),b0=st.trustBefore;
    if(t)h+='<div class="cc-todo"><b>🧰 Fix my numbers: '+e(t.headline)+'</b>'+(b0&&trustCount(b0)!==trustCount(t)?' <span class="fx-small">(was '+trustCount(b0)+')</span>':'')+'</div>';
    const all={double:[],dupelse:[],add:[],transfer:[],other:[],elsewhere:[],date:[],none:[],zero:[]};
    mt.results.forEach(o=>Object.keys(all).forEach(k=>all[k]=all[k].concat(o.ex[k]||[])));
    const todo=todoLines(all),okN=mt.results.filter(o=>o.res.ok).length;
+   if(!todo.length&&mt.back==='fix')h+='<button class="btn dark" style="display:block;width:100%;margin:8px 0" onclick="fixOpen()">✓ Nothing to fix here · Next step ›</button>';
    h+='<div class="cc-todo"><b>What to do · all accounts</b>'+(todo.length?todo.map(x=>'<div>'+x+'</div>').join(''):'<div>✅ Nothing to fix.</div>')+'<div class="fx-small" style="margin-top:6px">'+okN+' of '+mt.results.length+' accounts already match. The sure fixes are picked for you. Only <b>Needs you</b> needs a decision. Then tap Done once.</div></div>';
    mt.results.forEach(o=>{
     const a=acctById(o.acct)||{name:o.acct},r=o.res,k=kinds(o.ex),fixN=k.double+k.add+k.move+k.transfer+k.date;

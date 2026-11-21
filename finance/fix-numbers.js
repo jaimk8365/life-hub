@@ -139,7 +139,26 @@
   if(Math.abs(cents(g.difference))<1)return 'Matches the bank.';
   return g.difference>0?'The app is '+money(g.difference)+' lower than the bank. It is missing money coming in, or has spending counted twice.':'The app is '+money(-g.difference)+' higher than the bank. It is missing some spending, or has money in counted twice.';
  }
- return {shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money,balanceOn,statementCheck,trustReport};
+ /* ---------- The guide: one step at a time ----------
+    From the checks (trustReport) and the last bank-file check per account (csvLast: {acct: {clean, at}}), the
+    steps that are left, in the order that works: fresh bank balances → check accounts against bank files →
+    sort → settle any old difference. Each step names one button. Pure. */
+ function guideSteps(r,o){
+  o=o||{};const steps=[],csv=o.csvLast||{},acc=r.accounts||[];
+  const check=(a,k)=>a.checks.find(c=>c.key===k)||{};
+  const feed=(r.all||[]).find(c=>c.key==='feed'),stale=acc.filter(a=>['warn','bad'].includes(check(a,'fresh').tone)&&check(a,'fresh').fix==='sync');
+  if(feed&&['warn','bad'].includes(feed.tone)||stale.length)steps.push({id:'sync',icon:'🔄',title:'Bring in today\'s bank balances',why:'So the app compares itself with your real balances from today.',btn:'🔄 Sync now',act:"trustFix('sync')"});
+  const off=acc.filter(a=>check(a,'match').tone==='bad').map(a=>({id:a.id,name:a.name,amount:+check(a,'match').amount||0,clean:!!(csv[a.id]&&csv[a.id].clean)}));
+  const dups=acc.filter(a=>['warn','bad'].includes(check(a,'dups').tone)).map(a=>a.id);
+  const toCheck=off.filter(a=>!a.clean).concat(acc.filter(a=>dups.includes(a.id)&&!off.some(x=>x.id===a.id)&&!(csv[a.id]&&csv[a.id].clean)).map(a=>({id:a.id,name:a.name,amount:0,clean:false})));
+  if(toCheck.length)steps.push({id:'check',icon:'📚',title:'Check your accounts against your bank files',why:'Every payment is matched with the bank. Double-ups, missing payments and ones in the wrong account are fixed for you. You only decide the unsure ones.',btn:'📚 Check my accounts',act:"csvMultiOpen('fix')",accounts:toCheck});
+  if(+o.check)steps.push({id:'sortcheck',icon:'✨',title:'Check what the app sorted for you',why:o.check+(o.check===1?' payment it was':' payments it was')+' not sure about.',btn:'✨ Check them',act:'sortCheckOpen()'});
+  if(+o.misc)steps.push({id:'misc',icon:'🗂️',title:'Sort out Miscellaneous',why:o.misc+(o.misc===1?' payment has':' payments have')+' no category yet, so budgets cannot see them.',btn:'🗂️ Sort them',act:'fixMiscOpen()'});
+  const settle=off.filter(a=>a.clean);
+  if(settle.length)steps.push({id:'settle',icon:'🤝',title:'Settle the old difference',why:'Every payment in your bank files matches. What is left is older than the files (usually from before the bank feed started). One labelled line makes the app match the bank. It never counts as spending.',accounts:settle});
+  return steps;
+ }
+ return {guideSteps,shopKey,shopName,miscGroups,recategorise,markOneOff,addRule,removeRule,applyRules,gap,doubleUps,oneSided,startFreshRow,gapWords,money,balanceOn,statementCheck,trustReport};
 });
 
 /* ---------- Screens (Jaimi's Finance page only) ---------- */
@@ -193,7 +212,7 @@ function trustData(){
 }
 window.trustData=trustData;
 /* The one line Home shows: green when everything passed, otherwise how many things to look at. */
-function trustHome(){try{const r=trustData();return{tone:r.tone,headline:r.headline,matched:r.matched,accounts:r.accountCount};}catch(e){return null;}}
+function trustHome(){try{const r=trustData();let next=null;try{next=window.fixGuideNext?window.fixGuideNext():null;}catch(e){}return{tone:r.tone,headline:r.headline,matched:r.matched,accounts:r.accountCount,next};}catch(e){return null;}}
 window.trustHome=trustHome;
 const TRUST_ICON={good:'✅',warn:'⚠️',bad:'❌',note:'ℹ️'};
 const TRUST_FIX={sync:'Sync now',feed:'Bank feed settings',match:'Open',sortcheck:'Check them',misc:'Sort them',conflicts:'Review',statement:'Check a statement'};
@@ -262,21 +281,52 @@ function trustCsvOpen(id){
 /* Async functions inside this block are not global on their own, so every one a button calls is handed to the page here. */
 window.trustStatementSave=trustStatementSave;window.trustCsvOpen=trustCsvOpen;window.trustStatementOpen=trustStatementOpen;window.trustStatementTypedOpen=trustStatementTypedOpen;window.fixSaveTxns=fixSaveTxns;window.fixSoftDelete=fixSoftDelete;
 
-/* Screen 1: the starting point. */
+/* Screen 1: the guide. One step at a time, one button; each step brings you back here and the next one shows. */
+const K_CSV_LAST='fin_csv_last_v1';
+function guideNow(){
+ const r=trustData(),h=fixHome()||{misc:0,check:0};
+ return {r,steps:FinFix.guideSteps(r,{csvLast:load(K_CSV_LAST,{}),misc:h.misc,check:h.check})};
+}
+window.fixGuideNext=function(){try{const g=guideNow();return g.steps[0]?g.steps[0].title:null;}catch(e){return null;}};
 function fixOpen(){
  /* Nothing here can be saved while another tab holds the lock, so say so before any sorting is done, not after. */
  try{const l=typeof finStorageLock==='function'?finStorageLock():null;if(l){
   if(l.tab&&typeof finLoadLatest==='function'){$('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🔄 Load the latest first</h2><p>Finance was changed in another window on this device, so saving is paused here to keep the newer numbers safe.</p><p>Tap below, then open Fix my numbers again.</p><button class="btn dark" onclick="closeSheet();finLoadLatest()">Load latest</button>';openSheet();return;}
   toastMsg(l.title+'. Saving is paused until it is sorted.');try{render();}catch(e){}return;}}catch(e){}
- const h=fixHome()||{misc:0,miscTotal:0,off:0,check:0};
- $('sheet').innerHTML='<button class="close" onclick="closeSheet()">✕</button><h2>🧰 Fix my numbers</h2>'+trustBlock()+'<div class="fh-mean-h" style="margin-top:14px">The jobs</div><p>These make every other number in the app right. Do them in order.</p>'
+ let g;try{g=guideNow();}catch(e){g={r:null,steps:[]};}
+ const h=fixHome()||{misc:0,miscTotal:0,off:0,check:0},steps=g.steps,cur=steps[0],r=g.r;
+ if(!document.getElementById('fg-css')){const st=document.createElement('style');st.id='fg-css';st.textContent='.fg-step{background:#fff;color:#15384D;border-radius:20px;padding:16px;margin:12px 0;border:2px solid #2F6FA3}.fg-step .fg-n{font-weight:800;color:#2F6FA3;font-size:.9em;letter-spacing:.04em}.fg-step h3{margin:4px 0 6px;font-size:1.25em}.fg-step p{margin:0 0 12px}.fg-big{display:block;width:100%;padding:15px;font-size:1.08em}.fg-acc{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(0,0,0,.07);font-weight:700}.fg-acc small{font-weight:600;opacity:.75}.fg-then{opacity:.75;margin:6px 0}.fg-then div{padding:4px 0}.fg-done{background:#E6F2EA;color:#15384D;border-radius:20px;padding:18px;margin:12px 0;text-align:center}.fg-bar{display:flex;gap:6px;margin:10px 0 2px}.fg-bar i{flex:1;height:8px;border-radius:99px;background:#E7DFD0}.fg-bar i.on{background:#2F6FA3}';document.head.appendChild(st);}
+ let html='<button class="close" onclick="closeSheet()">✕</button><h2>🧰 Fix my numbers</h2>';
+ if(r)html+='<p class="fx-small">'+TRUST_ICON[r.tone]+' '+esc(r.headline)+' · '+r.matched+' of '+r.accountCount+' accounts match the bank</p>';
+ if(!cur){
+  html+='<div class="fg-done"><div style="font-size:2em">✅</div><h3 style="margin:6px 0">All done</h3><p>Nothing left to fix. Check your accounts against fresh bank files once a month to keep it that way.</p><button class="btn ghost" onclick="csvMultiOpen(\'fix\')">📚 Check my accounts again</button></div>';
+ }else{
+  const total=steps.length;
+  html+='<div class="fg-bar" aria-hidden="true">'+steps.map((x,k)=>'<i class="'+(k===0?'on':'')+'"></i>').join('')+'</div>';
+  html+='<div class="fg-step"><div class="fg-n">NEXT STEP'+(total>1?' · 1 OF '+total:'')+'</div><h3>'+cur.icon+' '+esc(cur.title)+'</h3><p>'+esc(cur.why)+'</p>';
+  if(cur.id==='check')html+=cur.accounts.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'</span><small>'+(a.amount?'off by '+FinFix.money(Math.abs(a.amount)):'possible double-ups')+'</small></div>').join('')+'<div style="height:10px"></div>';
+  if(cur.id==='settle')html+=cur.accounts.map(a=>'<div class="fg-acc"><span>'+esc(a.name)+'<small style="display:block">off by '+FinFix.money(Math.abs(a.amount))+'</small></span><button class="btn dark" style="width:auto;padding:10px 14px" onclick="fixGuideFresh(\''+esc(a.id)+'\')">Match to the bank</button></div>').join('');
+  if(cur.btn)html+='<button class="btn dark fg-big" onclick="'+cur.act+'">'+esc(cur.btn)+'</button>';
+  html+='</div>';
+  if(total>1)html+='<div class="fg-then"><b>Then</b>'+steps.slice(1).map(x=>'<div>'+x.icon+' '+esc(x.title)+'</div>').join('')+'</div>';
+ }
+ html+='<details class="ck-ev" style="margin-top:16px"><summary>More tools and every check</summary>'
   +(h.check?'<button class="fx-job" onclick="sortCheckOpen()"><b>✨ Check what I sorted</b><span>'+h.check+(h.check===1?' payment I was not sure about':' payments I was not sure about')+'</span></button>':'')
-  +'<button class="fx-job" onclick="fixMiscOpen()"><b>1. Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
-  +'<button class="fx-job" onclick="fixMatchOpen()"><b>2. Match to my bank</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
-  +'<button class="fx-job" onclick="trustStatementOpen()"><b>3. Check against a statement (once a month)</b><span>Upload the bank\'s CSV, pick the dates: every payment is matched, so you see exactly which ones are missing or doubled</span></button>'
-  +'<p class="fx-small">Nothing moves money. Every change can be undone.</p>';
- openSheet();
+  +'<button class="fx-job" onclick="fixMiscOpen()"><b>Sort out Miscellaneous</b><span>'+(h.misc?h.misc+' transactions, '+FinFix.money(h.miscTotal)+' in the last 4 weeks':'Nothing waiting')+'</span></button>'
+  +'<button class="fx-job" onclick="fixMatchOpen()"><b>Match to my bank (one account at a time)</b><span>'+(h.off?h.off+(h.off===1?' account does':' accounts do')+' not match the bank yet':'All accounts match')+'</span></button>'
+  +'<button class="fx-job" onclick="trustStatementOpen()"><b>Check one account with a bank CSV</b><span>Pick the dates and match every payment</span></button>'
+  +trustBlock()+'</details><p class="fx-small">Nothing moves money. Every change can be undone.</p>';
+ $('sheet').innerHTML=html;openSheet();
 }
+/* Settle: the same "Start fresh" line, from the guide, then straight back to the guide. */
+async function fixGuideFresh(id){
+ const a=acctById(id),g=FinFix.gap(a,TXNS),row=FinFix.startFreshRow(a,g,uid(),fixNow());if(!row){fixOpen();return;}
+ if(!confirm('Make '+a.name+' match the bank?\n\nThe app adds one labelled line of '+FinFix.money(row.amount)+' on '+fixDay(g.date)+'. It is not spending or income, and you can undo it from the account.'))return;
+ TXNS.push(row);
+ try{await fixSaveTxns();}catch(e){TXNS.pop();toastMsg('Could not save. Nothing changed.');return;}
+ toastMsg(a.name+' now matches the bank ✓');try{render();}catch(e){}fixOpen();
+}
+window.fixGuideFresh=fixGuideFresh;
 window.fixOpen=fixOpen;
 
 /* Screen 2: Miscellaneous, grouped by shop. */
