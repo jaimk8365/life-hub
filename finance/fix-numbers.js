@@ -89,18 +89,24 @@
  }
  function accountChecks(acct,txns,o){
   const today=o.today,out=[],sb=acct.sourceBalance;
-  // 1) a recent balance straight from the bank
-  if(!sb||!validISO(sb.date)||!Number.isFinite(+sb.amount))out.push({key:'fresh',tone:'bad',text:'No balance from the bank yet, so nothing can be compared.',fix:'feed'});
+  // the last check against a bank file (CSV): every payment matched, and its balance matched, up to its last day
+  const cl=(o.csvLast||{})[acct.id],csvOk=!!(cl&&cl.clean&&cl.balanceOk&&validISO(cl.to)),csvAge=csvOk?ageDays(cl.to,today):null;
+  const csvNewer=csvOk&&(!sb||!validISO(sb.date)||cl.to>=sb.date);
+  // 1) a recent balance straight from the bank (the feed, or a bank file you checked)
+  if(csvNewer&&csvAge<=14)out.push({key:'fresh',tone:'good',text:'Checked against your bank file up to '+cl.to+'.'});
+  else if(!sb||!validISO(sb.date)||!Number.isFinite(+sb.amount))out.push({key:'fresh',tone:'bad',text:'No balance from the bank yet, so nothing can be compared.',fix:'feed'});
   else{const age=ageDays(sb.date,today);out.push(age<=3?{key:'fresh',tone:'good',text:'Bank balance from '+(age===0?'today':age===1?'yesterday':age+' days ago')+'.'}:age<=14?{key:'fresh',tone:'warn',text:'Bank balance is '+age+' days old. Sync to bring it up to date.',fix:'sync'}:{key:'fresh',tone:'bad',text:'Bank balance is '+age+' days old, so this account cannot be checked properly.',fix:'sync'});}
   // 2) the app's balance equals the bank's balance on the bank's date
   const g=gap(acct,txns);
-  if(g)out.push(Math.abs(cents(g.difference))<1?{key:'match',tone:'good',text:'Matches the bank exactly ('+money(g.bank)+').'}:{key:'match',tone:'bad',text:'The app says '+money(g.app)+', the bank says '+money(g.bank)+'. '+money(Math.abs(g.difference))+' is missing or extra.',fix:'match',amount:g.difference});
+  if(csvNewer)out.push({key:'match',tone:'good',text:'Matches your bank file exactly ('+money(cl.bank)+' on '+cl.to+').'});
+  else if(g)out.push(Math.abs(cents(g.difference))<1?{key:'match',tone:'good',text:'Matches the bank exactly ('+money(g.bank)+').'}:{key:'match',tone:'bad',text:'The app says '+money(g.app)+', the bank says '+money(g.bank)+'. '+money(Math.abs(g.difference))+' is missing or extra.',fix:'match',amount:g.difference});
   // 3) the same payment recorded twice
-  const d=doubleUps(txns,acct.id).length;
+  // a pair inside dates a clean bank-file check covered is two real payments: the bank has both
+  const d=doubleUps(txns,acct.id).filter(p=>!(cl&&cl.clean&&validISO(cl.from)&&validISO(cl.to)&&p.keep.date>=cl.from&&p.keep.date<=cl.to)).length;
   if(d)out.push({key:'dups',tone:'warn',text:d+(d===1?' payment looks':' payments look')+' recorded twice.',fix:'match',count:d});
   // 4) transfers with only one side (last 60 days): money that left one account but never arrived in another
   const since=new Date(Date.parse(today+'T12:00:00Z')-60*dayMs).toISOString().slice(0,10);
-  const lonely=oneSided(txns,acct.id,o.pairedIds).filter(t=>t.date>=since).length;
+  const lonely=oneSided(txns,acct.id,o.pairedIds).filter(t=>t.date>=since&&!(cl&&cl.clean&&validISO(cl.from)&&validISO(cl.to)&&t.date>=cl.from&&t.date<=cl.to)).length;
   if(lonely)out.push({key:'lonely',tone:'warn',text:lonely+(lonely===1?' transfer has':' transfers have')+' no matching side in your other accounts.',fix:'match',count:lonely});
   // 5) records that cannot be right
   const broken=(txns||[]).filter(t=>live(t)&&t.acct===acct.id&&(!validISO(t.date)||!Number.isFinite(+t.amount)||String(t.amount).trim()==='')).length;
@@ -230,7 +236,7 @@ function trustData(){
  const moves=typeof FinMoves!=='undefined'?FinMoves.detectMoves(TXNS,ACCTS):[],h=fixHome()||{misc:0,off:0,check:0};
  let token=false,last=null;try{token=!!localStorage.getItem('finance_pocketsmith_app_token');last=localStorage.getItem('finance_pocketsmith_last_sync');}catch(e){}
  return FinFix.trustReport({today:todayISO(),accounts:ACCTS,txns:TXNS,pairedIds:moves.flatMap(m=>[m.outId,m.inId]),unchecked:h.check,misc:h.misc,
-  conflicts:(typeof load==='function'?load('lifehub_finance_sync_conflicts',[]):[]).length,lastSync:token?(last||null):undefined,statements:trustStatements()});
+  conflicts:(typeof load==='function'?load('lifehub_finance_sync_conflicts',[]):[]).length,lastSync:token?(last||null):undefined,statements:trustStatements(),csvLast:Object.assign({},(typeof load==='function'?load('fin_csv_last_v1',{}):{})||{},window._csvLast||{})});
 }
 window.trustData=trustData;
 /* The one line Home shows: green when everything passed, otherwise how many things to look at. */

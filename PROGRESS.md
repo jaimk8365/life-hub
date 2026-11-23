@@ -4,6 +4,12 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 23/11 8:45pm: Fix my numbers counts bank-file checks (PUSHED 23/11)
+- Jaimi: fixed several accounts with the CSV check but Fix my numbers still said 9 things need fixing; once fixed, it should update and drop what's fixed.
+- Cause: the trust checks only looked at the PocketSmith feed balance. An account checked clean against a bank file (every payment and the closing balance matched) still showed "No balance from the bank yet" / "Bank balance is N days old" / "The app says X, the bank says Y", and same-day pairs the bank file confirmed still showed as double-ups.
+- finance/csv-check.js keepLast now saves balanceOk, bank balance and the bank's last date per account (and keeps it in memory so the count changes at once). finance/fix-numbers.js accountChecks: a clean bank-file check with a matching balance, newer than the feed balance and no older than 2 weeks, counts as fresh and matching; double-ups and one-sided transfers inside its dates are not counted.
+- Proof: 741 passed (new test). Preview: Bills checked with a matching file → "3 things need fixing" became "2 (was 3)" straight away. sw lifehub-v123.
+
 ### 23/11 7:35pm: Check all my accounts: Done per account (PUSHED 23/11)
 - Jaimi: after looking at each account she wants to fix that account's transactions, not all together.
 - finance/csv-check.js: each account in the results has its own "✅ Done with <account> (remove 2 · fix 1)" button, which only updates that account (plan(acct) filters by the row's account; confirm says the account; "Bills: removed 1" after). The single Done for every account is gone; the to-do box says to tap Done under each account. Every account is re-checked after each one.

@@ -441,3 +441,30 @@ test('check all accounts: each account has its own Done, which only updates that
   for (const x of ['async function apply(acct)', "if(acct&&((ref.res||st.result||{}).acct)!==acct)return;", 'cc-apply-acct', "csvCheckApply(\\''+e(o.acct)+'\\')", 'Updates only ', 'Done</b> under each account']) assert.ok(c.includes(x), x);
   assert.ok(!/if\(st\.refs\.length\)h\+=doneBtn\(\);/.test(c), 'no single Done for every account at once');
 });
+
+test('Fix my numbers counts an account as checked once its bank file matched: balance, double-ups and transfers in the checked dates', () => {
+  const F = require('../finance/fix-numbers.js');
+  const acct = { id: 'levi', name: 'Levi Savings', openBal: 0 };
+  const txns = [
+    { id: 'a', acct: 'levi', date: '2026-11-10', amount: 50, pocketsmithId: 1 },
+    { id: 'b', acct: 'levi', date: '2026-11-10', amount: 50, src: 'csv-check' },
+    { id: 'c', acct: 'levi', date: '2026-11-12', amount: -20, cat: 'transfer', note: 'Transfer to Everyday' },
+  ];
+  const before = F.trustReport({ today: '2026-11-23', accounts: [acct], txns, statements: {} });
+  const row0 = before.accounts[0].checks;
+  assert.equal(row0.find(c => c.key === 'fresh').tone, 'bad', 'no bank feed balance: needs fixing');
+  assert.ok(row0.find(c => c.key === 'dups'));
+  const csvLast = { levi: { clean: true, balanceOk: true, bank: 80, from: '2026-07-01', to: '2026-11-20' } };
+  const after = F.trustReport({ today: '2026-11-23', accounts: [acct], txns, statements: {}, csvLast });
+  const row = after.accounts[0].checks;
+  assert.equal(row.find(c => c.key === 'fresh').tone, 'good');
+  assert.equal(row.find(c => c.key === 'match').tone, 'good');
+  assert.ok(!row.find(c => c.key === 'dups'), 'the bank has both payments, so they are not double-ups');
+  assert.ok(!row.find(c => c.key === 'lonely'));
+  assert.equal(after.bad, 0);
+  const old = F.trustReport({ today: '2026-11-23', accounts: [acct], txns, statements: {}, csvLast: { levi: { ...csvLast.levi, to: '2026-10-01' } } });
+  assert.equal(old.accounts[0].checks.find(c => c.key === 'fresh').tone, 'bad', 'a bank file older than 2 weeks is not fresh');
+  const notOk = F.trustReport({ today: '2026-11-23', accounts: [acct], txns, statements: {}, csvLast: { levi: { ...csvLast.levi, balanceOk: false } } });
+  assert.equal(notOk.accounts[0].checks.find(c => c.key === 'fresh').tone, 'bad', 'payments matched but the balance did not: still to fix');
+  assert.ok(read('finance/csv-check.js').includes('balanceOk:!!(r.bankClose'));
+});

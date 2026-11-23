@@ -531,7 +531,8 @@
  /* What the guide in Fix my numbers needs: per account, did the last bank-file check leave anything to fix? */
  function keepLast(results){
   try{const last=load('fin_csv_last_v1',{})||{},at=new Date().toISOString();
-   results.forEach(r=>{if(r)last[r.acct]={clean:!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100)),at,from:r.from,to:r.to};});
+   results.forEach(r=>{if(r)last[r.acct]={clean:!r.onlyApp.length&&!r.onlyBank.some(x=>Math.round(+x.amount*100)),balanceOk:!!(r.bankClose&&Math.round(+r.bankClose.balance*100)===Math.round(+r.appClose*100)),bank:r.bankClose?r.bankClose.balance:null,at,from:r.from,to:r.bankClose?r.bankClose.date:r.to};});
+   window._csvLast=last;   // the Fix my numbers count reads this straight away, before the save lands
    saveAtomic({fin_csv_last_v1:last}).catch(()=>{});}catch(_){}
  }
  function multiRun(){
