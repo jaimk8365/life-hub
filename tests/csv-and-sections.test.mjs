@@ -435,3 +435,9 @@ test('extra copies the bank never had: a different amount next to the bank\'s ow
   assert.deepEqual(all.flatMap(o => o.ex.ghost.map(x => x.t.id)).sort(), ['g1', 'g2'], 'a move neither bank file has: both sides');
   assert.ok(read('finance/csv-check.js').includes("grp('ghost'"));
 });
+
+test('check all accounts: each account has its own Done, which only updates that account', () => {
+  const c = read('finance/csv-check.js');
+  for (const x of ['async function apply(acct)', "if(acct&&((ref.res||st.result||{}).acct)!==acct)return;", 'cc-apply-acct', "csvCheckApply(\\''+e(o.acct)+'\\')", 'Updates only ', 'Done</b> under each account']) assert.ok(c.includes(x), x);
+  assert.ok(!/if\(st\.refs\.length\)h\+=doneBtn\(\);/.test(c), 'no single Done for every account at once');
+});

@@ -433,13 +433,14 @@
  }
  function edit(k){const p=$('cc_ed_'+k);if(p){p.hidden=!p.hidden;if(!p.hidden){const i=p.querySelector('input');if(i)i.focus();}}}
  /* What each row will do: its choice plus any edited details. */
- function plan(){
+ function plan(acct){
   const out=[];
   document.querySelectorAll('.cc-r[data-k]').forEach(el=>{
    const ref=(st.refs||[])[+el.dataset.k];if(!ref)return;const v=(el.querySelector('.cc-sel')||{}).value||'keep',src=ref.txn||ref.row,ed={};
    el.querySelectorAll('.cc-edit [data-f]').forEach(i=>{const f=i.dataset.f,val=f==='amount'?Math.round(+i.value*100)/100:String(i.value).trim();
     if(f==='amount'?(i.value!==''&&Number.isFinite(val)&&Math.round(val*100)!==Math.round(+src.amount*100)):(f==='date'?/^\d{4}-\d{2}-\d{2}$/.test(val)&&val!==src.date:f==='cat'?val!==String(src.cat||(ref.row&&!ref.txn?'__none':'other'))&&!!val:val!==String(src.note||'')))ed[f]=val;});
    el.classList.toggle('cc-on',v!=='keep'||Object.keys(ed).length>0);
+   if(acct&&((ref.res||st.result||{}).acct)!==acct)return;   // one account at a time
    out.push({ref,v,ed});
   });
   return out;
@@ -451,18 +452,18 @@
   return c;
  }
  function count(){
-  const b=$('cc_apply');if(!b)return;const c=sums(plan()),parts=[];
-  if(c.add)parts.push('add '+c.add);if(c.del)parts.push('remove '+c.del);if(c.move)parts.push('move '+c.move);if(c.fix)parts.push('fix '+c.fix);
-  b.disabled=!parts.length;b.textContent=parts.length?'✅ Done: update the app ('+parts.join(' · ')+')':'Nothing to change';
+  const words=c=>{const parts=[];if(c.add)parts.push('add '+c.add);if(c.del)parts.push('remove '+c.del);if(c.move)parts.push('move '+c.move);if(c.fix)parts.push('fix '+c.fix);return parts;};
+  const b=$('cc_apply');if(b){const parts=words(sums(plan()));b.disabled=!parts.length;b.textContent=parts.length?'✅ Done: update the app ('+parts.join(' · ')+')':'Nothing to change';}
+  document.querySelectorAll('.cc-apply-acct[data-acct]').forEach(x=>{const id=x.dataset.acct,parts=words(sums(plan(id))),nm=(acctById(id)||{name:id}).name;x.disabled=!parts.length;x.textContent=parts.length?'✅ Done with '+nm+' ('+parts.join(' · ')+')':'Nothing to change in '+nm;});
  }
- async function apply(){
-  if(!st.result&&!(st.mode==='multi'&&mt.results))return;const p=plan(),c=sums(p);if(!c.add&&!c.del&&!c.move&&!c.fix)return;
+ async function apply(acct){
+  if(!st.result&&!(st.mode==='multi'&&mt.results))return;acct=typeof acct==='string'?acct:null;const p=plan(acct),c=sums(p);if(!c.add&&!c.del&&!c.move&&!c.fix)return;
   const nm=id=>(acctById(id)||{name:id}).name,lines=[];
   if(c.add)lines.push('• Add '+c.add+' payment'+(c.add===1?'':'s')+' from the bank');
   if(c.del)lines.push('• Remove '+c.del+' payment'+(c.del===1?'':'s')+' (double-ups keep the copy that matches the bank)');
   if(c.move)lines.push('• Move '+c.move+' payment'+(c.move===1?'':'s')+' to the right account');
   if(c.fix)lines.push('• Fix the date or details on '+c.fix);
-  if(!confirm('Update the app?\n\n'+lines.join('\n')+'\n\nRemoved ones can be brought back from the account.'))return;
+  if(!confirm((acct?'Update '+nm(acct)+'?':'Update the app?')+'\n\n'+lines.join('\n')+'\n\nRemoved ones can be brought back from the account.'))return;
   const now=new Date().toISOString(),before=TXNS.map(t=>({...t})),made=[];
   const fixT=(t,ed)=>{if(ed.cat!=null){t.cat=ed.cat;t.categoryOverride=true;}if(ed.date!=null){t.date=ed.date;t.dateOverride=true;}if(ed.amount!=null){t.amount=ed.amount;t.amountOverride=true;}if(ed.note!=null){t.note=ed.note;t.noteOverride=true;}if(Object.keys(ed).length){t.editedAt=now;t.editedVia='csv-check';}};
   p.forEach(({ref,v,ed})=>{
@@ -481,7 +482,7 @@
   try{await saveAtomic({[K_TXNS]:TXNS});}catch(err){TXNS.length=0;before.forEach(t=>TXNS.push(t));toastMsg('Could not save. Nothing changed.');return;}
   const done=[];if(c.add)done.push('Added '+c.add);if(c.del)done.push('removed '+c.del);if(c.move)done.push('moved '+c.move);if(c.fix)done.push('fixed '+c.fix);
   if(made.length&&typeof finApplyCatRules==='function'){try{await finApplyCatRules();}catch(_){}} // new ones get sorted (shop rules, loan lines) straight away
-  st.applied=done.join(' · ');
+  st.applied=(acct?nm(acct)+': ':'')+done.join(' · ');
   if(st.mode==='multi'){mt.applied=st.applied;multiRun();try{render();}catch(_){}multiPaint();}else{compute();try{render();}catch(_){}paint();}
   const t1=trustNow(),n0=trustCount(st.trustBefore),n1=trustCount(t1);
   toastMsg('App updated ✓ '+st.applied+(n0!=null&&n1!=null&&n0!==n1?' · Fix my numbers: '+n0+' → '+n1:''));
@@ -570,14 +571,13 @@
    const todo=todoLines(all),okN=mt.results.filter(o=>o.res.ok).length,freshN=mt.results.reduce((n,o)=>n+(o.res.fresh||[]).length,0);
    if(freshN)todo.unshift('🧾 <b>'+freshN+' balancing line'+(freshN===1?'':'s')+'</b> to remove (not real payments)');
    if(!todo.length&&mt.back==='fix')h+='<button class="btn dark" style="display:block;width:100%;margin:8px 0" onclick="fixOpen()">✓ Nothing to fix here · Next step ›</button>';
-   h+='<div class="cc-todo"><b>What to do · all accounts</b>'+(todo.length?todo.map(x=>'<div>'+x+'</div>').join(''):'<div>✅ Nothing to fix.</div>')+'<div class="fx-small" style="margin-top:6px">'+okN+' of '+mt.results.length+' accounts already match. The sure fixes are picked for you. Only <b>Needs you</b> needs a decision. Then tap Done once.</div></div>';
+   h+='<div class="cc-todo"><b>What to do · all accounts</b>'+(todo.length?todo.map(x=>'<div>'+x+'</div>').join(''):'<div>✅ Nothing to fix.</div>')+'<div class="fx-small" style="margin-top:6px">'+okN+' of '+mt.results.length+' accounts already match. The sure fixes are picked for you. Only <b>Needs you</b> needs a decision. Then tap <b>Done</b> under each account, one at a time.</div></div>';
    mt.results.forEach(o=>{
     const a=acctById(o.acct)||{name:o.acct},r=o.res,k=kinds(o.ex),fixN=k.ghost+k.double+k.add+k.move+k.transfer+k.date+(r.fresh||[]).length;
     const status=r.ok?'✅ Matches the bank':(k.none?'❓ '+k.none+' need'+(k.none===1?'s':'')+' you · ':'⚠️ ')+(fixN?fixN+' ready to fix':'')+(!fixN&&!k.none&&r.realDiff?'Payments match, balance off by '+money(Math.abs(r.realDiff)):'');
     h+='<details class="cc-acct"'+(r.ok?'':' open')+'><summary>'+e((a.emoji||'🏦')+' '+a.name)+' · '+e(status)+'<small>'+r.matched.length+' of '+(r.bankCount-k.zero)+' bank payments match · '+e(shortD(r.from))+' – '+e(shortD(r.to))+(r.bankClose?' · bank '+money(r.bankClose.balance)+', app '+money(r.appClose):'')+'</small></summary>'
-     +(r.ok?'':groupsHtml(r,{multi:true,ex:o.ex}))+'</details>';
+     +(r.ok?'':(()=>{const n0=st.refs.length,g=groupsHtml(r,{multi:true,ex:o.ex});return g+(st.refs.length>n0?'<button type="button" class="btn dark cc-apply-acct" data-acct="'+e(o.acct)+'" onclick="csvCheckApply(\''+e(o.acct)+'\')" style="display:block;width:100%;padding:13px;margin:10px 0 6px">✅ Done with '+e(a.name)+'</button><p class="fx-small" style="margin:0 0 8px;text-align:center">Updates only '+e(a.name)+'. The other accounts wait for you.</p>':'');})())+'</details>';
    });
-   if(st.refs.length)h+=doneBtn();
   }
   $('sheet').innerHTML=h;count();
  }

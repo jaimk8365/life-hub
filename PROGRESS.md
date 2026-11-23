@@ -4,6 +4,11 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 23/11 7:35pm: Check all my accounts: Done per account (PUSHED 23/11)
+- Jaimi: after looking at each account she wants to fix that account's transactions, not all together.
+- finance/csv-check.js: each account in the results has its own "✅ Done with <account> (remove 2 · fix 1)" button, which only updates that account (plan(acct) filters by the row's account; confirm says the account; "Bills: removed 1" after). The single Done for every account is gone; the to-do box says to tap Done under each account. Every account is re-checked after each one.
+- Proof: 740 passed (new test). Preview: two accounts, Done with Bills removed only Bills' extra copy, Sinking Funds untouched and its button still ready. sw lifehub-v122.
+
 ### 23/11 4:40pm: All income, overtime ideas, mindful Wednesday check-in (PUSHED 23/11)
 - Jaimi: income tracking for all accounts (base wages vs extra, reimbursements etc.), smart overtime suggestions (buffer, Christmas, Bali), sinking funds and savings decided each Wednesday instead of automatic weekly transfers, the check-in remembering regular expenses and looking at her calendar, bills/essentials before lifestyle.
 - New finance/income.js (FinIncome, tested): Income tab "📊 All income" (FY or month; wages per person split base/extra; reimbursements, refunds, government, interest, other; own transfers, redraws and loan-account lines left out and said); "✨ What to do with overtime" (buffer → bills 4 weeks → must-pay coming up → sinking funds due ≤120 days → goals (Bali, open-ended takes the rest) → other funds; "Give it this job" saves to fin_overtime_alloc_v1 + adds a coach action); Home card "💵 Income · month". Removed (deleted) pays no longer count as pays (payMatchRows wrapped).
