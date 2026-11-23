@@ -194,7 +194,9 @@ function planPatch(s){
   const csvTag='<script src="../finance/csv-check.js?v=20261119"></script>';
   s=once(s,csvTag,csvTag+'\n<script src="../finance/cat-memory.js?v=20261120"></script>','memory head');
   const memTag='<script src="../finance/cat-memory.js?v=20261120"></script>';
-  return once(s,memTag,memTag+'\n<script src="../finance/fund-updates.js?v=20261121"></script>','fund updates head');
+  s=once(s,memTag,memTag+'\n<script src="../finance/fund-updates.js?v=20261121"></script>','fund updates head');
+  const fuTag='<script src="../finance/fund-updates.js?v=20261121"></script>';
+  return once(s,fuTag,fuTag+'\n<script src="../finance/income.js?v=20261123"></script>\n<script src="../finance/mindful.js?v=20261123"></script>','income head');
 }
 export function patchPhasesFinance(source){
   let s=source;

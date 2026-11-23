@@ -72,7 +72,7 @@ function coachAllocate(){
   let trusted=false;try{trusted=financeEvidence().trusted;}catch(e){}
   if(!trusted)return{withheld:true};
   const s=safeSpend();let rows=[];try{rows=cycleRows().filter(r=>r.accountId==='everyday'&&r.budget>0);}catch(e){}
-  const parts=[{label:'bills due from Everyday',amount:s.upcomingBills},{label:'transfers out (loans, savings, Bills top-ups)',amount:s.transfers},{label:'one-off costs',amount:s.oneoffs},{label:'extra the Bills account still needs',amount:s.billsShortfall},{label:'money already set aside',amount:(+s.reserved||0)+(+s.wishlist||0)}];
+  const parts=[{label:'bills due from Everyday',amount:s.upcomingBills},{label:coachMindful()?'planned transfers out (loans, Bills top-ups)':'transfers out (loans, savings, Bills top-ups)',amount:s.transfers},{label:'one-off costs',amount:s.oneoffs},{label:'extra the Bills account still needs',amount:s.billsShortfall},{label:'money already set aside',amount:(+s.reserved||0)+(+s.wishlist||0)}];
   const protectedTotal=parts.reduce((t,x)=>t+(+x.amount||0),0);
   const a=FinCoach.allocate({available:s.bal,parts,protected:protectedTotal,buffer:s.buffer,areas:rows.map(r=>({name:(catOf(r.category)||{}).n||r.name,weekly:r.budget}))});
   return a;
@@ -85,6 +85,41 @@ function coachGoals(){
   // sinking-fund buckets are shares of the regular transfer into the Sinking Funds account: already set aside
   try{(FUNDS||[]).filter(f=>+f.mapAmount>0&&f.mapFrequency).forEach(f=>{const w=FinGoals.weeklyEquivalent({amount:+f.mapAmount,freq:f.mapFrequency});if(w>0)out.push({name:(f.emoji||'🪙')+' '+f.name,weekly:Math.round(w*100)/100,fund:true,planned:true});});}catch(e){}
   return out;
+}
+/* ---------- Mindful Wednesday (finance/mindful.js): what goes where this week, most important first ---------- */
+const COACH_ESSENTIAL=/grocer|fuel|petrol|kids|child|school|medical|health|pharm|pets?\b|baby|nappies|transport/i;
+function coachMindful(){return typeof mindfulOn==='function'&&mindfulOn()&&typeof FinMindful!=='undefined';}
+function coachMindfulPlan(){
+  const a=coachAllocate();if(a.withheld)return{withheld:true};
+  const today=todayISO(),end=FinDates.budgetWeek(today).end,must=[],ess=[],life=[],soon=[],save=[];
+  // regular payments the app has noticed (not set up as bills), due before next Wednesday, from Everyday
+  let regs=[];try{regs=mindfulRegularsDue(end).filter(r=>r.acct==='everyday');}catch(e){}
+  regs.forEach(r=>must.push({name:'🔁 '+r.name+' · '+FinDates.short(r.next),want:r.amount,cat:r.cat}));
+  let rows=[];try{rows=cycleRows().filter(r=>r.accountId==='everyday'&&r.budget>0);}catch(e){}
+  rows.forEach(r=>{const c=catOf(r.category)||{},name=((c.e?c.e+' ':'')+(c.n||r.name)),covered=regs.filter(x=>x.cat===r.category).reduce((t,x)=>t+x.amount,0),want=Math.max(0,Math.round((r.budget-covered)*100)/100);
+    (COACH_ESSENTIAL.test(r.category+' '+(c.n||''))?ess:life).push({name,want});});
+  try{(FUNDS||[]).forEach(f=>{const w=FinMindful.fundWeekly(f,today);if(!w||!(w.weekly>0))return;const it={name:(f.emoji||'🪙')+' '+f.name+(w.due?' · due '+FinDates.short(w.due):''),want:w.weekly,acct:f.acct||'savings'};(w.soon?soon:save).push(it);});}catch(e){}
+  try{(SHARED_GOALS||[]).filter(g=>g.status!=='archived'&&g.status!=='complete').forEach(g=>{const w=g.fundRule?FinGoals.weeklyEquivalent(g.fundRule):(sharedGoalPlan(g).weekly||0);const pr=FinGoals.goalProgress(g);if(w>0&&(!(+pr.target>0)||pr.saved<pr.target))save.push({name:(g.emoji?g.emoji+' ':'')+g.name,want:Math.round(w*100)/100,acct:(g.fundRule&&g.fundRule.acct)||'savings'});});}catch(e){}
+  // kids' savings and other savings accounts that had a regular transfer
+  try{TRANSFERS.filter(t=>FinMindful.isMindful(t,ACCTS)&&!['savings','goals'].includes(t.toAcct)).forEach(t=>{const w=FinMindful.weekly(t.amount,t.frequency);if(w>0)save.push({name:((acctById(t.toAcct)||{}).emoji||'🐷')+' '+((acctById(t.toAcct)||{}).name||t.toAcct),want:w,acct:t.toAcct});});}catch(e){}
+  const plan=FinMindful.tiers(a.available,[
+    {key:'must',label:'Must pay',emoji:'🔴',items:must},
+    {key:'ess',label:'Essentials',emoji:'🛒',items:ess},
+    {key:'soon',label:'Sinking funds due soon',emoji:'⏰',items:soon},
+    {key:'life',label:'Lifestyle',emoji:'🎉',items:life},
+    {key:'save',label:'Savings',emoji:'🐷',items:save}]);
+  plan.working=a.working;plan.regs=regs;return plan;
+}
+function coachMoves(plan){
+  const by={};(plan.tiers||[]).filter(t=>t.key==='soon'||t.key==='save').forEach(t=>t.items.forEach(i=>{if(!(i.get>0))return;const k=i.acct||'savings';(by[k]=by[k]||{acct:k,amount:0,items:[]}).items.push(i);by[k].amount=Math.round((by[k].amount+i.get)*100)/100;}));
+  return Object.values(by).map(m=>({...m,label:(acctById(m.acct)||{}).name||m.acct}));
+}
+function coachCalAdd(i){
+  const x=(window._ckCal||[])[i];if(!x)return;
+  const amt=parseFloat(String(($('ckc_amt_'+i)||{}).value||'').replace(/[^0-9.]/g,'')),lv=($('ckc_lv_'+i)||{}).value||'important';
+  try{const item=FinPrio.newItem({name:x.title,amount:amt,due:x.date,acct:'everyday',priority:lv},uid);ONEOFFS=ONEOFFS.concat([item]);save(K_ONEOFFS,ONEOFFS);try{publishMoneyDates();}catch(e){}toastMsg('Added '+item.name+' to Coming up ✓');}
+  catch(e){toastMsg(e.message||'Add an amount first');return;}
+  coachRender();
 }
 function coachCatsWeekly(){const cats={};CATS.concat(CUSTOM_CATS||[]).forEach(c=>{const m=+CAT_BUDGET[c.id]||0;if(m>0)cats[c.id]={name:c.n,weekly:Math.round(m*12/52*100)/100,monthly:m};});return cats;}
 function coachWeekReview(st){return FinCoach.weekReview({today:todayISO(),txns:TXNS.filter(t=>t.date>=FinDates.shift(todayISO(),-49)),cats:coachCatsWeekly(),marks:st.marks});}
@@ -122,7 +157,7 @@ function coachBox(tone,head,lines){return '<div class="fh-meaning fh-t-'+tone+'"
 
 /* ---------- drawing ---------- */
 const COACH_STEP_TITLE={data:'Is the data right?',priority:'Anything coming up that matters most?',position:'Where you stand',leak:'One thing to look at',coach:'What to do now',finish:'All done',
-  income:'Did the pay arrive?',protect:'Bills and loans to cover',allocate:'Your spending money this week',savings:'Savings this week',accountability:'How last week went',
+  income:'Did the pay arrive?',calendar:'Coming up in the next 2 weeks',protect:'Bills and loans to cover',allocate:'Your spending money this week',savings:'Savings this week',accountability:'How last week went',
   'month-income':'Income this month','month-fixed':'Must-pay spending','month-variance':'Budget areas','month-leaks':'Top money leaks','month-habits':'Better or worse than last month',
   'month-savings':'Savings','month-debt':'Loans','month-next':'Changes for next month'};
 const COACH_KIND={daily:{name:'money check-in',time:'About 2 minutes'},payday:{name:'Payday Reset',time:'10 to 15 minutes'},month:{name:'Month-End Review',time:'15 to 20 minutes'}};
@@ -228,6 +263,16 @@ function coachRender(){
      +coachBox(p.rows.some(r=>r.status!=='ok')?'watch':'good',coachTag('fact')+' What this means',[p.rows.some(r=>r.status==='missing')?'Pay that has not arrived is not counted. Nothing is assumed.':'Pay received since Tuesday: '+FinCoach.aud(p.total)+'.'])
      +(p.unsure?'<p class="f">'+p.unsure+' deposit'+(p.unsure===1?' matches':'s match')+' more than one pay rule, so '+(p.unsure===1?'it is':'they are')+' not counted. Check it in Income.</p>':'')
      +'<p class="tiny">Expected amounts come from Income › base pay. A fortnightly pay is only expected every second week.</p>';
+  }else if(step==='calendar'){
+    const end=FinDates.shift(todayISO(),14),c=typeof mindfulCalendar==='function'?mindfulCalendar(end):{events:[],admin:[],known:false},money=c.events.filter(e=>e.money),other=c.events.filter(e=>!e.money);
+    window._ckCal=money;const have=new Set((ONEOFFS||[]).filter(x=>x.active!==false).map(x=>String(x.name).toLowerCase()+'|'+x.due));
+    body='<p class="fh-mean-main">What\'s coming up in the next 2 weeks that might need money?</p>'
+     +(c.admin.length?'<div class="fh-mean-h">📋 Life Admin due</div><div class="ck-rows">'+c.admin.map(x=>coachRow(x.name+' · '+FinDates.short(x.due),FinCoach.aud(x.amount))).join('')+'</div>':'')
+     +(money.length?'<div class="fh-mean-h" style="margin-top:8px">📅 From your calendar</div>'+money.map((e,i)=>{const added=have.has(e.title.toLowerCase()+'|'+e.date);return '<div class="fh-meaning fh-t-watch"><p><b>'+e.icon+' '+esc(e.title)+'</b> · '+esc(FinDates.short(e.date))+'<br><span class="tiny" style="text-transform:none">'+esc(e.hint)+'?</span></p>'
+       +(added?'<p class="tiny">✅ Already in Coming up.</p>':'<div class="row2" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><div class="amt-in"><span>$</span><input id="ckc_amt_'+i+'" inputmode="decimal" style="width:80px" aria-label="Amount"></div><select id="ckc_lv_'+i+'" aria-label="How important"><option value="must">🔴 Must pay</option><option value="important" selected>🟠 Important</option><option value="wait">🟢 Can wait</option></select><button class="btn ghost" style="width:auto" onclick="coachCalAdd('+i+')">＋ Set money aside</button></div>')+'</div>';}).join(''):'')
+     +(other.length?'<details class="ck-ev"><summary>Also on ('+other.length+')</summary>'+other.map(e=>'<p class="tiny">'+esc(FinDates.short(e.date))+' · '+esc(e.title)+'</p>').join('')+'</details>':'')
+     +(!c.known?coachBox('watch','',['Your calendar shows here once Today has loaded it on this device. Open Today, then come back.']):(!money.length&&!c.admin.length?coachBox('good','',['✅ Nothing in the next 2 weeks looks like it needs money.']):''))
+     +'<p class="tiny">Anything you set money aside for goes on your Coming up list, and the next steps work around it. Bills and must-pays always come before lifestyle.</p>';
   }else if(step==='protect'){
     const p=coachProtect();
     body=p.rows.length?'<div class="ck-rows">'+p.groups.map(g=>'<div class="ck-row"><span><b>'+esc(g.label)+'</b></span><b>'+FinCoach.aud(g.due)+'</b></div>'+g.rows.map(r=>'<div class="ck-row tiny"><span>'+esc(r.name)+' · '+esc(FinDates.short(r.due))+'</span><span>'+FinCoach.aud(r.amount)+'</span></div>').join('')
@@ -235,6 +280,24 @@ function coachRender(){
       +coachBox(p.groups.some(g=>g.have!=null&&!g.covered)?'act':'good',coachTag('fact')+' What this means',['Before next Wednesday: '+FinCoach.aud(p.bills)+' in bills and '+FinCoach.aud(p.loans)+' in loan repayments.',p.groups.some(g=>g.have!=null&&!g.covered)?'Top up the short account from this week\'s pay before spending money is worked out.':'Every bill and loan account already has enough in it.'])
       +'<p class="tiny">Each bill counts once. A loan listed as a bill too is not counted twice.</p>'
      :coachBox('good','',['✅ No bills or loan repayments are due before next Wednesday.']);
+    let regs=[];try{regs=typeof mindfulRegularsDue==='function'?mindfulRegularsDue(FinDates.budgetWeek(todayISO()).end):[];}catch(e){}
+    if(regs.length)body+='<div class="fh-mean-h" style="margin-top:10px">🔁 Regular payments I noticed ('+regs.length+')</div><p class="tiny" style="text-transform:none">Not set up as bills, but they come out on a rhythm. They are counted as must-pay this week.</p>'
+     +regs.map(r=>'<div class="ck-row"><span>'+esc(r.name)+'<small style="display:block" class="tiny">'+esc(r.every)+' · next '+esc(FinDates.short(r.next))+' · '+esc((acctById(r.acct)||{}).name||r.acct)+(r.confirmed?' · ✓ remembered':'')+'</small></span><b>'+FinCoach.aud(r.amount)+'</b></div>'
+      +(r.confirmed?'':'<p class="tiny ck-why"><button class="fh-link" onclick="rememberRegular(\''+esc(r.key)+'\',true)">✓ Yes, it\'s regular</button> · <button class="fh-link" onclick="rememberRegular(\''+esc(r.key)+'\',false)">✕ Not regular</button></p>')).join('');
+  }else if(step==='allocate'&&coachMindful()){
+    const m=coachMindfulPlan();
+    if(m.withheld)body=coachBox('watch',coachTag('fact')+' Held back',['Your balances are not confirmed up to date, so this week\'s money is not worked out. A guess could be wrong.','Sync, or check the balances, then come back to this step.'])+'<button class="btn ghost" onclick="coachDo(\'sync\')">🔄 Sync now</button>';
+    else{
+      s.mplan={left:m.left,moves:coachMoves(m)};coachSaveSession(st);
+      const ic={full:'✅',part:'⚠️',out:'⏸️',none:'·'};
+      body='<p class="f">After bills, loans and your buffer, <b>'+FinCoach.aud(m.start)+'</b> is free this week. Here\'s where it goes, most important first:</p>'
+       +m.tiers.filter(t=>t.status!=='none').map(t=>'<div class="fh-meaning fh-t-'+(t.status==='full'?'good':t.status==='part'?'watch':'act')+'"><div class="fh-mean-h">'+ic[t.status]+' '+t.emoji+' '+esc(t.label)+' · '+FinCoach.aud(t.get)+(t.get<t.want?' of '+FinCoach.aud(t.want):'')+'</div>'
+         +'<details class="ck-ev"><summary>'+t.items.length+' item'+(t.items.length===1?'':'s')+'</summary><div class="ck-rows">'+t.items.map(i=>coachRow(i.name,FinCoach.aud(i.get)+(i.get<i.want?' <span class="fh-muted">of '+FinCoach.aud(i.want)+'</span>':''))).join('')+'</div></details>'
+         +(t.status==='part'&&t.key==='life'?'<p class="tiny">Lifestyle is cut back this week so bills and essentials come first.</p>':t.status==='out'?'<p class="tiny">Not this week.</p>':'')+'</div>').join('')
+       +(m.left>0?coachBox('good',coachTag('fact')+' Left over',[FinCoach.aud(m.left)+' is not needed for anything this week. Leave it in Everyday, or move it to a goal in the next step.']):'')
+       +'<details class="ck-ev"><summary>How this was worked out</summary>'+(m.working||[]).map(w=>'<p class="tiny">'+esc(w)+'</p>').join('')+'<p class="tiny">Then: must-pay (bills and regular payments) → essentials → sinking funds due within 8 weeks → lifestyle → savings.</p></details>'
+       +'<button class="btn ghost" onclick="coachDo(\'budget\')">Change a limit</button><p class="tiny">Nothing changes unless you change it yourself.</p>';
+    }
   }else if(step==='allocate'){
     const a=coachAllocate();
     if(a.withheld)body=coachBox('watch',coachTag('fact')+' Held back',['Your balances are not confirmed up to date, so your spending money is not worked out. A guess could be wrong.','Sync, or check the balances, then come back to this step.'])+'<button class="btn ghost" onclick="coachDo(\'sync\')">🔄 Sync now</button>';
@@ -245,6 +308,17 @@ function coachRender(){
        +'<details class="ck-ev"><summary>How this was worked out</summary>'+a.working.map(w=>'<p class="tiny">'+esc(w)+'</p>').join('')+'</details>'
        +'<button class="btn ghost" onclick="coachDo(\'budget\')">Change a limit</button><p class="tiny">Nothing changes unless you change it yourself in Budget.</p>';
     }
+  }else if(step==='savings'&&coachMindful()){
+    const mp=s.mplan;
+    if(!mp)body=coachBox('watch',coachTag('fact')+' Not worked out',['The step before was skipped or held back, so it is not clear what can go to savings. Nothing is suggested.']);
+    else{
+      const moves=mp.moves||[];
+      s.sug=moves.map(m=>({name:m.label+' ('+m.items.map(i=>i.name.replace(/ · due.*$/,'')).join(', ')+')',amount:m.amount,ok:true}));coachSaveSession(st);
+      body=(moves.length?'<p class="fh-mean-main">Move these across this week:</p>'+moves.map((m,i)=>'<div class="fh-meaning fh-t-good"><div class="fh-mean-h">➡️ '+FinCoach.aud(m.amount)+' to '+esc(m.label)+'</div>'+m.items.map(x=>'<p class="tiny" style="text-transform:none">'+esc(x.name)+': '+FinCoach.aud(x.get)+(x.get<x.want?' (needs '+FinCoach.aud(x.want)+')':'')+'</p>').join('')+'<button class="fh-link" onclick="coachSaveAction('+i+')">I\'ll move it</button></div>').join('')
+        :coachBox('watch','',['Nothing can go to savings this week without cutting into bills or essentials. That\'s OK: next week is a fresh start.']))
+       +(mp.left>0?'<p class="f">Still free after that: <b>'+FinCoach.aud(mp.left)+'</b>. Keep it in Everyday as a cushion, or add it to a goal.</p>':'')
+       +'<p class="tiny">🧘 Savings are your Wednesday choice: nothing moves by itself. "I\'ll move it" adds a reminder; you move the money in your bank app. <button class="fh-link" onclick="setMindful(false)">Go back to planned transfers</button></p>';
+    }
   }else if(step==='savings'){
     const all=coachGoals(),goals=all.filter(g=>!g.planned),planned=all.filter(g=>g.planned),spare=Number.isFinite(s.spare)?s.spare:null;
     const plannedHtml=planned.length?'<details class="ck-ev"><summary>'+coachTag('fact')+' Already set aside by regular transfers ('+planned.length+')</summary><div class="ck-rows">'+planned.map(g=>coachRow(g.name,FinCoach.aud(g.weekly)+'/wk')).join('')+'</div><p class="tiny">These were taken off your spending money in the last step, so they are not counted again.</p></details>':'';
@@ -253,7 +327,7 @@ function coachRender(){
     else{
       const sug=FinCoach.savingsSuggestions({spare,goals});
       body='<p class="f">Spare this week: <b>'+FinCoach.aud(spare)+'</b></p><div class="ck-rows">'+sug.map((g,i)=>'<div class="ck-row"><span>'+esc(g.name)+'</span><b>'+FinCoach.aud(g.amount)+'</b></div><p class="tiny ck-why">'+(g.ok?coachTag('suggestion')+' Affordable this week. <button class="fh-link" onclick="coachSaveAction('+i+')">I will move it</button>':esc(g.why))+'</p>').join('')+'</div>'
-       +plannedHtml+'<p class="tiny">Nothing moves by itself. "I will move it" adds a reminder to your actions; you move the money in your bank app.</p>';
+       +plannedHtml+'<p class="tiny">Nothing moves by itself. "I will move it" adds a reminder to your actions; you move the money in your bank app.</p>'+(typeof setMindful==='function'?'<p class="tiny"><button class="fh-link" onclick="setMindful(true)">🧘 Decide savings each Wednesday instead of planned transfers</button></p>':'');
       s.sug=sug.map(g=>({name:g.name,amount:g.amount,ok:g.ok}));coachSaveSession(st);
     }
   }else if(step==='accountability'){
@@ -428,7 +502,7 @@ function coachBuildPlan(st,s){
   const missing=p.rows.filter(r=>r.status==='missing').map(r=>({person:r.person,amount:r.expected||null}));
   const shorts=pr.groups.filter(g=>g.have!=null&&!g.covered).map(g=>({acct:g.acct,label:g.label,amount:g.short,by:g.rows.map(r=>r.due).sort()[0]||todayISO(),from:'everyday'}));
   const bills=[];pr.groups.forEach(g=>g.rows.forEach(r=>bills.push({name:r.name,due:r.due,amount:r.amount,acct:g.acct,acctName:g.label})));
-  const transfers=(TRANSFERS||[]).filter(t=>t.active!==false&&(t.frequency==='weekly'||t.frequency==='fortnightly')&&t.fromAcct!==t.toAcct&&+t.amount>0&&acctById(t.fromAcct)&&acctById(t.toAcct)).map(t=>({name:t.name||'transfer',amount:+t.amount,from:t.fromAcct,to:t.toAcct,frequency:t.frequency,toLoan:(acctById(t.toAcct)||{}).type==='loan'}));
+  const transfers=(TRANSFERS||[]).filter(t=>t.active!==false&&(t.frequency==='weekly'||t.frequency==='fortnightly')&&t.fromAcct!==t.toAcct&&+t.amount>0&&acctById(t.fromAcct)&&acctById(t.toAcct)&&!(coachMindful()&&FinMindful.isMindful(t,ACCTS))&&!(typeof FinMindful!=='undefined'&&FinMindful.duplicateTransfers(TRANSFERS).includes(t))).map(t=>({name:t.name||'transfer',amount:+t.amount,from:t.fromAcct,to:t.toAcct,frequency:t.frequency,toLoan:(acctById(t.toAcct)||{}).type==='loan'}));
   const savings=((s&&s.sug)||[]).filter(g=>g.ok).map(g=>({name:g.name,amount:g.amount}));
   const actions=FinCoach.followUps(st,coachEvidence()).map(x=>({id:x.id,text:x.text}));
   return FinCoach.buildWeekPlan({today:todayISO(),pays:{received:p.received,missing},shorts,bills,transfers,savings,actions,spending:a.withheld?{withheld:true}:{need:a.need,spare:a.spare},at:new Date().toISOString()});

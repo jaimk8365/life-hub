@@ -35,7 +35,7 @@
  }
  const STEPS={
   daily:['data','position','leak','coach','finish'],
-  payday:['data','income','protect','allocate','savings','accountability','coach','finish'],
+  payday:['data','income','calendar','protect','allocate','savings','accountability','coach','finish'],
   month:['data','month-income','month-fixed','month-variance','month-leaks','month-habits','month-savings','month-debt','month-next','finish']
  };
  /* Overlapping reviews are merged: each step appears once, the bigger review leads, and finishing it also ticks the smaller ones. */
