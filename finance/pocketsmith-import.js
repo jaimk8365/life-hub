@@ -113,6 +113,8 @@
   function planTransactions(existing=[],snapshotTransactions=[],accountMap={},asAt=null,largeStore=false,booksStart=null){
     // Keep every existing row, including manual edits and older linked records.
     // Only previously unseen source history is subject to the import window.
+    // the books start: one date for everything, and/or a later date for an account started from its bank file
+    const bs=typeof booksStart==='string'?{all:booksStart,accts:{}}:(booksStart||{}),startOf=a=>[bs.all,(bs.accts||{})[a]].filter(validDate).sort().pop()||null;
     const anchor=validDate(asAt)?new Date(String(asAt).slice(0,10)+'T00:00:00Z'):null;
     const cutoff=anchor?new Date(anchor.getTime()-HISTORY_DAYS*86400000).toISOString().slice(0,10):null;
     const byExternal=new Map();
@@ -142,7 +144,7 @@
       }
       const match=existingMatch(existing.filter(t=>!used.has(String(t.id))&&!t.pocketsmithId),row);
       if(match&&match.id!=null){used.add(String(match.id));links.push({existingId:match.id,pocketsmithId:psId,importKey:row.importKey,sourceCategory:row.sourceCategory,sourceCat:row.sourceCat});}
-      else if(cutoff&&row.date<cutoff||validDate(booksStart)&&row.date<booksStart)outsideWindow.push(psId); // before the books start: never brought back
+      else if(cutoff&&row.date<cutoff||startOf(acct)&&row.date<startOf(acct))outsideWindow.push(psId); // before the books start: never brought back
       else additions.push(row);
     }
     const bankRows=existing.filter(t=>t.pocketsmithId!=null||String(t.importKey||'').startsWith('pocketsmith:')).length;
@@ -180,7 +182,7 @@
   }
 
   function financeModel(){
-    return evalFinance(`(()=>({accounts:ACCTS.map(a=>({...a})),transactions:TXNS.map(t=>({...t})),booksStart:(typeof load==='function'?load('fin_books_start_v1',null):null)}))()`);
+    return evalFinance(`(()=>({accounts:ACCTS.map(a=>({...a})),transactions:TXNS.map(t=>({...t})),booksStart:(typeof load==='function'?{all:load('fin_books_start_v1',null),accts:load('fin_books_start_accts_v1',{})||{}}:null)}))()`);
   }
 
   async function applyOps(snapshot,mapping,plan){

@@ -468,3 +468,30 @@ test('Fix my numbers counts an account as checked once its bank file matched: ba
   assert.equal(notOk.accounts[0].checks.find(c => c.key === 'fresh').tone, 'bad', 'payments matched but the balance did not: still to fix');
   assert.ok(read('finance/csv-check.js').includes('balanceOk:!!(r.bankClose'));
 });
+
+test('another way: "stop asking" hides a line for good, an account can start from its bank file, the feed respects it', () => {
+  const importer = require('../finance/pocketsmith-import.js');
+  const rows = [
+    { date: '2026-01-02', amount: -10, note: 'V1 01/01 SHOP', balance: 490 },
+    { date: '2026-01-05', amount: -20, note: 'SHOP B', balance: 470 },
+    { date: '2026-01-09', amount: 5, note: 'Mystery', balance: 475 },
+  ];
+  const txns = [
+    { id: 'old', acct: 'b', date: '2025-08-01', amount: -999 },
+    { id: 'x', acct: 'b', date: '2026-01-02', amount: -10 },
+    { id: 'y', acct: 'b', date: '2026-01-05', amount: -20 },
+    { id: 'z', acct: 'b', date: '2026-01-06', amount: -3, note: 'Cash' },
+  ];
+  let r = Csv.run({ rows, txns, acct: 'b', from: '2026-01-01', to: '2026-01-31', openBal: 1000 });
+  assert.deepEqual([r.onlyApp.map(t => t.id), r.onlyBank.map(x => x.note)], [['z'], ['Mystery']]);
+  assert.deepEqual(r.bankOpen, { date: '2026-01-02', balance: 500 }, 'the bank balance just before the file starts');
+  r = Csv.run({ rows, txns, acct: 'b', from: '2026-01-01', to: '2026-01-31', openBal: 1000, accepted: { ids: ['z'], rows: [Csv.rowKey(rows[2])] } });
+  assert.deepEqual([r.onlyApp.length, r.onlyBank.length, r.accepted], [0, 0, 2], 'lines she said are right are not listed again');
+  assert.equal(r.realDiff, 475 - (1000 - 999 - 10 - 20 - 3), 'they still count in the balance');
+  // per-account start date: feed rows before it are never added back
+  const src = [{ id: 1, transactionAccountId: 9, date: '2025-12-20', amount: -5, payee: 'Old' }, { id: 2, transactionAccountId: 8, date: '2025-12-20', amount: -5, payee: 'Other acct' }];
+  const plan = importer.planTransactions([], src, { 9: 'b', 8: 'e' }, '2026-11-21', false, { all: '2025-07-01', accts: { b: '2026-01-02' } });
+  assert.deepEqual([plan.additions.map(x => x.pocketsmithId), plan.outsideWindow], [['2'], ['1']]);
+  const c = read('finance/csv-check.js');
+  for (const x of ["['ok','✔️ It\\'s correct · stop asking']", "['okrow','✔️ Leave it out · stop asking']", 'csvStartAcct:startAcct', "K_ACCT_START='fin_books_start_accts_v1'", 'Show them again', 'start:startFor(a.id),accepted:accFor(a.id)']) assert.ok(c.includes(x), x);
+});

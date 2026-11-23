@@ -4,6 +4,12 @@ Newest at the top. Keep each entry to a few lines.
 
 ## Hand-off (read this first)
 
+### 23/11 9:40pm: Fixed accounts drop off: "stop asking", start an account from its bank file (PUSHED 23/11)
+- Jaimi: still not working, accounts she fixed still show; "try another way".
+- Why they stayed: (1) lines she meant to leave came back every check (only "Not sure, ask me next time" existed); (2) accounts whose payments all match still had a balance difference from before the file starts, so they never matched the bank.
+- finance/csv-check.js: new choices "✔️ It's correct · stop asking" (Needs you) and "✔️ Leave it out · stop asking" (missing from the app), remembered per account (fin_csv_accepted_v1), not listed again ("Show them again" brings them back) and counted as clean; if the balance difference is exactly those lines, it says so instead of offering an opening balance. New "📅 Start <account> from <date>" when every payment matches but older history makes the balance wrong: that account's payments before the file are deleted for good (backup file first) and the opening balance is the bank's own balance just before the file's first line (openingOf), per-account start saved (fin_books_start_accts_v1); the CSV check and the bank feed (planTransactions) both respect it. Finished accounts sort to the bottom.
+- Proof: 742 passed (new test). Preview: Bills with an old wrong line and a typed line: removed the typed line, Start Bills from 2 Oct → "✅ Matches the bank", Fix my numbers 3 → 2 (was 3) and Bills is off the list. sw lifehub-v124.
+
 ### 23/11 8:45pm: Fix my numbers counts bank-file checks (PUSHED 23/11)
 - Jaimi: fixed several accounts with the CSV check but Fix my numbers still said 9 things need fixing; once fixed, it should update and drop what's fixed.
 - Cause: the trust checks only looked at the PocketSmith feed balance. An account checked clean against a bank file (every payment and the closing balance matched) still showed "No balance from the bank yet" / "Bank balance is N days old" / "The app says X, the bank says Y", and same-day pairs the bank file confirmed still showed as double-ups.
